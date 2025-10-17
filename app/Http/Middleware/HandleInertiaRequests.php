@@ -45,6 +45,12 @@ class HandleInertiaRequests extends Middleware
                         'last_name' => Auth::user()->last_name,
                         'email' => Auth::user()->email,
                         'photo' => Auth::user()->photo,
+                        'document_type' => Auth::user()->document_type,
+                        'document_number' => Auth::user()->document_number,
+                        'phone' => Auth::user()->phone,
+                        'address' => Auth::user()->address,
+                        'birth_date' => Auth::user()->birth_date,
+                        'is_active' => $request->user()->is_active,
                         'roles' => Auth::user()->roles->pluck('name'),
                     ]
                     : null,

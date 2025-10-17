@@ -62,10 +62,10 @@ export default function Layout({ title, children }) {
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
                   className="flex items-center space-x-2 focus:outline-none"
                 >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center text-white font-bold border-2 border-green-300 shadow-md">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-bold border-2 border-blue-300 shadow-md">
                     {user?.photo ? (
                       <img
-                        src={`/storage/${user.photo}`}
+                        src={`/storage/${user?.photo}`}
                         alt="Foto de perfil"
                         className="w-10 h-10 rounded-full object-cover"
                       />
