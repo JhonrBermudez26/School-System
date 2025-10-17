@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+
+.btn-primary {
+    padding: 1rem 1.5rem;
+    background-color: #2563eb;
+    color: white;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+}
+
+.btn-primary:hover {
+    background-color: #1d4ed8;
+}
+
+.btn-secondary {
+    padding: 1rem 1.5rem;
+    background-color: #e5e7eb;
+    color: #1f2937;
+    border-radius: 0.5rem;
+    transition: background-color 0.2s;
+}
+
+.btn-secondary:hover {
+    background-color: #d1d5db;
+}
