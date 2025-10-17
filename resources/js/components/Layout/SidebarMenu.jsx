@@ -47,7 +47,7 @@ export default function SidebarMenu({ role }) {
     estudiante: [
       { icon: GraduationCap, label: "Inicio", path: "/estudiante/dashboard" },
       { icon: BookOpen, label: "Mis materias", path: "/estudiante/materias" },
-      { icon: FileText, label: "Boletín", path: "/estudiante/boletin" },
+      { icon: FileText, label: "Calificaciones", path: "/estudiante/notas" },
       { icon: UserCog, label: "Perfil académico", path: "/estudiante/perfil" },
     ],
   };

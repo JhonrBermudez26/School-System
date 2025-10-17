@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\ProfileController;
 
 // Página principal (pública)
 Route::get('/', function () {
@@ -17,17 +18,29 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 // Rutas protegidas por autenticación
 Route::middleware(['auth'])->group(function () {
     
-    // Dashboard por rol
-    Route::get('/rector/dashboard', function () {
-        return Inertia::render('Rector/Dashboard');
-    })->middleware('role:rector')->name('rector.dashboard');
+    //RECTOR
+    Route::middleware('role:rector')->prefix('rector')->group(function () {
 
-    Route::get('/coordinadora/dashboard', function () {
-        return Inertia::render('Coordinadora/Dashboard');
-    })->middleware('role:coordinadora')->name('coordinadora.dashboard');
+        // Dashboard
+        Route::get('/dashboard', function () {
+            return Inertia::render('Rector/Dashboard');
+        })->name('rector.dashboard');
+
+    });
     
-    // Rutas de Secretaria
+    //COORDINADOR
+    Route::middleware('role:coordinadora')->prefix('coordinadora')->group(function () {
+
+        // Dashboard
+        Route::get('/dashboard', function () {
+            return Inertia::render('Coordinadora/Dashboard');
+        })->name('coordinadora.dashboard');
+
+    });
+
+    //SECRETARIA
     Route::middleware('role:secretaria')->prefix('secretaria')->group(function () {
+
         // Dashboard
         Route::get('/dashboard', function () {
             return Inertia::render('Secretaria/Dashboard');
@@ -74,21 +87,42 @@ Route::middleware(['auth'])->group(function () {
         })->name('secretaria.configuracion.actualizar');
     });
 
+    //PROFESOR
+    Route::middleware('role:profesor')->prefix('profesor')->group(function () {
 
-    Route::get('/profesor/dashboard', function () {
-        return Inertia::render('Profesor/Dashboard');
-    })->middleware('role:profesor')->name('profesor.dashboard');
+        // Dashboard
+        Route::get('/dashboard', function () {
+            return Inertia::render('Profesor/Dashboard');
+        })->name('profesor.dashboard');
 
-    Route::get('/estudiante/dashboard', function () {
-        return Inertia::render('Estudiante/Dashboard');
-    })->middleware('role:estudiante')->name('estudiante.dashboard');
+    });
 
+    //ESTUDIANTE
+    Route::middleware('role:estudiante')->prefix('estudiante')->group(function () {
 
+        // Dashboard
+        Route::get('/dashboard', function () {
+            return Inertia::render('Estudiante/Dashboard');
+        })->name('estudiante.dashboard');
+
+         // Notas
+        Route::get('/notas', function () {
+            return Inertia::render('Estudiante/Notas');
+        })->name('estudiante.notas');
+
+        // Materias
+        Route::get('/materias', function () {
+            return Inertia::render('Estudiante/Materias');
+        })->name('estudiante.materias');
+    });
+
+    //GET EDITAR
     Route::get('/perfil/editar', function () {
     return inertia('Perfil/EditarPerfil');
-})->middleware(['auth'])->name('perfil.editar');
+    })->middleware(['auth'])->name('perfil.editar');
 
-Route::post('/perfil/actualizar', [ProfileController::class, 'update'])
+    //POST EDITAR
+    Route::post('/perfil/actualizar', [ProfileController::class, 'update'])
     ->middleware(['auth'])
     ->name('perfil.update');
 
