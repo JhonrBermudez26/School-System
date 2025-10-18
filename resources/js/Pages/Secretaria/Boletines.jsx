@@ -1,4 +1,3 @@
-import { Head } from '@inertiajs/react';
 import { FileText, Download, Eye, Printer, Filter, Search } from 'lucide-react';
 import { useState } from 'react';
 import Layout from '@/Components/Layout/Layout';

@@ -31,8 +31,13 @@ export default function SidebarMenu({ role }) {
     ],
     secretaria: [
       { icon: GraduationCap, label: "Inicio", path: "/secretaria/dashboard" },
+      { icon: Users, label: "Gestionar usuarios", path: "/secretaria/usuarios" },
+      { icon: UserPlus, label: "Nuevo usuario", path: "/secretaria/nuevo/usuario" },
       { icon: Users, label: "Gestionar estudiantes", path: "/secretaria/estudiantes" },
       { icon: UserPlus, label: "Nuevo estudiante", path: "/secretaria/nuevo/estudiante" },
+      { icon: Users, label: "Gestionar profesores", path: "/secretaria/profesores" },
+      { icon:ClipboardList, label:"Gestionar grados", path:"/secretaria/grados"},
+      { icon: Calendar, label: "Horarios", path: "/secretaria/horarios" },
       { icon: Calendar, label: "Periodos académicos", path: "/secretaria/periodos" },
       { icon: FileText, label: "Generar boletines", path: "/secretaria/boletines" },
       { icon: Settings, label: "Configuración", path: "/secretaria/configuracion" },
@@ -79,10 +84,9 @@ function MenuItem({ icon: Icon, label, path }) {
     <button
       onClick={handleClick}
       className={`w-full flex items-center space-x-4 px-5 py-3 rounded-lg text-left transition-all duration-200 text-[15px]
-        ${
-          isActive
-            ? "bg-blue-50 text-blue-700 border-l-4 border-blue-600 font-semibold shadow-sm"
-            : "text-gray-700 hover:bg-gray-100 hover:text-blue-600"
+        ${isActive
+          ? "bg-blue-50 text-blue-700 border-l-4 border-blue-600 font-semibold shadow-sm"
+          : "text-gray-700 hover:bg-gray-100 hover:text-blue-600"
         }`}
     >
       <Icon

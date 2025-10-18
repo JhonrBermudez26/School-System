@@ -2,9 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import { BookOpen, ClipboardList, Users, CheckSquare, Calendar, LogOut, GraduationCap } from 'lucide-react';
 import Layout from '@/Components/Layout/Layout';
 export default function Dashboard() {
-    const handleLogout = () => {
-        router.post('/logout');
-    };
+
 
     return (
         

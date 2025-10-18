@@ -77,9 +77,8 @@ export default function Layout({ title, children }) {
                     )}
                   </div>
                   <ChevronDown
-                    className={`h-4 w-4 text-gray-600 transition-transform ${
-                      showProfileMenu ? "rotate-180" : ""
-                    }`}
+                    className={`h-4 w-4 text-gray-600 transition-transform ${showProfileMenu ? "rotate-180" : ""
+                      }`}
                   />
                 </button>
 
@@ -119,20 +118,19 @@ export default function Layout({ title, children }) {
         <div className="flex flex-1 pt-16">
           {/* Sidebar */}
           <aside
-            className={`bg-white shadow-lg lg:w-72 w-64 fixed top-16 z-40 h-full transform transition-transform duration-300 ease-in-out
-            ${
-              sidebarOpen
+            className={`bg-white shadow-lg lg:w-72 w-64 fixed top-16 z-40 h-[calc(100vh-4rem)] transform transition-transform duration-300 ease-in-out overflow-y-auto
+  ${sidebarOpen
                 ? "translate-x-0"
                 : "-translate-x-full lg:translate-x-0"
-            }`}
+              }`}
           >
             <div className="p-6">
               <h2 className="text-sm sm:text-base font-semibold text-gray-500 uppercase tracking-wider mb-6">
                 Menú Principal
               </h2>
 
-              <nav className="space-y-3">
-                {/* Menú según rol */}
+              {/* Menú con scroll */}
+              <nav className="space-y-3 pb-6">
                 {user?.roles?.map((role, index) => (
                   <div key={index}>
                     <SidebarMenu role={role} />
@@ -141,7 +139,7 @@ export default function Layout({ title, children }) {
               </nav>
             </div>
           </aside>
-
+          
           {/* Contenido principal */}
           <main className="flex-1 lg:ml-72 p-6 sm:p-8 transition-all duration-300">
             {children}

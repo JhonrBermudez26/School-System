@@ -30,6 +30,7 @@ class User extends Authenticatable
         'address',
         'birth_date',
         'is_active',
+
     ];
 
     /**
@@ -56,5 +57,11 @@ class User extends Authenticatable
             'is_active' => 'boolean',
         ];
     }
+
+    public function student()
+{
+    return $this->hasOne(Student::class);
+}
+
 
 }

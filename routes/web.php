@@ -4,6 +4,8 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\Secretaria\DashboardController;
+use App\Http\Controllers\Secretaria\UsuarioController;
 
 // Página principal (pública)
 Route::get('/', function () {
@@ -42,9 +44,22 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('role:secretaria')->prefix('secretaria')->group(function () {
 
         // Dashboard
-        Route::get('/dashboard', function () {
-            return Inertia::render('Secretaria/Dashboard');
-        })->name('secretaria.dashboard');
+        Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->name('secretaria.dashboard');
+
+        // USUARIOS
+         Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
+    Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
+    Route::delete('/usuarios/{id}', [UsuarioController::class, 'destroy'])->name('usuarios.destroy');
+    Route::put('/usuarios/{id}/toggle', [UsuarioController::class, 'toggle'])->name('usuarios.toggle');
+
+        Route::get('/nuevo/usuario', function () {
+            return Inertia::render('Secretaria/NuevoUsuario');
+        })->name('secretaria.nuevo.usuario');
+
+        Route::post('/nuevo/usuario/crear', function () {
+            // Lógica para crear usuario
+        })->name('secretaria.nuevo.usuario.crear');
 
         // Estudiantes
         Route::get('/estudiantes', function () {
@@ -54,10 +69,25 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/nuevo/estudiante', function () {
             return Inertia::render('Secretaria/NuevoEstudiante');
         })->name('secretaria.nuevo.estudiante');
-        
+
         Route::post('/nuevo/estudiante/crear', function () {
             // Lógica para crear estudiante
         })->name('secretaria.nuevo.estudiante.crear');
+
+        // Profesores
+        Route::get('/profesores', function () {
+            return Inertia::render('Secretaria/Profesores');
+        })->name('secretaria.profesores');
+
+         // Grados
+        Route::get('/grados', function () {
+            return Inertia::render('Secretaria/Grados');
+        })->name('secretaria.grados');
+
+         // Horarios
+        Route::get('/horarios', function () {
+            return Inertia::render('Secretaria/Horarios');
+        })->name('secretaria.horarios');
 
         // Periodos
         Route::get('/periodos', function () {
