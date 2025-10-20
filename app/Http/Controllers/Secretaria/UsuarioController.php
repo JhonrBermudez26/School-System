@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
 
 class UsuarioController extends Controller
 {
@@ -53,6 +54,42 @@ class UsuarioController extends Controller
         $user->assignRole($validated['role']);
 
         return redirect()->route('usuarios.index')->with('success', '✅ Usuario creado correctamente');
+    }
+
+    public function update(Request $request, $id)
+    {
+        $user = User::findOrFail($id);
+
+        $validated = $request->validate([
+            'name'      => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'email'     => ['required', 'email', Rule::unique('users')->ignore($user->id)],
+            'role'      => 'required|string',
+            'password'  => 'nullable|min:6',
+            'is_active' => 'boolean',
+        ]);
+
+        // Actualizar datos básicos
+        $user->update([
+            'name'      => $validated['name'],
+            'last_name' => $validated['last_name'],
+            'email'     => $validated['email'],
+            'is_active' => $validated['is_active'] ?? $user->is_active,
+        ]);
+
+        // Actualizar contraseña solo si se proporciona
+        if (!empty($validated['password'])) {
+            $user->update([
+                'password' => Hash::make($validated['password'])
+            ]);
+        }
+
+        // Actualizar rol si cambió
+        if ($user->roles->first()->name !== $validated['role']) {
+            $user->syncRoles([$validated['role']]);
+        }
+
+        return back()->with('success', '✅ Usuario actualizado correctamente');
     }
 
     public function destroy($id)

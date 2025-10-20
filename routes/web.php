@@ -48,18 +48,11 @@ Route::middleware(['auth'])->group(function () {
         ->name('secretaria.dashboard');
 
         // USUARIOS
-         Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
-    Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
-    Route::delete('/usuarios/{id}', [UsuarioController::class, 'destroy'])->name('usuarios.destroy');
-    Route::put('/usuarios/{id}/toggle', [UsuarioController::class, 'toggle'])->name('usuarios.toggle');
-
-        Route::get('/nuevo/usuario', function () {
-            return Inertia::render('Secretaria/NuevoUsuario');
-        })->name('secretaria.nuevo.usuario');
-
-        Route::post('/nuevo/usuario/crear', function () {
-            // Lógica para crear usuario
-        })->name('secretaria.nuevo.usuario.crear');
+       Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
+        Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
+        Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])->name('usuarios.update');
+        Route::delete('/usuarios/{id}', [UsuarioController::class, 'destroy'])->name('usuarios.destroy');
+        Route::put('/usuarios/{id}/toggle', [UsuarioController::class, 'toggle'])->name('usuarios.toggle');
 
         // Estudiantes
         Route::get('/estudiantes', function () {
