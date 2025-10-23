@@ -6,6 +6,8 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Secretaria\DashboardController;
 use App\Http\Controllers\Secretaria\UsuarioController;
+use App\Http\Controllers\Secretaria\StudentController;
+use App\Http\Controllers\Secretaria\GrupoController;
 
 // Página principal (pública)
 Route::get('/', function () {
@@ -55,27 +57,39 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/usuarios/{id}/toggle', [UsuarioController::class, 'toggle'])->name('usuarios.toggle');
 
         // Estudiantes
-        Route::get('/estudiantes', function () {
-            return Inertia::render('Secretaria/Estudiantes');
-        })->name('secretaria.estudiantes');
-        
-        Route::get('/nuevo/estudiante', function () {
-            return Inertia::render('Secretaria/NuevoEstudiante');
-        })->name('secretaria.nuevo.estudiante');
+       Route::get('/estudiantes', [StudentController::class, 'index'])->name('secretaria.estudiantes');
+        Route::put('/estudiantes/{id}', [StudentController::class, 'update'])->name('estudiantes.update');
+        Route::put('/estudiantes/{id}/toggle', [StudentController::class, 'toggle'])->name('estudiantes.toggle');
+        Route::get('/estudiantes/export/excel', [StudentController::class, 'exportExcel'])->name('estudiantes.export.excel');
+        Route::get('/estudiantes/export/pdf', [StudentController::class, 'exportPDF'])->name('estudiantes.export.pdf');
 
-        Route::post('/nuevo/estudiante/crear', function () {
-            // Lógica para crear estudiante
-        })->name('secretaria.nuevo.estudiante.crear');
 
-        // Profesores
-        Route::get('/profesores', function () {
-            return Inertia::render('Secretaria/Profesores');
-        })->name('secretaria.profesores');
 
-         // Grados
-        Route::get('/grados', function () {
-            return Inertia::render('Secretaria/Grados');
-        })->name('secretaria.grados');
+        // PROFESORES
+    Route::get('/profesores', [App\Http\Controllers\Secretaria\TeacherController::class, 'index'])
+        ->name('secretaria.profesores');
+    Route::put('/profesores/{id}', [App\Http\Controllers\Secretaria\TeacherController::class, 'update'])
+        ->name('profesores.update');
+    Route::put('/profesores/{id}/toggle', [App\Http\Controllers\Secretaria\TeacherController::class, 'toggle'])
+        ->name('profesores.toggle');
+
+    // ASIGNATURAS
+    Route::get('/asignaturas', [App\Http\Controllers\Secretaria\SubjectController::class, 'index'])
+        ->name('secretaria.asignaturas');
+    Route::post('/asignaturas', [App\Http\Controllers\Secretaria\SubjectController::class, 'store'])
+        ->name('asignaturas.store');
+    Route::put('/asignaturas/{id}', [App\Http\Controllers\Secretaria\SubjectController::class, 'update'])
+        ->name('asignaturas.update');
+    Route::delete('/asignaturas/{id}', [App\Http\Controllers\Secretaria\SubjectController::class, 'destroy'])
+        ->name('asignaturas.destroy');
+    Route::put('/asignaturas/{id}/toggle', [App\Http\Controllers\Secretaria\SubjectController::class, 'toggle'])
+        ->name('asignaturas.toggle');
+
+         // Grupos
+        Route::get('/grupos', [GrupoController::class, 'index'])->name('secretaria.grupos');
+        Route::post('/grupos', [GrupoController::class, 'store'])->name('grupos.store');
+        Route::put('/grupos/{id}', [GrupoController::class, 'update'])->name('grupos.update');
+        Route::delete('/grupos/{id}', [GrupoController::class, 'destroy'])->name('grupos.destroy');
 
          // Horarios
         Route::get('/horarios', function () {

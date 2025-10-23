@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('boletines', function (Blueprint $table) {
             $table->id();
-            $table->unsignedBigInteger('student_id')->nullable();
+            $table->unsignedBigInteger('user_id')->nullable();
             $table->unsignedBigInteger('period_id')->nullable();
             $table->string('status')->default('generado');
             $table->timestamps();

@@ -194,17 +194,17 @@ export default function Usuarios() {
                         {/* Email */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Correo Electrónico *
+                                Correo
                             </label>
                             <input
-                                type="email"
-                                value={newUserData.email}
-                                onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                placeholder="correo@ejemplo.com"
-                                required
-                            />
-                            {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
+                            type="email"
+                            value={newUserData.email}
+                            onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            placeholder="correo@ejemplo.com"
+                            required
+                        />
+                        {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
                         </div>
 
                         {/* Contraseña */}
@@ -424,6 +424,9 @@ export default function Usuarios() {
                                     Correo
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Contraseña
+                                </th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Documento
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -502,6 +505,26 @@ export default function Usuarios() {
                                                 />
                                             ) : (
                                                 <div className="break-all">{u.email}</div>
+                                            )}
+                                        </td>
+
+                                        {/* Contraseña */}
+                                        <td className="px-6 py-4 text-sm text-gray-500">
+                                            {editingUser === u.id ? (
+                                                <input
+                                                    type="password"
+                                                    value={editData.password}
+                                                    onChange={(e) =>
+                                                        setEditData({
+                                                            ...editData,
+                                                            password: e.target.value,
+                                                        })
+                                                    }
+                                                    className="border border-gray-300 rounded-lg px-3 py-1 w-full focus:ring-2 focus:ring-green-500 focus:border-transparent text-sm"
+                                                    placeholder="Nueva contraseña"
+                                                />
+                                            ) : (
+                                                <span className="text-gray-500">******</span>
                                             )}
                                         </td>
 
@@ -602,7 +625,7 @@ export default function Usuarios() {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
+                                    <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
                                         No se encontraron usuarios
                                     </td>
                                 </tr>

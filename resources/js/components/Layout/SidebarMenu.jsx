@@ -11,6 +11,7 @@ import {
   UserCheck,
   UserCog,
   ChartPie,
+  Book,
 } from "lucide-react";
 
 export default function SidebarMenu({ role }) {
@@ -32,11 +33,10 @@ export default function SidebarMenu({ role }) {
     secretaria: [
       { icon: GraduationCap, label: "Inicio", path: "/secretaria/dashboard" },
       { icon: Users, label: "Gestionar usuarios", path: "/secretaria/usuarios" },
-      { icon: UserPlus, label: "Nuevo usuario", path: "/secretaria/nuevo/usuario" },
       { icon: Users, label: "Gestionar estudiantes", path: "/secretaria/estudiantes" },
-      { icon: UserPlus, label: "Nuevo estudiante", path: "/secretaria/nuevo/estudiante" },
       { icon: Users, label: "Gestionar profesores", path: "/secretaria/profesores" },
-      { icon:ClipboardList, label:"Gestionar grados", path:"/secretaria/grados"},
+      { icon:Book, label:"Gestionar Asignaturas", path:"/secretaria/asignaturas"},
+      { icon:ClipboardList, label:"Gestionar Grupos", path:"/secretaria/grupos"},
       { icon: Calendar, label: "Horarios", path: "/secretaria/horarios" },
       { icon: Calendar, label: "Periodos académicos", path: "/secretaria/periodos" },
       { icon: FileText, label: "Generar boletines", path: "/secretaria/boletines" },

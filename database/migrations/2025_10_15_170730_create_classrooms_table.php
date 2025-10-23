@@ -9,6 +9,7 @@ return new class extends Migration {
         Schema::create('classrooms', function (Blueprint $table) {
             $table->id();
             $table->string('name'); // ej: 3A, 3B
+             $table->string('group_name')->nullable();
             $table->foreignId('grade_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('teacher_id')->nullable()->constrained()->nullOnDelete(); // director de grupo
             $table->timestamps();

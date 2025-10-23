@@ -9,22 +9,21 @@ return new class extends Migration
     /**
      * Run the migrations.
      */
-    public function up(): void
+   public function up(): void
 {
-    Schema::create('grades', function (Blueprint $table) {
+    Schema::create('groups', function (Blueprint $table) {
         $table->id();
-        $table->string('nombre'); // Ej: "Décimo", "Undécimo"
-        $table->text('descripcion')->nullable();
+        $table->foreignId('grade_id')->constrained()->onDelete('cascade');
+        $table->foreignId('course_id')->constrained()->onDelete('cascade');
+        $table->string('nombre')->unique(); // Ej: "10A", "11B"
         $table->timestamps();
     });
 }
-
-
     /**
      * Reverse the migrations.
      */
     public function down(): void
     {
-        Schema::dropIfExists('grades');
+        Schema::dropIfExists('groups');
     }
 };
