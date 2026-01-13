@@ -10,14 +10,33 @@ class Schedule extends Model
     use HasFactory;
 
     protected $fillable = [
-        'grade_id', 'teacher_id', 'subject', 'day_of_week', 'start_time', 'end_time'
+        'group_id',
+        'subject_id',
+        'user_id',
+        'day_of_week',
+        'start_time',
+        'end_time',
+        'classroom',
     ];
 
-    public function grade() {
-        return $this->belongsTo(Grade::class);
+    protected $casts = [
+        'day_of_week' => 'integer',
+        'start_time' => 'datetime:H:i',
+        'end_time' => 'datetime:H:i',
+    ];
+
+    public function group()
+    {
+        return $this->belongsTo(Group::class);
     }
 
-    public function teacher() {
-        return $this->belongsTo(Teacher::class);
+    public function subject()
+    {
+        return $this->belongsTo(Subject::class);
+    }
+
+    public function teacher()
+    {
+        return $this->belongsTo(User::class, 'user_id');
     }
 }

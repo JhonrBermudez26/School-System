@@ -1,5 +1,4 @@
 <?php
-// database/seeders/DemoDataSeeder.php
 namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
@@ -13,18 +12,13 @@ use Illuminate\Support\Facades\DB;
 
 class DemoDataSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     */
     public function run(): void
     {
         // ============================================
-        // 1. CREAR USUARIOS ADMINISTRATIVOS
+        // 1. USUARIOS ADMINISTRATIVOS
         // ============================================
-        
-        $this->command->info('📋 Creando usuarios administrativos...');
-        
-        // Rector
+        $this->command->info('Creando usuarios administrativos...');
+
         $rector = User::create([
             'name' => 'Carlos',
             'last_name' => 'Mendoza Ruiz',
@@ -38,7 +32,6 @@ class DemoDataSeeder extends Seeder
         ]);
         $rector->assignRole('rector');
 
-        // Coordinadora
         $coordinadora = User::create([
             'name' => 'María',
             'last_name' => 'González Castro',
@@ -52,7 +45,6 @@ class DemoDataSeeder extends Seeder
         ]);
         $coordinadora->assignRole('coordinadora');
 
-        // Secretarias
         $secretaria1 = User::create([
             'name' => 'Ana',
             'last_name' => 'Rodríguez López',
@@ -79,13 +71,12 @@ class DemoDataSeeder extends Seeder
         ]);
         $secretaria2->assignRole('secretaria');
 
-        $this->command->info('✅ Usuarios administrativos creados');
+        $this->command->info('Usuarios administrativos creados');
 
         // ============================================
         // 2. CREAR GRADOS Y CURSOS
         // ============================================
-        
-        $this->command->info('📚 Creando grados y cursos...');
+        $this->command->info('Creando grados y cursos...');
 
         $grados = [
             ['nombre' => '6°', 'descripcion' => 'Sexto grado'],
@@ -110,13 +101,12 @@ class DemoDataSeeder extends Seeder
             Course::create($curso);
         }
 
-        $this->command->info('✅ Grados y cursos creados');
+        $this->command->info('Grados y cursos creados');
 
         // ============================================
-        // 3. CREAR GRUPOS (COMBINACIÓN GRADO-CURSO)
+        // 3. CREAR GRUPOS (GRADO + CURSO)
         // ============================================
-        
-        $this->command->info('👥 Creando grupos...');
+        $this->command->info('Creando grupos...');
 
         $allGrades = Grade::all();
         $allCourses = Course::all();
@@ -126,18 +116,17 @@ class DemoDataSeeder extends Seeder
                 Group::create([
                     'grade_id' => $grade->id,
                     'course_id' => $course->id,
-                    'nombre' => str_replace('°', '', $grade->nombre) . $course->nombre,
+                    'nombre' => str_replace('°','',$grade->nombre) . $course->nombre,
                 ]);
             }
         }
 
-        $this->command->info('✅ Grupos creados: ' . Group::count());
+        $this->command->info('Grupos creados: ' . Group::count());
 
         // ============================================
-        // 4. CREAR ASIGNATURAS
+        // 4. ASIGNATURAS
         // ============================================
-        
-        $this->command->info('📖 Creando asignaturas...');
+        $this->command->info('Creando asignaturas...');
 
         $asignaturas = [
             ['name' => 'Matemáticas', 'code' => 'MAT-01', 'description' => 'Álgebra, geometría y cálculo', 'hours_per_week' => 5],
@@ -145,7 +134,7 @@ class DemoDataSeeder extends Seeder
             ['name' => 'Inglés', 'code' => 'ING-01', 'description' => 'Lengua extranjera', 'hours_per_week' => 3],
             ['name' => 'Ciencias Naturales', 'code' => 'CIE-01', 'description' => 'Biología, química y física', 'hours_per_week' => 4],
             ['name' => 'Ciencias Sociales', 'code' => 'SOC-01', 'description' => 'Historia y geografía', 'hours_per_week' => 3],
-            ['name' => 'Educación Física', 'code' => 'EDF-01', 'description' => 'Deporte y actividad física', 'hours_per_week' => 2],
+            ['name' => 'Educación Física', 'code' => 'EDF-01', 'description' => 'Actividad física', 'hours_per_week' => 2],
             ['name' => 'Artes', 'code' => 'ART-01', 'description' => 'Expresión artística', 'hours_per_week' => 2],
             ['name' => 'Tecnología', 'code' => 'TEC-01', 'description' => 'Informática y tecnología', 'hours_per_week' => 2],
             ['name' => 'Ética y Valores', 'code' => 'ETI-01', 'description' => 'Formación en valores', 'hours_per_week' => 2],
@@ -156,13 +145,12 @@ class DemoDataSeeder extends Seeder
             Subject::create($asignatura);
         }
 
-        $this->command->info('✅ Asignaturas creadas: ' . Subject::count());
+        $this->command->info('Asignaturas creadas: ' . Subject::count());
 
         // ============================================
         // 5. CREAR PROFESORES
         // ============================================
-        
-        $this->command->info('👨‍🏫 Creando profesores...');
+        $this->command->info('Creando profesores...');
 
         $profesores = [
             ['name' => 'Juan', 'last_name' => 'Pérez Martínez', 'email' => 'juan.perez@schoolsystem.com', 'document_number' => '1001234567', 'phone' => '3101234567'],
@@ -178,52 +166,48 @@ class DemoDataSeeder extends Seeder
         ];
 
         $profesoresCreados = [];
-        foreach ($profesores as $profesor) {
-            $user = User::create([
-                'name' => $profesor['name'],
-                'last_name' => $profesor['last_name'],
-                'email' => $profesor['email'],
+        foreach ($profesores as $p) {
+            $u = User::create([
+                'name' => $p['name'],
+                'last_name' => $p['last_name'],
+                'email' => $p['email'],
                 'password' => Hash::make('password'),
                 'document_type' => 'CC',
-                'document_number' => $profesor['document_number'],
-                'phone' => $profesor['phone'],
+                'document_number' => $p['document_number'],
+                'phone' => $p['phone'],
                 'address' => 'Bogotá, Colombia',
                 'is_active' => true,
             ]);
-            $user->assignRole('profesor');
-            $profesoresCreados[] = $user;
+            $u->assignRole('profesor');
+            $profesoresCreados[] = $u;
         }
 
-        $this->command->info('✅ Profesores creados: ' . count($profesoresCreados));
+        $this->command->info('Profesores creados: '.count($profesoresCreados));
 
         // ============================================
         // 6. ASIGNAR ASIGNATURAS A PROFESORES
         // ============================================
-        
-        $this->command->info('🔗 Asignando asignaturas a profesores...');
+        $this->command->info('Asignando asignaturas a profesores...');
 
-        $allSubjects = Subject::all();
-        $allGroups = Group::all();
-
-        // Asignar cada asignatura a un profesor específico
         $asignacionesPorProfesor = [
-            0 => [1],      // Juan -> Matemáticas
-            1 => [2],      // Laura -> Español
-            2 => [3],      // Roberto -> Inglés
-            3 => [4],      // Carmen -> Ciencias Naturales
-            4 => [5],      // Miguel -> Ciencias Sociales
-            5 => [6],      // Diana -> Educación Física
-            6 => [7],      // Fernando -> Artes
-            7 => [8],      // Mónica -> Tecnología
-            8 => [9],      // Andrés -> Ética y Valores
-            9 => [10],     // Claudia -> Religión
+            0 => [1],
+            1 => [2],
+            2 => [3],
+            3 => [4],
+            4 => [5],
+            5 => [6],
+            6 => [7],
+            7 => [8],
+            8 => [9],
+            9 => [10],
         ];
 
+        $allGroups = Group::all();
+
         foreach ($profesoresCreados as $index => $profesor) {
-            $asignaturaIds = $asignacionesPorProfesor[$index] ?? [];
-            
-            foreach ($asignaturaIds as $subjectId) {
-                // Asignar a todos los grupos (6°A hasta 11°C)
+            $subjectIds = $asignacionesPorProfesor[$index] ?? [];
+
+            foreach ($subjectIds as $subjectId) {
                 foreach ($allGroups as $group) {
                     DB::table('subject_group')->insert([
                         'user_id' => $profesor->id,
@@ -236,13 +220,12 @@ class DemoDataSeeder extends Seeder
             }
         }
 
-        $this->command->info('✅ Asignaciones completadas');
+        $this->command->info('Asignaciones completadas');
 
         // ============================================
         // 7. CREAR ESTUDIANTES
         // ============================================
-        
-        $this->command->info('👨‍🎓 Creando estudiantes...');
+        $this->command->info('Creando estudiantes...');
 
         $nombresEstudiantes = [
             ['name' => 'Pedro', 'last_name' => 'López García'],
@@ -278,91 +261,71 @@ class DemoDataSeeder extends Seeder
         ];
 
         $estudiantesCreados = [];
+        $birthYears = [2008,2009,2010,2011,2012,2013];
         $documentCounter = 2000000000;
-        $birthYears = [2008, 2009, 2010, 2011, 2012, 2013]; // Para grados 6° a 11°
 
-        foreach ($nombresEstudiantes as $estudiante) {
+        foreach ($nombresEstudiantes as $est) {
             $birthYear = $birthYears[array_rand($birthYears)];
-            $birthMonth = rand(1, 12);
-            $birthDay = rand(1, 28);
 
-            $user = User::create([
-                'name' => $estudiante['name'],
-                'last_name' => $estudiante['last_name'],
-                'email' => strtolower($estudiante['name'] . '.' . explode(' ', $estudiante['last_name'])[0]) . '@estudiantes.com',
+            $u = User::create([
+                'name' => $est['name'],
+                'last_name' => $est['last_name'],
+                'email' => strtolower($est['name'] . '.' . explode(' ',$est['last_name'])[0]).'@estudiantes.com',
                 'password' => Hash::make('password'),
                 'document_type' => 'TI',
                 'document_number' => (string)$documentCounter++,
-                'phone' => '310' . rand(1000000, 9999999),
+                'phone' => '310'.rand(1000000,9999999),
                 'address' => 'Bogotá, Colombia',
-                'birth_date' => sprintf('%04d-%02d-%02d', $birthYear, $birthMonth, $birthDay),
+                'birth_date' => $birthYear.'-'.rand(1,12).'-'.rand(1,28),
                 'is_active' => true,
             ]);
-            $user->assignRole('estudiante');
-            $estudiantesCreados[] = $user;
+
+            $u->assignRole('estudiante');
+            $estudiantesCreados[] = $u;
         }
 
-        $this->command->info('✅ Estudiantes creados: ' . count($estudiantesCreados));
+        $this->command->info('Estudiantes creados: '.count($estudiantesCreados));
 
         // ============================================
         // 8. ASIGNAR ESTUDIANTES A GRUPOS
         // ============================================
-        
-        $this->command->info('🎒 Asignando estudiantes a grupos...');
+        $this->command->info('Asignando estudiantes a grupos...');
 
-        // Distribuir estudiantes equitativamente entre grupos
-        $gruposArray = $allGroups->toArray();
-        $estudiantesPorGrupo = ceil(count($estudiantesCreados) / count($gruposArray));
+        $groupsArray = $allGroups->toArray();
+        $studentsPerGroup = ceil(count($estudiantesCreados) / count($groupsArray));
 
         $grupoIndex = 0;
-        $contadorEnGrupo = 0;
+        $countInGroup = 0;
 
-        foreach ($estudiantesCreados as $estudiante) {
-            if ($contadorEnGrupo >= $estudiantesPorGrupo && $grupoIndex < count($gruposArray) - 1) {
+        foreach ($estudiantesCreados as $est) {
+            if ($countInGroup >= $studentsPerGroup && $grupoIndex < count($groupsArray) - 1) {
                 $grupoIndex++;
-                $contadorEnGrupo = 0;
+                $countInGroup = 0;
             }
 
             DB::table('group_user')->insert([
-                'user_id' => $estudiante->id,
-                'group_id' => $gruposArray[$grupoIndex]['id'],
+                'user_id' => $est->id,
+                'group_id' => $groupsArray[$grupoIndex]['id'],
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
 
-            $contadorEnGrupo++;
+            $countInGroup++;
         }
 
-        $this->command->info('✅ Estudiantes asignados a grupos');
+        $this->command->info('Estudiantes asignados a grupos');
 
         // ============================================
-        // RESUMEN FINAL
+        // RESUMEN
         // ============================================
-        
-        $this->command->info('');
-        $this->command->info('══════════════════════════════════════════════════════');
-        $this->command->info('✅ DATOS DE DEMOSTRACIÓN CREADOS EXITOSAMENTE');
-        $this->command->info('══════════════════════════════════════════════════════');
-        $this->command->info('');
-        $this->command->info('📊 RESUMEN:');
-        $this->command->info('  • Rector: 1');
-        $this->command->info('  • Coordinadora: 1');
-        $this->command->info('  • Secretarias: 2');
-        $this->command->info('  • Profesores: ' . count($profesoresCreados));
-        $this->command->info('  • Estudiantes: ' . count($estudiantesCreados));
-        $this->command->info('  • Grados: ' . Grade::count());
-        $this->command->info('  • Cursos: ' . Course::count());
-        $this->command->info('  • Grupos: ' . Group::count());
-        $this->command->info('  • Asignaturas: ' . Subject::count());
-        $this->command->info('');
-        $this->command->info('🔐 CREDENCIALES DE ACCESO:');
-        $this->command->info('  Rector:        rector@schoolsystem.com / password');
-        $this->command->info('  Coordinadora:  coordinadora@schoolsystem.com / password');
-        $this->command->info('  Secretaria 1:  secretaria@schoolsystem.com / password');
-        $this->command->info('  Secretaria 2:  secretaria2@schoolsystem.com / password');
-        $this->command->info('  Profesor:      juan.perez@schoolsystem.com / password');
-        $this->command->info('  Estudiante:    pedro.lopez@estudiantes.com / password');
-        $this->command->info('');
-        $this->command->info('══════════════════════════════════════════════════════');
+        $this->command->info('===================== RESUMEN =====================');
+        $this->command->info('Usuarios admin creados');
+        $this->command->info('Profesores: '.count($profesoresCreados));
+        $this->command->info('Estudiantes: '.count($estudiantesCreados));
+        $this->command->info('Grados: '.Grade::count());
+        $this->command->info('Cursos: '.Course::count());
+        $this->command->info('Grupos: '.Group::count());
+        $this->command->info('Asignaturas: '.Subject::count());
+        $this->command->info('===================================================');
     }
 }

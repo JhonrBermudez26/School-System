@@ -8,6 +8,7 @@ use App\Http\Controllers\Secretaria\DashboardController;
 use App\Http\Controllers\Secretaria\UsuarioController;
 use App\Http\Controllers\Secretaria\StudentController;
 use App\Http\Controllers\Secretaria\GrupoController;
+use App\Http\Controllers\Secretaria\ScheduleController;
 
 // Página principal (pública)
 Route::get('/', function () {
@@ -92,9 +93,11 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/grupos/{id}', [GrupoController::class, 'destroy'])->name('grupos.destroy');
 
          // Horarios
-        Route::get('/horarios', function () {
-            return Inertia::render('Secretaria/Horarios');
-        })->name('secretaria.horarios');
+        Route::get('/horarios', [ScheduleController::class, 'index'])->name('secretaria.horarios');
+        Route::post('/horarios', [ScheduleController::class, 'store'])->name('horarios.store');
+        Route::put('/horarios/{id}', [ScheduleController::class, 'update'])->name('horarios.update');
+        Route::delete('/horarios/{id}', [ScheduleController::class, 'destroy'])->name('horarios.destroy');
+        Route::post('/horarios/generar', [ScheduleController::class, 'generate'])->name('horarios.generate');
 
         // Periodos
         Route::get('/periodos', function () {
