@@ -12,11 +12,13 @@ import {
 import SidebarMenu from "./SidebarMenu";
 
 export default function Layout({ title, children }) {
-  const { auth } = usePage().props;
+  const { auth, app } = usePage().props;
   const currentUrl = usePage().url;
   const user = auth?.user;
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const appName = app?.name;
+  const appFullName = app?.fullName || appName;
 
   const handleLogout = () => router.post("/logout");
   const handleEditProfile = () => router.visit("/perfil/editar");
@@ -27,7 +29,7 @@ export default function Layout({ title, children }) {
 
   return (
     <>
-      <Head title={title} />
+      <Head title={title ? `${title} | ${appName}` : appFullName} />
       <div className="min-h-screen bg-gray-100 flex flex-col">
         {/* Navbar */}
         <nav className="bg-white shadow-md fixed w-full top-0 z-50">
@@ -40,7 +42,7 @@ export default function Layout({ title, children }) {
               >
                 <GraduationCap className="h-8 w-8 text-green-600" />
                 <span className="ml-2 text-lg sm:text-xl font-bold text-gray-900">
-                  Colegio San Martín
+                  {appName}
                 </span>
               </div>
 

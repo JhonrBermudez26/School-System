@@ -7,7 +7,7 @@ export default function Dashboard() {
   const user = auth?.user;
 
   return (
-    <Layout title="Dashboard - Secretaría">
+    <Layout title="Dashboard">
       {/* Encabezado */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900">
@@ -73,7 +73,12 @@ export default function Dashboard() {
               <p className="text-2xl font-bold text-gray-900">
                 {stats.periodoActual ?? 'No definido'}
               </p>
-              <p className="text-purple-600 text-sm mt-2">En curso</p>
+              <p className="text-gray-600 text-sm mt-2">
+                {stats.periodoActualInicio && stats.periodoActualFin
+                  ? `${stats.periodoActualInicio} a ${stats.periodoActualFin}`
+                  : 'Fechas no definidas'}
+              </p>
+              <p className="text-purple-600 text-sm mt-1">En curso</p>
             </div>
             <div className="bg-purple-100 p-3 rounded-lg">
               <Calendar className="h-8 w-8 text-purple-600" />

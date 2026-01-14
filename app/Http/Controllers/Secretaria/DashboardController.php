@@ -25,8 +25,14 @@ class DashboardController extends Controller
                 ->whereYear('created_at', Carbon::now()->year)
                 ->count();
 
-            // Periodo académico actual (último registrado o actual)
-            $periodoActual = AcademicPeriod::latest('id')->value('name') ?? 'No definido';
+            // Periodo académico actual por rango de fechas
+            $hoy = Carbon::now();
+            $periodo = AcademicPeriod::where('start_date', '<=', $hoy)
+                ->where('end_date', '>=', $hoy)
+                ->first();
+            $periodoActual = $periodo->name ?? 'No definido';
+            $periodoActualInicio = optional($periodo?->start_date)->format('Y-m-d');
+            $periodoActualFin = optional($periodo?->end_date)->format('Y-m-d');
 
             // Cantidad de boletines generados
             $boletines = Boletin::count() ?? 0;
@@ -77,6 +83,8 @@ class DashboardController extends Controller
                     'totalEstudiantes' => $totalEstudiantes,
                     'nuevosEsteMes' => $nuevosEsteMes,
                     'periodoActual' => $periodoActual,
+                    'periodoActualInicio' => $periodoActualInicio,
+                    'periodoActualFin' => $periodoActualFin,
                     'boletines' => $boletines,
                     'totalGrupos' => $totalGrupos,
                     'estudiantesSinGrupo' => $estudiantesSinGrupo,

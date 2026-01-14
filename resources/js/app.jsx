@@ -6,7 +6,8 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 const appName = import.meta.env.VITE_APP_NAME || 'School System';
 
 createInertiaApp({
-    title: (title) => `${title} - ${appName}`,
+    // Let each page (or our Layout) compose the full title; do not append a global suffix
+    title: (title) => title,
     resolve: (name) =>
         resolvePageComponent(
             `./Pages/${name}.jsx`,

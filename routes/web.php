@@ -9,6 +9,8 @@ use App\Http\Controllers\Secretaria\UsuarioController;
 use App\Http\Controllers\Secretaria\StudentController;
 use App\Http\Controllers\Secretaria\GrupoController;
 use App\Http\Controllers\Secretaria\ScheduleController;
+use App\Http\Controllers\Secretaria\PeriodController;
+use App\Http\Controllers\Secretaria\SchoolSettingController;
 
 // Página principal (pública)
 Route::get('/', function () {
@@ -100,17 +102,20 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/horarios/generar', [ScheduleController::class, 'generate'])->name('horarios.generate');
 
         // Periodos
-        Route::get('/periodos', function () {
-            return Inertia::render('Secretaria/Periodos');
-        })->name('secretaria.periodos');
-        
-        Route::post('/periodos/crear', function () {
-            // Lógica para crear periodo
-        })->name('secretaria.periodos.crear');
-        
-        Route::put('/periodos/{id}', function ($id) {
-            // Lógica para actualizar periodo
-        })->name('secretaria.periodos.actualizar');
+        Route::get('/periodos', [PeriodController::class, 'index'])
+            ->name('secretaria.periodos');
+        Route::post('/periodos', [PeriodController::class, 'store'])
+            ->name('secretaria.periodos.crear');
+        // Alias temporal para compatibilidad con frontend actual
+        Route::post('/periodos/crear', [PeriodController::class, 'store']);
+        Route::put('/periodos/{id}', [PeriodController::class, 'update'])
+            ->name('secretaria.periodos.actualizar');
+        Route::delete('/periodos/{id}', [PeriodController::class, 'destroy'])
+            ->name('secretaria.periodos.eliminar');
+        Route::patch('/periodos/{id}/toggle', [PeriodController::class, 'toggle'])
+            ->name('secretaria.periodos.toggle');
+        Route::post('/periodos/verify-password', [PeriodController::class, 'verifyPassword'])
+    ->name('secretaria.periodos.verify');
 
         // Boletines
         Route::get('/boletines', function () {
@@ -118,13 +123,13 @@ Route::middleware(['auth'])->group(function () {
         })->name('secretaria.boletines');
 
         // Configuración
-        Route::get('/configuracion', function () {
-            return Inertia::render('Secretaria/Configuracion');
-        })->name('secretaria.configuracion');
-        
-        Route::post('/configuracion/actualizar', function () {
-            // Lógica para actualizar configuración
-        })->name('secretaria.configuracion.actualizar');
+        // Dentro del grupo de secretaria
+        Route::get('/configuracion', [SchoolSettingController::class, 'index'])
+            ->name('secretaria.configuracion');
+        Route::post('/configuracion', [SchoolSettingController::class, 'update'])
+            ->name('secretaria.configuracion.actualizar');
+        Route::delete('/configuracion/logo', [SchoolSettingController::class, 'deleteLogo'])
+            ->name('secretaria.configuracion.deleteLogo');
     });
 
     //PROFESOR

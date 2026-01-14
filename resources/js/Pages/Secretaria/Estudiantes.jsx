@@ -118,9 +118,6 @@ export default function Estudiantes() {
 
     return (
         <Layout title="Gestionar Estudiantes">
-            <div>
-                <Head title="Gestionar Estudiantes" />
-
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                     <div>
@@ -432,7 +429,6 @@ export default function Estudiantes() {
                         </div>
                     </div>
                 )}
-            </div>
         </Layout>
     );
 }   

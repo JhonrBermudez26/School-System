@@ -120,9 +120,6 @@ export default function Asignaturas() {
 
     return (
         <Layout title="Gestión de Asignaturas">
-            <div>
-                <Head title="Gestión de Asignaturas" />
-
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                     <div>
@@ -472,7 +469,6 @@ export default function Asignaturas() {
                         </div>
                     </div>
                 )}
-            </div>
         </Layout>
     );
 }

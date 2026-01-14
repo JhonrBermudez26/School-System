@@ -145,9 +145,6 @@ export default function Grupos() {
 
     return (
         <Layout title="Gestión de Grupos">
-            <div>
-                <Head title="Gestión de Grupos" />
-
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
                     <div>
@@ -452,7 +449,6 @@ export default function Grupos() {
                         </div>
                     </div>
                 )}
-            </div>
         </Layout>
     );
 }

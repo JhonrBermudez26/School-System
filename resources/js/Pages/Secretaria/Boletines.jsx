@@ -47,7 +47,6 @@ export default function Boletines() {
     return (
          <Layout title="Generar Boletines - Secretaria">
             
-            <div>
                 <div className="mb-6">
                     <h1 className="text-3xl font-bold text-gray-900">Generar Boletines</h1>
                     <p className="text-gray-600 mt-2">Genera y descarga boletines académicos</p>
@@ -260,7 +259,6 @@ export default function Boletines() {
                         </table>
                     </div>
                 </div>
-            </div>
         </Layout>
     );
 }
