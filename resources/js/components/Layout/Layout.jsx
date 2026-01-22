@@ -12,9 +12,12 @@ import {
 import SidebarMenu from "./SidebarMenu";
 
 export default function Layout({ title, children }) {
+  
   const { auth, app } = usePage().props;
   const currentUrl = usePage().url;
   const user = auth?.user;
+
+   const [previewImage, setPreviewImage] = useState(user?.photo ? `/storage/${user.photo}` : null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const appName = app?.name;
@@ -64,10 +67,10 @@ export default function Layout({ title, children }) {
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
                   className="flex items-center space-x-2 focus:outline-none"
                 >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-bold border-2 border-blue-300 shadow-md">
-                    {user?.photo ? (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br flex items-center justify-center text-black font-bold border-2 border-blue-300 shadow-md">
+                    {previewImage ? (
                       <img
-                        src={`/storage/${user?.photo}`}
+                        src={previewImage || "/default-user.png"}
                         alt="Foto de perfil"
                         className="w-10 h-10 rounded-full object-cover"
                       />

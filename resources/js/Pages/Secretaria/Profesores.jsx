@@ -1,5 +1,5 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { Search, Edit3, Users, X, Filter, Plus, Trash2 } from 'lucide-react';
+import { Search, Edit3, Users, X, Filter, Plus, Trash2 , ArrowUpDown, ArrowUp, ArrowDown} from 'lucide-react';
 import { useState, useMemo, useRef } from 'react';
 import Layout from '@/Components/Layout/Layout';
 
@@ -10,6 +10,7 @@ export default function Profesores() {
     const [search, setSearch] = useState('');
     const [filterAsignatura, setFilterAsignatura] = useState('todos');
     const [filterActive, setFilterActive] = useState('todos');
+    const [sortConfig, setSortConfig] = useState({ field: null, order: null }); // null, 'asc', 'desc'
     const [editingTeacher, setEditingTeacher] = useState(null);
     const [editData, setEditData] = useState({
         is_active: true,
@@ -21,6 +22,25 @@ export default function Profesores() {
         ],
     });
     const [formErrors, setFormErrors] = useState({});
+
+    // Función para alternar el orden de una columna específica
+    const toggleSort = (field) => {
+        setSortConfig(prev => {
+            if (prev.field !== field) {
+                // Si es una columna diferente, empezar con ascendente
+                return { field, order: 'asc' };
+            } else if (prev.order === null || prev.order === 'desc') {
+                // Si no hay orden o es descendente, cambiar a ascendente
+                return { field, order: 'asc' };
+            } else if (prev.order === 'asc') {
+                // Si es ascendente, cambiar a descendente
+                return { field, order: 'desc' };
+            } else {
+                // Si es descendente, quitar el ordenamiento
+                return { field: null, order: null };
+            }
+        });
+    };
 
     // Filtrado dinámico
     const filteredProfesores = useMemo(() => {
@@ -44,6 +64,8 @@ export default function Profesores() {
 
             return matchSearch && matchAsignatura && matchActive;
         });
+
+        
     }, [search, filterAsignatura, filterActive, profesores]);
 
     const handleEditClick = (prof) => {
@@ -230,20 +252,20 @@ export default function Profesores() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-6">
                     <div className="bg-white rounded-lg shadow-md p-4">
                         <p className="text-gray-500 text-xs sm:text-sm">Total Profesores</p>
-                        <p className="text-xl sm:text-2xl font-bold text-gray-900">{profesores?.total || 0}</p>
+                        <p className="text-xl sm:text-2xl font-bold text-gray-900">{filteredProfesores.length}</p>
                     </div>
                     <div className="bg-white rounded-lg shadow-md p-4">
                         <p className="text-gray-500 text-xs sm:text-sm">Activos</p>
                         <p className="text-xl sm:text-2xl font-bold text-green-600">
-                            {profesores?.data?.filter(p => p.is_active).length || 0}
+                            {filteredProfesores.filter(p => p.is_active).length}
                         </p>
                     </div>
                     <div className="bg-white rounded-lg shadow-md p-4">
                         <p className="text-gray-500 text-xs sm:text-sm">Inactivos</p>
                         <p className="text-xl sm:text-2xl font-bold text-red-600">
-                            {profesores?.data?.filter(p => !p.is_active).length || 0}
+                            {filteredProfesores.filter(p => !p.is_active).length}
                         </p>
-                    </div>
+                    </div>  
                     <div className="bg-white rounded-lg shadow-md p-4">
                         <p className="text-gray-500 text-xs sm:text-sm">Asignaturas</p>
                         <p className="text-xl sm:text-2xl font-bold text-blue-600">{asignaturas?.length || 0}</p>

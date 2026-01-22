@@ -163,4 +163,15 @@ class User extends Authenticatable
         
         return count($data);
     }
+
+    public function conversations()
+{
+    return $this->belongsToMany(Conversation::class, 'participants')
+        ->withTimestamps();
+}
+
+public function messages()
+{
+    return $this->hasMany(Message::class);
+}
 }

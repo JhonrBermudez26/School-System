@@ -1,3 +1,6 @@
+// ✅ ESTO DEBE SER LA PRIMERA LÍNEA
+import './bootstrap';
+
 import '../css/app.css';
 import { createRoot } from 'react-dom/client';
 import { createInertiaApp } from '@inertiajs/react';
@@ -6,7 +9,6 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 const appName = import.meta.env.VITE_APP_NAME || 'School System';
 
 createInertiaApp({
-    // Let each page (or our Layout) compose the full title; do not append a global suffix
     title: (title) => title,
     resolve: (name) =>
         resolvePageComponent(
@@ -20,4 +22,4 @@ createInertiaApp({
     progress: {
         color: '#2563eb',
     },
-});
+}); 

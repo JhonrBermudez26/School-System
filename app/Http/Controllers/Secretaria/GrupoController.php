@@ -46,12 +46,12 @@ class GrupoController extends Controller
                 $query->where('course_id', $request->course_id);
             }
 
-            $grupos = $query->orderBy('nombre', 'asc')->paginate(10);
+            $grupos = $query->orderBy('nombre', 'asc')->get();
             $grados = Grade::select('id', 'nombre')->orderBy('nombre')->get();
             $cursos = Course::select('id', 'nombre')->orderBy('nombre')->get();
 
             Log::info('Controlador Grupos ejecutado', [
-                'grupos_count' => $grupos->total(),
+                'grupos_count' => $grupos,
                 'grados_count' => $grados->count(),
                 'cursos_count' => $cursos->count(),
                 'filters' => $request->only(['search', 'grade_id', 'course_id']),

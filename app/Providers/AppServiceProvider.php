@@ -34,6 +34,9 @@ class AppServiceProvider extends ServiceProvider
                 'fullName' => $settings?->nombre_colegio ?: config('app.name'),
             ],
             'school' => $settings,
+            'modules' => [
+                'boletines' => (bool) ($settings?->tiene_boletines ?? true),
+            ],
         ]);
     }
 }

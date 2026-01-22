@@ -28,7 +28,7 @@ class SubjectController extends Controller
                 $query->where('is_active', $request->estado === 'activo');
             }
 
-            $asignaturas = $query->orderBy('name', 'asc')->paginate(10);
+            $asignaturas = $query->orderBy('name', 'asc')->get();
 
             return Inertia::render('Secretaria/Asignaturas', [
                 'asignaturas' => $asignaturas,
@@ -41,12 +41,7 @@ class SubjectController extends Controller
             ]);
 
             return Inertia::render('Secretaria/Asignaturas', [
-                'asignaturas' => [
-                    'data' => [],
-                    'total' => 0,
-                    'per_page' => 10,
-                    'current_page' => 1,
-                ],
+                'asignaturas' => [],
                 'filters' => [],
                 'error' => 'No se pudieron cargar las asignaturas.',
             ]);

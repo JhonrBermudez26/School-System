@@ -45,11 +45,11 @@ class StudentController extends Controller
                 $query->where('is_active', $request->estado === 'activo');
             }
 
-            // 🔢 Paginación
-            $estudiantes = $query->orderBy('name', 'asc')->paginate(10);
+            // 🔢 Lista completa (sin paginación) para mostrar como en Usuarios
+            $estudiantes = $query->orderBy('name', 'asc')->get();
 
             // Transformar datos para el frontend
-            $estudiantes->getCollection()->transform(function ($estudiante) {
+            $estudiantes = $estudiantes->map(function ($estudiante) {
                 $estudiante->group = $estudiante->groups->first(); // Obtener primer grupo
                 $estudiante->group_id = $estudiante->group ? $estudiante->group->id : null;
                 return $estudiante;
@@ -61,7 +61,7 @@ class StudentController extends Controller
                 ->orderBy('nombre')
                 ->get();
 
-            Log::info('Estudiantes cargados', ['total' => $estudiantes->total()]);
+            Log::info('Estudiantes cargados', ['total' => $estudiantes->count()]);
 
             return Inertia::render('Secretaria/Estudiantes', [
                 'estudiantes' => $estudiantes,
@@ -77,14 +77,7 @@ class StudentController extends Controller
             ]);
 
             return Inertia::render('Secretaria/Estudiantes', [
-                'estudiantes' => [
-                    'data' => [],
-                    'total' => 0,
-                    'per_page' => 10,
-                    'current_page' => 1,
-                    'last_page' => 1,
-                    'links' => []
-                ],
+                'estudiantes' => [],
                 'grupos' => Group::select('id', 'nombre')->get(),
                 'filters' => [],
                 'error' => 'No se pudieron cargar los estudiantes.',
@@ -180,37 +173,132 @@ class StudentController extends Controller
             return back()->with('error', '❌ No se pudo cambiar el estado');
         }
     }
-
-    public function exportExcel()
+    private function applyStudentFilters($query, Request $request)
     {
-        try {
-            return Excel::download(new EstudiantesExport, 'estudiantes_' . date('Y-m-d') . '.xlsx');
-        } catch (\Exception $e) {
-            Log::error('Error al exportar Excel', ['message' => $e->getMessage()]);
-            return back()->with('error', '❌ No se pudo exportar a Excel');
+    // Búsqueda (la misma que hace el frontend)
+    if ($request->filled('search')) {
+        $search = $request->search;
+        $query->where(function ($q) use ($search) {
+            $q->where('name', 'like', "%{$search}%")
+              ->orWhere('last_name', 'like', "%{$search}%")
+              ->orWhere('email', 'like', "%{$search}%")
+              ->orWhere('document_number', 'like', "%{$search}%")
+              ->orWhereHas('groups', function ($q) use ($search) {
+                  $q->where('nombre', 'like', "%{$search}%");
+              });
+        });
+    }
+
+    // Filtro por grupo
+    if ($request->filled('group_id') && $request->group_id !== 'todos') {
+        $query->whereHas('groups', function ($q) use ($request) {
+            $q->where('groups.id', $request->group_id);
+        });
+    }
+
+    // Filtro por estado
+    if ($request->filled('estado') && $request->estado !== 'todos') {
+        $query->where('is_active', $request->estado === 'activo');
+    }
+
+    return $query;
+}
+
+private function applySorting($query, Request $request)
+{
+    $sort_field = $request->input('sort_field');
+    $sort_order = $request->input('sort_order', 'asc');
+
+    if (!$sort_field) {
+        return $query->orderBy('name', 'asc');
+    }
+
+    // Campos permitidos y su traducción a columnas reales
+    $sortable = [
+        'name'   => ['name', 'last_name'], // orden compuesto
+        'group'  => 'groups.nombre',       // importante: usar groups.nombre
+        // Puedes agregar más si implementas orden por documento, email, etc.
+    ];
+
+    if (!array_key_exists($sort_field, $sortable)) {
+        return $query->orderBy('name', 'asc');
+    }
+
+    $field = $sortable[$sort_field];
+
+    if (is_array($field)) {
+        // Orden compuesto (nombre + apellido)
+        $query->orderBy($field[0], $sort_order)
+              ->orderBy($field[1], $sort_order);
+    } else {
+        // Relación (necesita join o orderByRaw en algunos casos)
+        if (str_contains($field, '.')) {
+            $query->join('group_user', 'users.id', '=', 'group_user.user_id')
+                  ->join('groups', 'group_user.group_id', '=', 'groups.id')
+                  ->orderBy($field, $sort_order)
+                  ->select('users.*'); // muy importante evitar duplicados
+        } else {
+            $query->orderBy($field, $sort_order);
         }
     }
 
-    public function exportPDF()
-    {
-        try {
-            $estudiantes = User::role('estudiante')
-                ->with(['groups.grade', 'groups.course'])
-                ->orderBy('name')
-                ->get();
+    return $query;
+}
 
-            // Transformar para agregar el primer grupo
-            $estudiantes->transform(function ($estudiante) {
-                $estudiante->group = $estudiante->groups->first();
-                return $estudiante;
-            });
+    public function exportExcel(Request $request)
+{
+    try {
+        $query = User::role('estudiante')
+            ->with(['groups.grade', 'groups.course'])
+            ->select('users.*');
 
-            $pdf = Pdf::loadView('pdf.estudiantes', ['estudiantes' => $estudiantes]);
-            return $pdf->download('estudiantes_' . date('Y-m-d') . '.pdf');
+        $query = $this->applyStudentFilters($query, $request);
+        $query = $this->applySorting($query, $request);
 
-        } catch (\Exception $e) {
-            Log::error('Error al exportar PDF', ['message' => $e->getMessage()]);
-            return back()->with('error', '❌ No se pudo exportar a PDF');
-        }
+        $estudiantes = $query->get();
+
+        // Transformación para export
+        $estudiantes->transform(function ($est) {
+            $est->group = $est->groups->first();
+            return $est;
+        });
+
+        return Excel::download(new EstudiantesExport($estudiantes), 'estudiantes_' . date('Y-m-d_H-i') . '.xlsx');
+
+    } catch (\Exception $e) {
+        Log::error('Error exportando Excel', ['message' => $e->getMessage()]);
+        return back()->with('error', '❌ Error al generar el Excel');
     }
+}
+
+public function exportPDF(Request $request)
+{
+    try {
+        // Mismo query que en exportExcel (copia y pega la lógica de filtros)
+        $query = User::role('estudiante')
+            ->with(['groups.grade', 'groups.course'])
+            ->select('users.*');
+
+        $query = $this->applyStudentFilters($query, $request);
+        $query = $this->applySorting($query, $request);
+
+        $estudiantes = $query->get();
+
+        $estudiantes->transform(function ($est) {
+            $est->group = $est->groups->first();
+            return $est;
+        });
+
+        $pdf = Pdf::loadView('pdf.estudiantes', [
+            'estudiantes' => $estudiantes,
+            'filters' => $request->only(['search', 'group_id', 'estado']),
+        ]);
+
+        return $pdf->download('estudiantes_' . date('Y-m-d_H-i') . '.pdf');
+
+    } catch (\Exception $e) {
+        Log::error('Error exportando PDF', ['message' => $e->getMessage()]);
+        return back()->with('error', '❌ Error al generar el PDF');
+    }
+}
 }

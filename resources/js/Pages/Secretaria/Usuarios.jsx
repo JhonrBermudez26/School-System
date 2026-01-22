@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Users, Search, Edit3, Trash2, Save, X, Filter, UserPlus } from "lucide-react";
+import { Users, Search, Edit3, Trash2, Save, X, Filter, UserPlus, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import Layout from "@/Components/Layout/Layout";
 import { usePage, router } from "@inertiajs/react";
 
@@ -9,6 +9,7 @@ export default function Usuarios() {
     const [search, setSearch] = useState("");
     const [filterRole, setFilterRole] = useState("todos");
     const [filterActive, setFilterActive] = useState("todos");
+    const [sortOrder, setSortOrder] = useState(null); // null, 'asc', 'desc'
     const [editingUser, setEditingUser] = useState(null);
     const [showNewUserForm, setShowNewUserForm] = useState(false);
     const [editData, setEditData] = useState({
@@ -35,9 +36,20 @@ export default function Usuarios() {
     });
     const [formErrors, setFormErrors] = useState({});
 
-    // Filtrado dinámico
+    // Función para alternar el orden
+    const toggleSort = () => {
+        if (sortOrder === null) {
+            setSortOrder('asc');
+        } else if (sortOrder === 'asc') {
+            setSortOrder('desc');
+        } else {
+            setSortOrder(null);
+        }
+    };
+
+    // Filtrado y ordenamiento dinámico
     const filteredUsers = useMemo(() => {
-        return usuarios.filter((u) => {
+        let result = usuarios.filter((u) => {
             const fullName = `${u.name} ${u.last_name || ''}`.toLowerCase();
             const matchSearch =
                 fullName.includes(search.toLowerCase()) ||
@@ -51,7 +63,23 @@ export default function Usuarios() {
                 (filterActive === "inactivo" && !u.is_active);
             return matchSearch && matchRole && matchActive;
         });
-    }, [search, filterRole, filterActive, usuarios]);
+
+        // Aplicar ordenamiento si está activo
+        if (sortOrder !== null) {
+            result = [...result].sort((a, b) => {
+                const nameA = `${a.name} ${a.last_name || ''}`.toLowerCase();
+                const nameB = `${b.name} ${b.last_name || ''}`.toLowerCase();
+                
+                if (sortOrder === 'asc') {
+                    return nameA.localeCompare(nameB);
+                } else {
+                    return nameB.localeCompare(nameA);
+                }
+            });
+        }
+
+        return result;
+    }, [search, filterRole, filterActive, sortOrder, usuarios]);
 
     const handleDelete = (id) => {
         if (confirm("⚠️ ¿Seguro que deseas eliminar este usuario?")) {
@@ -123,6 +151,17 @@ export default function Usuarios() {
             rector: 'bg-orange-100 text-orange-800',
         };
         return colors[role] || 'bg-gray-100 text-gray-800';
+    };
+
+    // Icono de ordenamiento
+    const getSortIcon = () => {
+        if (sortOrder === 'asc') {
+            return <ArrowUp className="h-4 w-4 text-green-600" />;
+        } else if (sortOrder === 'desc') {
+            return <ArrowDown className="h-4 w-4 text-green-600" />;
+        } else {
+            return <ArrowUpDown className="h-4 w-4 text-gray-400" />;
+        }
     };
 
     return (
@@ -197,14 +236,14 @@ export default function Usuarios() {
                                 Correo
                             </label>
                             <input
-                            type="email"
-                            value={newUserData.email}
-                            onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            placeholder="correo@ejemplo.com"
-                            required
-                        />
-                        {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
+                                type="email"
+                                value={newUserData.email}
+                                onChange={(e) => setNewUserData({ ...newUserData, email: e.target.value })}
+                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                placeholder="correo@ejemplo.com"
+                                required
+                            />
+                            {formErrors.email && <p className="text-red-500 text-xs mt-1">{formErrors.email}</p>}
                         </div>
 
                         {/* Contraseña */}
@@ -344,24 +383,24 @@ export default function Usuarios() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-6">
                 <div className="bg-white rounded-lg shadow-md p-4">
                     <p className="text-gray-500 text-xs sm:text-sm">Total Usuarios</p>
-                    <p className="text-xl sm:text-2xl font-bold text-gray-900">{usuarios.length}</p>
+                    <p className="text-xl sm:text-2xl font-bold text-gray-900">{filteredUsers.length}</p>
                 </div>
                 <div className="bg-white rounded-lg shadow-md p-4">
                     <p className="text-gray-500 text-xs sm:text-sm">Activos</p>
                     <p className="text-xl sm:text-2xl font-bold text-green-600">
-                        {usuarios.filter(e => e.is_active).length}
+                        {filteredUsers.filter(e => e.is_active).length}
                     </p>
                 </div>
                 <div className="bg-white rounded-lg shadow-md p-4">
                     <p className="text-gray-500 text-xs sm:text-sm">Inactivos</p>
                     <p className="text-xl sm:text-2xl font-bold text-red-600">
-                        {usuarios.filter(e => !e.is_active).length}
+                        {filteredUsers.filter(e => !e.is_active).length}
                     </p>
                 </div>
                 <div className="bg-white rounded-lg shadow-md p-4">
                     <p className="text-gray-500 text-xs sm:text-sm">Roles Únicos</p>
                     <p className="text-xl sm:text-2xl font-bold text-blue-600">
-                        {new Set(usuarios.map(u => u.roles?.[0]?.name).filter(Boolean)).size}
+                        {new Set(filteredUsers.map(u => u.roles?.[0]?.name).filter(Boolean)).size}
                     </p>
                 </div>
             </div>
@@ -418,7 +457,14 @@ export default function Usuarios() {
                         <thead className="bg-gray-50 border-b border-gray-200">
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Usuario
+                                    <button
+                                        onClick={toggleSort}
+                                        className="flex items-center space-x-2 hover:text-gray-700 transition"
+                                        title="Ordenar alfabéticamente"
+                                    >
+                                        <span>Usuario</span>
+                                        {getSortIcon()}
+                                    </button>
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Correo
@@ -561,11 +607,10 @@ export default function Usuarios() {
 
                                         {/* Estado */}
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                                u.is_active 
-                                                    ? 'bg-green-100 text-green-800' 
+                                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${u.is_active
+                                                    ? 'bg-green-100 text-green-800'
                                                     : 'bg-red-100 text-red-800'
-                                            }`}>
+                                                }`}>
                                                 {u.is_active ? 'Activo' : 'Inactivo'}
                                             </span>
                                         </td>
@@ -594,11 +639,10 @@ export default function Usuarios() {
                                                     <>
                                                         <button
                                                             onClick={() => toggleActive(u.id, u.is_active)}
-                                                            className={`${
-                                                                u.is_active 
-                                                                    ? 'text-orange-600 hover:text-orange-900 hover:bg-orange-50' 
+                                                            className={`${u.is_active
+                                                                    ? 'text-orange-600 hover:text-orange-900 hover:bg-orange-50'
                                                                     : 'text-green-600 hover:text-green-900 hover:bg-green-50'
-                                                            } p-2 rounded`}
+                                                                } p-2 rounded`}
                                                             title={u.is_active ? 'Desactivar' : 'Activar'}
                                                         >
                                                             <Users className="h-4 w-4" />
