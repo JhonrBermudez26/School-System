@@ -59,6 +59,28 @@ class ChatController extends Controller
         ]);
     }
 
+    // ChatController.php
+public function conversationsJson()
+{
+    $user = Auth::user();
+
+    return Conversation::whereHas('participants', fn ($q) =>
+        $q->where('user_id', $user->id)
+    )
+    ->with([
+        'participants.user:id,name,last_name,photo',
+        'messages' => fn ($q) => $q->latest()->limit(1),
+        'messages.user:id,name,last_name,photo',
+    ])
+    ->withCount(['messages as unread_count' => function ($q) use ($user) {
+        $q->where('user_id', '!=', $user->id)
+          ->whereJsonDoesntContain('read_by', $user->id);
+    }])
+    ->orderByDesc('last_message_at')
+    ->get();
+}
+
+
     private function getMessagePreview($message)
     {
         switch ($message->type) {
@@ -74,63 +96,70 @@ class ChatController extends Controller
                 return 'Nuevo mensaje';
         }
     }
+
+    private function normalize($string)
+{
+    return mb_strtolower(
+        iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $string)
+    );
+}
+
     
     /**
      * Buscar usuarios para iniciar conversación
      */
     public function searchUsers(Request $request)
-    {
-        $query = $request->validate(['query' => 'required|string|min:2']);
+{
+    $request->validate([
+        'query' => 'required|string|min:1|max:100',
+    ]);
 
-        $users = User::whereHas('roles', function ($q) {
+    $rawQuery = $request->query('query');
+    $query = $this->normalize($rawQuery);
+
+    $users = User::whereHas('roles', function ($q) {
             $q->whereIn('name', ['estudiante', 'profesor']);
         })
-        ->where(function ($q) use ($query) {
-            $q->where('name', 'like', '%' . $query['query'] . '%')
-              ->orWhere('last_name', 'like', '%' . $query['query'] . '%')
-              ->orWhere('email', 'like', '%' . $query['query'] . '%');
-        })
         ->where('id', '!=', Auth::id())
+        ->where(function ($q) use ($query) {
+            $q->whereRaw(
+                "LOWER(
+        CONCAT(
+            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(name,
+            'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),
+            ' ',
+            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(last_name,
+            'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u')
+        )
+    ) LIKE ?",
+    ["%{$query}%"]
+            )
+            ->orWhereRaw(
+                "LOWER(
+                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(last_name,  
+                    'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u')
+                ) LIKE ?",
+                ["%{$query}%"]
+            )
+            ->orWhereRaw(
+                "LOWER(
+                    REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(email,
+                    'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u')
+                ) LIKE ?",
+                ["%{$query}%"]
+            );
+        })
         ->select('id', 'name', 'last_name', 'email', 'photo')
         ->limit(20)
         ->get();
 
-        $user = Auth::user();
+    return response()->json([
+        'users' => $users,
+    ]);
+}
 
-        $conversations = Conversation::whereHas('participants', function ($q) use ($user) {
-            $q->where('user_id', $user->id);
-        })
-        ->with([
-            'participants.user' => function ($q) {
-                $q->select('id', 'name', 'last_name', 'email', 'photo');
-            },
-            'messages' => function ($q) {
-                $q->latest()->limit(1);
-            },
-            'messages.user' => function ($q) {
-                $q->select('id', 'name', 'last_name');
-            }
-        ])
-        ->withCount(['messages as unread_count' => function ($q) use ($user) {
-            $q->where('user_id', '!=', $user->id)
-              ->whereJsonDoesntContain('read_by', $user->id);
-        }])
-        ->orderByDesc('last_message_at')
-        ->get();
 
-        $availableUsers = User::whereHas('roles', function ($q) {
-            $q->whereIn('name', ['estudiante', 'profesor']);
-        })
-        ->where('id', '!=', $user->id)
-        ->select('id', 'name', 'last_name', 'email', 'photo')
-        ->get();
 
-        return Inertia::render('Profesor/Chat', [
-            'conversations' => $conversations,
-            'availableUsers' => $availableUsers,
-            'users' => $users,
-        ]);
-    }
 
     /**
      * Crear una nueva conversación (personal o grupal)
@@ -285,9 +314,13 @@ class ChatController extends Controller
             'messages_count' => $conversation->messages->count()
         ]);
 
+        if (request()->wantsJson()) {
+            return response()->json([
+                'conversation' => $conversation
+            ]);
+        }
+
         return Inertia::render('Profesor/Chat', [
-            'conversations' => $conversations,
-            'availableUsers' => $availableUsers,
             'conversation' => $conversation,
             'users' => [],
         ]);
@@ -372,7 +405,10 @@ class ChatController extends Controller
             ]);
         }
         
-        return redirect()->back();
+        return response()->json([
+    'message' => $message
+]);
+
     }
 
     /**

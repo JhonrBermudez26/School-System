@@ -31,18 +31,8 @@ export default function Chat() {
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-
-  // ✅ Sincronizar conversación desde props cuando se carga la página
-  useEffect(() => {
-    if (props.conversation) {
-      console.log('📦 Conversación recibida desde props:', props.conversation);
-      setSelectedConversation(props.conversation);
-      setMessages(props.conversation.messages || []);
-    }
-  }, [props.conversation]);
 
   useEffect(() => {
     fetchConversations();
@@ -50,106 +40,103 @@ export default function Chat() {
 
   // ✅ Efecto separado SOLO para Echo (escucha en tiempo real)
   useEffect(() => {
-  if (!selectedConversation?.id || !window.Echo) {
-    console.warn('Echo no disponible o sin conversación');
-    return;
-  }
-  
-  console.log('📡 Conectándose al canal:', `conversation.${selectedConversation.id}`);
-  
-  // ✅ SINTAXIS CORREGIDA
-  const channel = window.Echo.channel(`conversation.${selectedConversation.id}`);
-  
-  channel.listen('.message.sent', (data) => {
-    console.log('📨 Mensaje recibido en tiempo real:', data);
-    
-    if (data.message.user_id !== user.id) {
-      setMessages(prev => {
-        const exists = prev.some(m => m.id === data.message.id);
-        if (exists) return prev;
-        return [...prev, data.message];
-      });
-      
-      markAsRead(selectedConversation.id);
+    if (!selectedConversation?.id || !window.Echo) {
+      console.warn('Echo no disponible o sin conversación');
+      return;
     }
-    
-    fetchConversations();
-  });
-  
-  return () => {
-    console.log('🔌 Desconectándose del canal:', `conversation.${selectedConversation.id}`);
-    // ✅ SINTAXIS CORREGIDA
-    window.Echo.leave(`conversation.${selectedConversation.id}`);
-  };
-}, [selectedConversation?.id, user.id]);
 
-// 2. Efecto de notificaciones globales (líneas 85-102)
-useEffect(() => {
-  if (!user?.id || !window.Echo) {
-    console.warn('Echo no disponible o sin usuario');
-    return;
-  }
-  
-  console.log('📡 Escuchando notificaciones globales para usuario:', user.id);
-  
-  // ✅ SINTAXIS CORREGIDA
-  const userChannel = window.Echo.private(`user.${user.id}`);
-  
-  userChannel.listen('.chat.notification', (data) => {
-    console.log('🔔 Notificación recibida:', data);
-    fetchConversations();
-  });
-  
-  return () => {
-    console.log('🔌 Desconectándose de notificaciones globales');
+    console.log('📡 Conectándose al canal:', `conversation.${selectedConversation.id}`);
+
     // ✅ SINTAXIS CORREGIDA
-    window.Echo.leave(`user.${user.id}`);
-  };
-}, [user.id]);
+    const channel = window.Echo.channel(`conversation.${selectedConversation.id}`);
+
+    channel.listen('.message.sent', (data) => {
+      console.log('📨 Mensaje recibido en tiempo real:', data);
+
+      if (data.message.user_id !== user.id) {
+        setMessages(prev => {
+          const exists = prev.some(m => m.id === data.message.id);
+          if (exists) return prev;
+          return [...prev, data.message];
+        });
+        markAsRead(selectedConversation.id);
+      }
+    });
+
+    return () => {
+      console.log('🔌 Desconectándose del canal:', `conversation.${selectedConversation.id}`);
+      // ✅ SINTAXIS CORREGIDA
+      window.Echo.leave(`conversation.${selectedConversation.id}`);
+    };
+  }, [selectedConversation?.id, user.id]);
+
+  // 2. Efecto de notificaciones globales (líneas 85-102)
+  useEffect(() => {
+    if (!user?.id || !window.Echo) {
+      console.warn('Echo no disponible o sin usuario');
+      return;
+    }
+
+    console.log('📡 Escuchando notificaciones globales para usuario:', user.id);
+
+    // ✅ SINTAXIS CORREGIDA
+    const userChannel = window.Echo.private(`user.${user.id}`);
+
+    userChannel.listen('.chat.notification', (data) => {
+      console.log('🔔 Notificación recibida:', data);
+      fetchConversations();
+    });
+
+    return () => {
+      console.log('🔌 Desconectándose de notificaciones globales');
+      // ✅ SINTAXIS CORREGIDA
+      window.Echo.leave(`user.${user.id}`);
+    };
+  }, [user.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const fetchConversations = () => {
-    router.get(route('profesor.chat'), {}, {
-      preserveState: true,
-      onSuccess: (page) => {
-        setConversations(page.props.conversations || []);
-      }
-    });
+  const fetchConversations = async () => {
+    const res = await axios.get(
+      route('profesor.chat.conversations.json')
+    );
+    setConversations(res.data);
   };
 
-  const markAsRead = (conversationId) => {
-    router.post(route('profesor.chat.read', conversationId), {}, {
-      preserveState: true,
-      preserveScroll: true,
-      only: [],
-      onError: (errors) => {
-        console.error('Error al marcar como leído:', errors);
-      }
-    });
-  };
 
-  const handleSearchKeyPress = (e) => {
-    if (e.key === 'Enter' && searchQuery.trim().length >= 2) {
-      performSearch();
+  const markAsRead = async (conversationId) => {
+    try {
+      await axios.post(route('profesor.chat.read', conversationId));
+    } catch (e) {
+      console.error('Error al marcar como leído', e);
     }
   };
 
-  const performSearch = () => {
-    if (searchQuery.trim().length < 2) return;
+useEffect(() => {
+  if (searchQuery.trim().length < 2) {
+    setSearchedUsers([]);
+    setIsSearching(false);
+    return;
+  }
 
+  const timeout = setTimeout(async () => {
     setIsSearching(true);
-    router.get(route('profesor.chat.search'), { query: searchQuery }, {
-      preserveState: true,
-      onSuccess: (page) => {
-        setSearchedUsers(page.props.users || []);
-        setIsSearching(false);
-      },
-      onError: () => setIsSearching(false)
-    });
-  };
+    try {
+      const res = await axios.get(
+        route('profesor.chat.search'),
+       { params: { query: searchQuery }}
+      );
+      setSearchedUsers(res.data.users || []);
+    } finally {
+      setIsSearching(false);
+    }
+  }, 300);
+
+  return () => clearTimeout(timeout);
+}, [searchQuery]);
+
 
   const clearSearch = () => {
     setSearchQuery('');
@@ -158,16 +145,22 @@ useEffect(() => {
   };
 
   const startPersonalChat = (userId) => {
-    router.post(route('profesor.chat.create'), {
+  router.post(
+    route('profesor.chat.create'),
+    {
       type: 'personal',
       participants: [userId],
-    }, {
-      preserveState: false,
+    },
+    {
+      preserveScroll: true,
       onSuccess: () => {
-        clearSearch();
+        setSearchQuery('');
+        setSearchedUsers([]);
       }
-    });
-  };
+    }
+  );
+};
+
 
   const createGroup = () => {
     if (groupParticipants.length < 2) {
@@ -190,42 +183,31 @@ useEffect(() => {
   };
 
   // ✅ Función simplificada para seleccionar conversación
-  const selectConversation = (conv) => {
-    console.log('👆 Click en conversación:', conv.id);
+  const selectConversation = async (conv) => {
+  console.log('👆 Click en conversación:', conv.id);
 
-    setShowGroupInfo(false);
-    setIsLoadingMessages(true);
+  setShowGroupInfo(false);
+  setIsLoadingMessages(true);
 
-    // ✅ Navegar usando router.visit con preserveState
-    router.visit(route('profesor.chat.show', conv.id), {
-      method: 'get',
-      preserveState: true,
-      preserveScroll: true,
-      only: ['conversation'],
-      onBefore: () => {
-        console.log('⏳ Iniciando carga de mensajes...');
-      },
-      onSuccess: (page) => {
-        console.log('✅ Mensajes cargados exitosamente:', page.props.conversation);
-        const conversation = page.props.conversation;
-        if (conversation && conversation.messages) {
-          console.log('📝 Estableciendo', conversation.messages.length, 'mensajes');
-          setMessages(conversation.messages);
-          setSelectedConversation(conversation);
+  try {
+    const res = await axios.get(
+      route('profesor.chat.show', conv.id),
+      { headers: { Accept: 'application/json' } }
+    );
 
-          // ✅ Marcar como leído después de cargar
-          markAsRead(conversation.id);
-        } else {
-          console.warn('⚠️ No se recibieron mensajes en la respuesta');
-        }
-        setIsLoadingMessages(false);
-      },
-      onError: (errors) => {
-        console.error('❌ Error al cargar mensajes:', errors);
-        setIsLoadingMessages(false);
-      }
-    });
-  };
+    const conversation = res.data.conversation;
+
+    setSelectedConversation(conversation);
+    setMessages(conversation.messages);
+
+    markAsRead(conversation.id);
+  } catch (e) {
+    console.error('❌ Error cargando conversación', e);
+  } finally {
+    setIsLoadingMessages(false);
+  }
+};
+
 
   const handleFileSelect = (e) => {
     const selectedFile = e.target.files?.[0];
@@ -248,61 +230,53 @@ useEffect(() => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const sendMessage = () => {
-    if (!newMessage.trim() && !file && !audioBlob) return;
+  const sendMessage = async () => {
+  if (!newMessage.trim() && !file && !audioBlob) return;
 
-    const formData = new FormData();
-    formData.append('body', newMessage);
+  const formData = new FormData();
+  formData.append('body', newMessage);
 
-    if (audioBlob) {
-      formData.append('type', 'audio');
-      formData.append('file', audioBlob, 'audio.webm');
-    } else if (file) {
-      formData.append('type', 'file');
-      formData.append('file', file);
-    } else {
-      formData.append('type', 'text');
-    }
+  if (audioBlob) {
+    formData.append('type', 'audio');
+    formData.append('file', audioBlob, 'audio.webm');
+  } else if (file) {
+    formData.append('type', 'file');
+    formData.append('file', file);
+  } else {
+    formData.append('type', 'text');
+  }
 
-    const tempMessage = {
-      id: `temp-${Date.now()}`,
-      user_id: user.id,
-      body: newMessage,
-      type: audioBlob ? 'audio' : (file ? 'file' : 'text'),
-      created_at: new Date().toISOString(),
-      user: {
-        id: user.id,
-        name: user.name,
-        last_name: user.last_name,
-        photo: user.photo
-      }
-    };
-
-    setMessages(prev => [...prev, tempMessage]);
-
-    const messageText = newMessage;
-    setNewMessage('');
-    clearFile();
-    setAudioBlob(null);
-
-    router.post(route('profesor.chat.message', selectedConversation.id), formData, {
-      forceFormData: true,
-      onSuccess: (page) => {
-        const realMessage = page.props.conversation?.messages?.slice(-1)[0];
-        if (realMessage) {
-          setMessages(prev =>
-            prev.map(m => m.id === tempMessage.id ? realMessage : m)
-          );
-        }
-        fetchConversations();
-      },
-      onError: () => {
-        setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
-        setNewMessage(messageText);
-        alert('Error al enviar el mensaje');
-      }
-    });
+  const tempMessage = {
+    id: `temp-${Date.now()}`,
+    user_id: user.id,
+    body: newMessage,
+    type: audioBlob ? 'audio' : (file ? 'file' : 'text'),
+    created_at: new Date().toISOString(),
+    user: user
   };
+
+  setMessages(prev => [...prev, tempMessage]);
+  setNewMessage('');
+  clearFile();
+  setAudioBlob(null);
+
+  try {
+    const res = await axios.post(
+      route('profesor.chat.message', selectedConversation.id),
+      formData
+    );
+
+    setMessages(prev =>
+      prev.map(m => m.id === tempMessage.id ? res.data.message : m)
+    );
+
+    fetchConversations();
+  } catch (e) {
+    setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
+    alert('Error al enviar el mensaje');
+  }
+};
+
 
   const startCall = () => {
     router.post(route('profesor.chat.message', selectedConversation.id), {
@@ -358,7 +332,6 @@ useEffect(() => {
     }, {
       onSuccess: () => {
         setEditingGroup(null);
-        fetchConversations();
         selectConversation(selectedConversation);
       }
     });
@@ -369,7 +342,6 @@ useEffect(() => {
       user_id: userId
     }, {
       onSuccess: () => {
-        fetchConversations();
         selectConversation(selectedConversation);
       }
     });
@@ -422,10 +394,9 @@ useEffect(() => {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                  placeholder="Buscar usuarios... (Enter)"
+                  placeholder="Buscar usuarios..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  onKeyPress={handleSearchKeyPress}
                 />
                 {searchQuery && (
                   <button
@@ -624,13 +595,16 @@ useEffect(() => {
                           <p className={`text-xs truncate mt-1 ${hasUnread ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
                             {conv.messages?.[0] ? (
                               <>
+                                {/* Prefijo */}
                                 {conv.messages[0].user_id === user.id ? (
                                   <span className="font-medium text-gray-700">Tú: </span>
-                                ) : conv.type === 'group' ? (
+                                ) : (
                                   <span className="font-medium text-gray-700">
-                                    {conv.messages[0].user?.name || 'Usuario'}:
+                                    {conv.messages[0].user?.name || 'Usuario'}:{' '}
                                   </span>
-                                ) : null}
+                                )}
+
+                                {/* Contenido del mensaje */}
                                 <span>
                                   {conv.messages[0].type === 'text'
                                     ? conv.messages[0].body
@@ -646,6 +620,7 @@ useEffect(() => {
                               'Sin mensajes aún'
                             )}
                           </p>
+
                         </div>
                       </div>
                     </div>
@@ -1168,5 +1143,5 @@ useEffect(() => {
 
 // arreglar los en visto
 // arreglar lo de las llamdas
-// los mensajes no se reenderizan automaticamente mientras yo no este en el chatt
+// poner el dia o fecha de los mensajes, marcacion pequeña parte superior donde diga hoy, ayer o fecha
 // php artisan reverb:start

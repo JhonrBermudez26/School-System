@@ -148,6 +148,9 @@ Route::middleware(['auth'])->group(function () {
         //CHAT
         Route::get('/chat', [ChatController::class, 'index'])
             ->name('profesor.chat');
+            Route::get('/chat/conversations/json', [ChatController::class, 'conversationsJson'])
+            ->name('profesor.chat.conversations.json');
+
         
         Route::get('/chat/search', [ChatController::class, 'searchUsers'])
             ->name('profesor.chat.search');
