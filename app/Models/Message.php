@@ -1,9 +1,9 @@
 <?php
+
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Facades\Storage;
 
 class Message extends Model
 {
@@ -32,10 +32,23 @@ class Message extends Model
         return $this->belongsTo(User::class);
     }
 
-    // Marcar como leído por un usuario
+    /**
+     * Marcar mensaje como leído por un usuario
+     */
     public function markAsRead($userId)
     {
-        $readBy = $this->read_by ?? [];
+        // Asegurar que read_by sea un array
+        $readBy = $this->read_by;
+        
+        // Si es null, string o no es array, convertir a array
+        if (!is_array($readBy)) {
+            if (is_string($readBy)) {
+                $readBy = json_decode($readBy, true) ?? [];
+            } else {
+                $readBy = [];
+            }
+        }
+        
         if (!in_array($userId, $readBy)) {
             $readBy[] = $userId;
             $this->read_by = $readBy;
@@ -43,14 +56,39 @@ class Message extends Model
         }
     }
 
-    protected static function boot()
+    /**
+     * Verificar si un mensaje ha sido leído por un usuario
+     */
+    public function isReadBy($userId)
     {
-        parent::boot();
-
-        static::deleting(function ($message) {
-            if ($message->attachment && $message->type === 'file') {
-                Storage::disk('public')->delete($message->attachment);
+        $readBy = $this->read_by;
+        
+        if (!is_array($readBy)) {
+            if (is_string($readBy)) {
+                $readBy = json_decode($readBy, true) ?? [];
+            } else {
+                $readBy = [];
             }
-        });
+        }
+        
+        return in_array($userId, $readBy);
+    }
+
+    /**
+     * Obtener la cantidad de lecturas (excluyendo al autor)
+     */
+    public function getReadCountAttribute()
+    {
+        $readBy = $this->read_by;
+        
+        if (!is_array($readBy)) {
+            if (is_string($readBy)) {
+                $readBy = json_decode($readBy, true) ?? [];
+            } else {
+                $readBy = [];
+            }
+        }
+        
+        return count(array_filter($readBy, fn($id) => $id !== $this->user_id));
     }
 }

@@ -146,15 +146,35 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/dashboard', [TeacherDashboardController::class, 'index'])->name('profesor.dashboard');
 
         //CHAT
-        Route::get('/chat', [ChatController::class, 'index'])->name('profesor.chat');
-        Route::get('/chat/search', [ChatController::class, 'searchUsers'])->name('profesor.chat.search');
-        Route::post('/chat/create', [ChatController::class, 'createConversation'])->name('profesor.chat.create');
-        Route::get('/chat/{id}', [ChatController::class, 'getConversation'])->name('profesor.chat.show');
-        Route::post('/chat/{id}/message', [ChatController::class, 'sendMessage'])->name('profesor.chat.message');
-        Route::post('/chat/{id}/read', [ChatController::class, 'markAsRead'])->name('profesor.chat.read');
-        Route::delete('/chat/message/{id}', [ChatController::class, 'deleteMessage'])->name('profesor.chat.delete-message');
-        Route::post('/chat/{id}/leave', [ChatController::class, 'leaveGroup'])->name('profesor.chat.leave');
-        Route::post('/chat/{id}/add-participant', [ChatController::class, 'addParticipant'])->name('profesor.chat.add-participant');
+        Route::get('/chat', [ChatController::class, 'index'])
+            ->name('profesor.chat');
+        
+        Route::get('/chat/search', [ChatController::class, 'searchUsers'])
+            ->name('profesor.chat.search');
+        
+        Route::post('/chat/create', [ChatController::class, 'createConversation'])
+            ->name('profesor.chat.create');
+        
+        Route::get('/chat/{id}', [ChatController::class, 'getConversation'])
+            ->name('profesor.chat.show');
+        
+        Route::post('/chat/{id}/message', [ChatController::class, 'sendMessage'])
+            ->name('profesor.chat.message');
+        
+        Route::post('/chat/{id}/read', [ChatController::class, 'markAsRead'])
+            ->name('profesor.chat.read');
+        
+        Route::delete('/chat/message/{id}', [ChatController::class, 'deleteMessage'])
+            ->name('profesor.chat.delete-message');
+        
+        Route::post('/chat/{id}/leave', [ChatController::class, 'leaveGroup'])
+            ->name('profesor.chat.leave');
+        
+        Route::post('/chat/{id}/add-participant', [ChatController::class, 'addParticipant'])
+            ->name('profesor.chat.add-participant');
+        
+        Route::put('/chat/{id}/update-group', [ChatController::class, 'updateGroup'])
+            ->name('profesor.chat.update-group');
         
         // Mis Clases
         Route::get('/clases', [ClassController::class, 'index'])->name('profesor.clases.index');

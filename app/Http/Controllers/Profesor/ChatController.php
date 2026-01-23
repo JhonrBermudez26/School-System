@@ -21,24 +21,28 @@ class ChatController extends Controller
     {
         $user = Auth::user();
 
-        // Obtener conversaciones del usuario con último mensaje
+        // Obtener conversaciones con el último mensaje (para performance)
         $conversations = Conversation::whereHas('participants', function ($q) use ($user) {
             $q->where('user_id', $user->id);
-        })->with([
+        })
+        ->with([
             'participants.user' => function ($q) {
                 $q->select('id', 'name', 'last_name', 'email', 'photo');
-            }, 
+            },
             'messages' => function ($q) {
-                $q->latest()->limit(1); // Solo último mensaje
-            }, 
+                $q->latest()->limit(1); // Solo último mensaje para la lista
+            },
             'messages.user' => function ($q) {
-                $q->select('id', 'name', 'last_name');
+                $q->select('id', 'name', 'last_name', 'photo');
             }
         ])
+        ->withCount(['messages as unread_count' => function ($q) use ($user) {
+            $q->where('user_id', '!=', $user->id)
+              ->whereJsonDoesntContain('read_by', $user->id);
+        }])
         ->orderByDesc('last_message_at')
         ->get();
 
-        // Usuarios disponibles para nuevo chat (estudiantes y profesores)
         $availableUsers = User::whereHas('roles', function ($q) {
             $q->whereIn('name', ['estudiante', 'profesor']);
         })
@@ -49,13 +53,12 @@ class ChatController extends Controller
         return Inertia::render('Profesor/Clases/Chat', [
             'conversations' => $conversations,
             'availableUsers' => $availableUsers,
-            'users' => [], // Inicialmente vacío
+            'users' => [],
         ]);
     }
 
     /**
      * Buscar usuarios para iniciar conversación
-     * MODIFICADO PARA INERTIA
      */
     public function searchUsers(Request $request)
     {
@@ -74,22 +77,26 @@ class ChatController extends Controller
         ->limit(20)
         ->get();
 
-        // CAMBIO IMPORTANTE: Devolver con Inertia en lugar de JSON
         $user = Auth::user();
-        
+
         $conversations = Conversation::whereHas('participants', function ($q) use ($user) {
             $q->where('user_id', $user->id);
-        })->with([
+        })
+        ->with([
             'participants.user' => function ($q) {
                 $q->select('id', 'name', 'last_name', 'email', 'photo');
-            }, 
+            },
             'messages' => function ($q) {
                 $q->latest()->limit(1);
-            }, 
+            },
             'messages.user' => function ($q) {
                 $q->select('id', 'name', 'last_name');
             }
         ])
+        ->withCount(['messages as unread_count' => function ($q) use ($user) {
+            $q->where('user_id', '!=', $user->id)
+              ->whereJsonDoesntContain('read_by', $user->id);
+        }])
         ->orderByDesc('last_message_at')
         ->get();
 
@@ -103,7 +110,7 @@ class ChatController extends Controller
         return Inertia::render('Profesor/Clases/Chat', [
             'conversations' => $conversations,
             'availableUsers' => $availableUsers,
-            'users' => $users, // Resultados de búsqueda
+            'users' => $users,
         ]);
     }
 
@@ -120,7 +127,7 @@ class ChatController extends Controller
         ]);
 
         DB::beginTransaction();
-        
+
         try {
             // Verificar si ya existe una conversación personal
             if ($data['type'] === 'personal') {
@@ -135,7 +142,8 @@ class ChatController extends Controller
 
                 if ($existingConv) {
                     DB::commit();
-                    return redirect()->back();
+                    // ✅ Redirigir a la conversación existente
+                    return redirect()->route('profesor.chat.show', $existingConv->id);
                 }
             }
 
@@ -161,8 +169,9 @@ class ChatController extends Controller
             }
 
             DB::commit();
-            
-            return redirect()->back();
+
+            // ✅ Redirigir a la nueva conversación
+            return redirect()->route('profesor.chat.show', $conversation->id);
         } catch (\Exception $e) {
             DB::rollback();
             return redirect()->back()->withErrors(['error' => $e->getMessage()]);
@@ -174,36 +183,75 @@ class ChatController extends Controller
      */
     public function getConversation($id)
     {
-        $conversation = Conversation::with(['participants.user', 'messages.user'])
-            ->findOrFail($id);
-
-        // Verificar que el usuario pertenece al chat
-        if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
-            abort(403);
-        }
-
-        // Marcar mensajes como leídos
-        foreach ($conversation->messages as $message) {
-            if ($message->user_id !== Auth::id()) {
-                $message->markAsRead(Auth::id());
-            }
-        }
-
         $user = Auth::user();
         
-        $conversations = Conversation::whereHas('participants', function ($q) use ($user) {
-            $q->where('user_id', $user->id);
-        })->with([
+        \Log::info('🔍 Cargando conversación', ['conversation_id' => $id, 'user_id' => $user->id]);
+        
+        $conversation = Conversation::with([
             'participants.user' => function ($q) {
                 $q->select('id', 'name', 'last_name', 'email', 'photo');
-            }, 
+            },
             'messages' => function ($q) {
-                $q->latest()->limit(1);
-            }, 
+                $q->orderBy('created_at', 'asc');
+            },
             'messages.user' => function ($q) {
-                $q->select('id', 'name', 'last_name');
+                $q->select('id', 'name', 'last_name', 'photo');
             }
         ])
+        ->findOrFail($id);
+
+        // Verificar que el usuario pertenece al chat
+        if (!$conversation->participants()->where('user_id', $user->id)->exists()) {
+            \Log::warning('❌ Usuario no tiene acceso a conversación', ['conversation_id' => $id, 'user_id' => $user->id]);
+            abort(403, 'No tienes acceso a esta conversación');
+        }
+
+        \Log::info('📊 Conversación encontrada', [
+            'conversation_id' => $id,
+            'messages_count' => $conversation->messages->count(),
+            'participants_count' => $conversation->participants->count()
+        ]);
+
+        // Marcar mensajes como leídos
+        $markedCount = 0;
+        foreach ($conversation->messages as $message) {
+            if ($message->user_id !== $user->id && !$message->isReadBy($user->id)) {
+                $message->markAsRead($user->id);
+                $markedCount++;
+            }
+        }
+        
+        \Log::info('✓ Mensajes marcados como leídos', ['count' => $markedCount]);
+
+        // Recargar mensajes para obtener el read_by actualizado
+        $conversation->load([
+            'messages' => function ($q) {
+                $q->orderBy('created_at', 'asc');
+            },
+            'messages.user' => function ($q) {
+                $q->select('id', 'name', 'last_name', 'photo');
+            }
+        ]);
+
+        // Obtener todas las conversaciones actualizadas
+        $conversations = Conversation::whereHas('participants', function ($q) use ($user) {
+            $q->where('user_id', $user->id);
+        })
+        ->with([
+            'participants.user' => function ($q) {
+                $q->select('id', 'name', 'last_name', 'email', 'photo');
+            },
+            'messages' => function ($q) {
+                $q->latest()->limit(1);
+            },
+            'messages.user' => function ($q) {
+                $q->select('id', 'name', 'last_name', 'photo');
+            }
+        ])
+        ->withCount(['messages as unread_count' => function ($q) use ($user) {
+            $q->where('user_id', '!=', $user->id)
+              ->whereJsonDoesntContain('read_by', $user->id);
+        }])
         ->orderByDesc('last_message_at')
         ->get();
 
@@ -213,6 +261,11 @@ class ChatController extends Controller
         ->where('id', '!=', $user->id)
         ->select('id', 'name', 'last_name', 'email', 'photo')
         ->get();
+
+        \Log::info('✅ Devolviendo vista con conversación', [
+            'conversation_id' => $conversation->id,
+            'messages_count' => $conversation->messages->count()
+        ]);
 
         return Inertia::render('Profesor/Clases/Chat', [
             'conversations' => $conversations,
@@ -226,55 +279,62 @@ class ChatController extends Controller
      * Enviar un mensaje en una conversación
      */
     public function sendMessage(Request $request, $conversationId)
-{
-    $conversation = Conversation::findOrFail($conversationId);
+    {
+        $conversation = Conversation::findOrFail($conversationId);
 
-    if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
-        abort(403);
+        if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'body' => 'nullable|string',
+            'file' => 'nullable|file|max:10240',
+            'type' => 'required|in:text,file,call,audio',
+        ]);
+
+        $attachment = null;
+        $messageType = $data['type'];
+
+        // Manejar archivo o audio
+        if ($request->hasFile('file')) {
+            if ($messageType === 'audio') {
+                $attachment = $request->file('file')->store('chat_audios', 'public');
+            } else {
+                $attachment = $request->file('file')->store('chat_files', 'public');
+                $messageType = 'file';
+            }
+        }
+
+        // Manejar llamadas
+        if ($messageType === 'call') {
+            $data['body'] = 'Iniciando llamada...';
+            // Usar Jitsi Meet como en las clases
+            $roomName = "chat-{$conversationId}-" . time();
+            $attachment = "https://meet.jit.si/{$roomName}";
+        }
+
+        $message = $conversation->messages()->create([
+            'user_id' => Auth::id(),
+            'body' => $data['body'] ?? null,
+            'type' => $messageType,
+            'attachment' => $attachment,
+            'read_by' => [Auth::id()], // Guardar como array, no como JSON string
+        ]);
+
+        $conversation->updateLastMessage();
+
+        $message->load('user:id,name,last_name,photo');
+
+        broadcast(new \App\Events\MessageSent($message));
+
+        \Log::info('📤 Mensaje enviado y broadcast', [
+            'conversation_id' => $conversationId,
+            'message_id' => $message->id,
+            'user_id' => Auth::id()
+        ]);
+
+        return redirect()->back();
     }
-
-    $data = $request->validate([
-        'body' => 'required_without:file|string',
-        'file' => 'nullable|file|max:10240',
-        'type' => 'required|in:text,file,call',
-    ]);
-
-    $attachment = null;
-    if ($request->hasFile('file')) {
-        $attachment = $request->file('file')->store('chat_files', 'public');
-        $data['type'] = 'file';
-    }
-
-    if ($data['type'] === 'call') {
-        $data['body'] = 'Iniciando llamada...';
-        $attachment = 'https://meet.google.com/xxx-yyyy-zzz';
-    }
-
-    $message = $conversation->messages()->create([
-        'user_id' => Auth::id(),
-        'body' => $data['body'] ?? null,
-        'type' => $data['type'],
-        'attachment' => $attachment,
-        'read_by' => [Auth::id()],
-    ]);
-
-    $conversation->updateLastMessage();
-
-    // ✅ CARGAR la relación del usuario ANTES de broadcast
-    $message->load('user:id,name,last_name,photo');
-
-    // ✅ Broadcast el evento
-    broadcast(new \App\Events\MessageSent($message));
-
-    // ✅ LOG para debug
-    \Log::info('📤 Mensaje enviado y broadcast', [
-        'conversation_id' => $conversationId,
-        'message_id' => $message->id,
-        'user_id' => Auth::id()
-    ]);
-
-    return redirect()->back();
-}
 
     /**
      * Marcar mensajes como leídos
@@ -289,12 +349,12 @@ class ChatController extends Controller
 
         $conversation->messages()
             ->where('user_id', '!=', Auth::id())
-            ->whereJsonDoesntContain('read_by', Auth::id())
             ->get()
             ->each(function ($message) {
                 $message->markAsRead(Auth::id());
             });
 
+        // ✅ NO devolver JSON, devolver redirect back para Inertia
         return redirect()->back();
     }
 
@@ -305,13 +365,11 @@ class ChatController extends Controller
     {
         $message = Message::findOrFail($messageId);
 
-        // Solo el autor puede eliminar
         if ($message->user_id !== Auth::id()) {
             abort(403);
         }
 
-        // Eliminar archivo adjunto si existe
-        if ($message->attachment && $message->type === 'file') {
+        if ($message->attachment && in_array($message->type, ['file', 'audio'])) {
             Storage::disk('public')->delete($message->attachment);
         }
 
@@ -351,12 +409,37 @@ class ChatController extends Controller
             'user_id' => 'required|integer|exists:users,id'
         ]);
 
-        // Verificar que quien agrega es parte del grupo
         if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
             abort(403);
         }
 
         $conversation->addParticipant($data['user_id']);
+
+        return redirect()->back();
+    }
+
+    /**
+     * Actualizar información del grupo
+     */
+    public function updateGroup(Request $request, $conversationId)
+    {
+        $conversation = Conversation::findOrFail($conversationId);
+
+        if ($conversation->type !== 'group') {
+            return redirect()->back()->withErrors(['error' => 'Solo se puede editar información de grupos']);
+        }
+
+        if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+        ]);
+
+        $conversation->update([
+            'name' => $data['name']
+        ]);
 
         return redirect()->back();
     }
