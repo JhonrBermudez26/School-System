@@ -11,6 +11,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use App\Events\MessageSent;
+use App\Events\ChatNotification;
+
 
 class ChatController extends Controller
 {
@@ -21,7 +24,6 @@ class ChatController extends Controller
     {
         $user = Auth::user();
 
-        // Obtener conversaciones con el último mensaje (para performance)
         $conversations = Conversation::whereHas('participants', function ($q) use ($user) {
             $q->where('user_id', $user->id);
         })
@@ -30,7 +32,7 @@ class ChatController extends Controller
                 $q->select('id', 'name', 'last_name', 'email', 'photo');
             },
             'messages' => function ($q) {
-                $q->latest()->limit(1); // Solo último mensaje para la lista
+                $q->latest()->limit(1);
             },
             'messages.user' => function ($q) {
                 $q->select('id', 'name', 'last_name', 'photo');
@@ -38,7 +40,7 @@ class ChatController extends Controller
         ])
         ->withCount(['messages as unread_count' => function ($q) use ($user) {
             $q->where('user_id', '!=', $user->id)
-              ->whereJsonDoesntContain('read_by', $user->id);
+                ->whereJsonDoesntContain('read_by', $user->id);
         }])
         ->orderByDesc('last_message_at')
         ->get();
@@ -50,13 +52,29 @@ class ChatController extends Controller
         ->select('id', 'name', 'last_name', 'email', 'photo')
         ->get();
 
-        return Inertia::render('Profesor/Clases/Chat', [
+        return Inertia::render('Profesor/Chat', [
             'conversations' => $conversations,
             'availableUsers' => $availableUsers,
             'users' => [],
         ]);
     }
 
+    private function getMessagePreview($message)
+    {
+        switch ($message->type) {
+            case 'text':
+                return mb_substr($message->body, 0, 50) . (mb_strlen($message->body) > 50 ? '...' : '');
+            case 'audio':
+                return '🎤 Mensaje de voz';
+            case 'file':
+                return '📎 Archivo adjunto';
+            case 'call':
+                return '📞 Llamada';
+            default:
+                return 'Nuevo mensaje';
+        }
+    }
+    
     /**
      * Buscar usuarios para iniciar conversación
      */
@@ -107,7 +125,7 @@ class ChatController extends Controller
         ->select('id', 'name', 'last_name', 'email', 'photo')
         ->get();
 
-        return Inertia::render('Profesor/Clases/Chat', [
+        return Inertia::render('Profesor/Chat', [
             'conversations' => $conversations,
             'availableUsers' => $availableUsers,
             'users' => $users,
@@ -267,7 +285,7 @@ class ChatController extends Controller
             'messages_count' => $conversation->messages->count()
         ]);
 
-        return Inertia::render('Profesor/Clases/Chat', [
+        return Inertia::render('Profesor/Chat', [
             'conversations' => $conversations,
             'availableUsers' => $availableUsers,
             'conversation' => $conversation,
@@ -278,24 +296,23 @@ class ChatController extends Controller
     /**
      * Enviar un mensaje en una conversación
      */
-    public function sendMessage(Request $request, $conversationId)
+     public function sendMessage(Request $request, $conversationId)
     {
         $conversation = Conversation::findOrFail($conversationId);
-
+        
         if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
             abort(403);
         }
-
+        
         $data = $request->validate([
             'body' => 'nullable|string',
             'file' => 'nullable|file|max:10240',
             'type' => 'required|in:text,file,call,audio',
         ]);
-
+        
         $attachment = null;
         $messageType = $data['type'];
-
-        // Manejar archivo o audio
+        
         if ($request->hasFile('file')) {
             if ($messageType === 'audio') {
                 $attachment = $request->file('file')->store('chat_audios', 'public');
@@ -304,35 +321,57 @@ class ChatController extends Controller
                 $messageType = 'file';
             }
         }
-
-        // Manejar llamadas
+        
         if ($messageType === 'call') {
             $data['body'] = 'Iniciando llamada...';
-            // Usar Jitsi Meet como en las clases
             $roomName = "chat-{$conversationId}-" . time();
             $attachment = "https://meet.jit.si/{$roomName}";
         }
-
+        
         $message = $conversation->messages()->create([
             'user_id' => Auth::id(),
             'body' => $data['body'] ?? null,
             'type' => $messageType,
             'attachment' => $attachment,
-            'read_by' => [Auth::id()], // Guardar como array, no como JSON string
+            'read_by' => [Auth::id()],
         ]);
-
+        
         $conversation->updateLastMessage();
-
         $message->load('user:id,name,last_name,photo');
-
-        broadcast(new \App\Events\MessageSent($message));
-
-        \Log::info('📤 Mensaje enviado y broadcast', [
-            'conversation_id' => $conversationId,
-            'message_id' => $message->id,
-            'user_id' => Auth::id()
-        ]);
-
+        
+        // ✅ CORRECCIÓN: Manejo de errores en broadcast
+        try {
+            // Broadcast del mensaje al canal de la conversación
+            broadcast(new MessageSent($message))->toOthers();
+            
+            // Enviar notificación a cada participante (excepto el remitente)
+            $participants = $conversation->participants()
+                ->where('user_id', '!=', Auth::id())
+                ->with('user')
+                ->get();
+            
+            foreach ($participants as $participant) {
+                broadcast(new ChatNotification(
+                    $participant->user_id,
+                    $conversationId,
+                    Auth::user()->name . ' ' . Auth::user()->last_name,
+                    $this->getMessagePreview($message)
+                ))->toOthers();
+            }
+            
+            \Log::info('📤 Mensaje enviado con notificaciones', [
+                'conversation_id' => $conversationId,
+                'message_id' => $message->id,
+                'user_id' => Auth::id(),
+                'participants_notified' => $participants->count()
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('❌ Error broadcasting message:', [
+                'error' => $e->getMessage(),
+                'conversation_id' => $conversationId
+            ]);
+        }
+        
         return redirect()->back();
     }
 
@@ -342,20 +381,20 @@ class ChatController extends Controller
     public function markAsRead($conversationId)
     {
         $conversation = Conversation::findOrFail($conversationId);
-
+        
         if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
             abort(403);
         }
-
+        
         $conversation->messages()
             ->where('user_id', '!=', Auth::id())
             ->get()
             ->each(function ($message) {
                 $message->markAsRead(Auth::id());
             });
-
-        // ✅ NO devolver JSON, devolver redirect back para Inertia
-        return redirect()->back();
+        
+        // ✅ CORRECCIÓN: Devolver JSON para Inertia con preserveState
+        return response()->json(['success' => true]);
     }
 
     /**

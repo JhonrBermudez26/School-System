@@ -7,10 +7,11 @@ import {
 } from 'lucide-react';
 import Layout from '@/Components/Layout/Layout';
 
+
 export default function Chat() {
   const { props } = usePage();
   const user = props.auth.user;
-  
+
   const [searchQuery, setSearchQuery] = useState('');
   const [searchedUsers, setSearchedUsers] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -30,7 +31,7 @@ export default function Chat() {
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
-  
+
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -49,30 +50,62 @@ export default function Chat() {
 
   // ✅ Efecto separado SOLO para Echo (escucha en tiempo real)
   useEffect(() => {
-    if (selectedConversation && messages.length > 0) {
-      console.log('📡 Conectándose al canal:', `conversation.${selectedConversation.id}`);
-      const channel = window.Echo.channel(`conversation.${selectedConversation.id}`);
-      
-      channel.listen('.message.sent', (data) => {
-        console.log('📨 Mensaje recibido en tiempo real:', data);
-        if (data.message.user_id !== user.id) {
-          setMessages(prev => {
-            const exists = prev.some(m => m.id === data.message.id);
-            if (exists) return prev;
-            return [...prev, data.message];
-          });
-          
-          markAsRead(selectedConversation.id);
-        }
-        fetchConversations();
+  if (!selectedConversation?.id || !window.Echo) {
+    console.warn('Echo no disponible o sin conversación');
+    return;
+  }
+  
+  console.log('📡 Conectándose al canal:', `conversation.${selectedConversation.id}`);
+  
+  // ✅ SINTAXIS CORREGIDA
+  const channel = window.Echo.channel(`conversation.${selectedConversation.id}`);
+  
+  channel.listen('.message.sent', (data) => {
+    console.log('📨 Mensaje recibido en tiempo real:', data);
+    
+    if (data.message.user_id !== user.id) {
+      setMessages(prev => {
+        const exists = prev.some(m => m.id === data.message.id);
+        if (exists) return prev;
+        return [...prev, data.message];
       });
-
-      return () => {
-        console.log('🔌 Desconectándose del canal:', `conversation.${selectedConversation.id}`);
-        window.Echo.leave(`conversation.${selectedConversation.id}`);
-      };
+      
+      markAsRead(selectedConversation.id);
     }
-  }, [selectedConversation?.id, messages.length, user.id]);
+    
+    fetchConversations();
+  });
+  
+  return () => {
+    console.log('🔌 Desconectándose del canal:', `conversation.${selectedConversation.id}`);
+    // ✅ SINTAXIS CORREGIDA
+    window.Echo.leave(`conversation.${selectedConversation.id}`);
+  };
+}, [selectedConversation?.id, user.id]);
+
+// 2. Efecto de notificaciones globales (líneas 85-102)
+useEffect(() => {
+  if (!user?.id || !window.Echo) {
+    console.warn('Echo no disponible o sin usuario');
+    return;
+  }
+  
+  console.log('📡 Escuchando notificaciones globales para usuario:', user.id);
+  
+  // ✅ SINTAXIS CORREGIDA
+  const userChannel = window.Echo.private(`user.${user.id}`);
+  
+  userChannel.listen('.chat.notification', (data) => {
+    console.log('🔔 Notificación recibida:', data);
+    fetchConversations();
+  });
+  
+  return () => {
+    console.log('🔌 Desconectándose de notificaciones globales');
+    // ✅ SINTAXIS CORREGIDA
+    window.Echo.leave(`user.${user.id}`);
+  };
+}, [user.id]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -106,7 +139,7 @@ export default function Chat() {
 
   const performSearch = () => {
     if (searchQuery.trim().length < 2) return;
-    
+
     setIsSearching(true);
     router.get(route('profesor.chat.search'), { query: searchQuery }, {
       preserveState: true,
@@ -141,7 +174,7 @@ export default function Chat() {
       alert('El grupo debe tener al menos 2 participantes');
       return;
     }
-    
+
     router.post(route('profesor.chat.create'), {
       type: 'group',
       name: groupName,
@@ -159,10 +192,10 @@ export default function Chat() {
   // ✅ Función simplificada para seleccionar conversación
   const selectConversation = (conv) => {
     console.log('👆 Click en conversación:', conv.id);
-    
+
     setShowGroupInfo(false);
     setIsLoadingMessages(true);
-    
+
     // ✅ Navegar usando router.visit con preserveState
     router.visit(route('profesor.chat.show', conv.id), {
       method: 'get',
@@ -179,7 +212,7 @@ export default function Chat() {
           console.log('📝 Estableciendo', conversation.messages.length, 'mensajes');
           setMessages(conversation.messages);
           setSelectedConversation(conversation);
-          
+
           // ✅ Marcar como leído después de cargar
           markAsRead(conversation.id);
         } else {
@@ -198,7 +231,7 @@ export default function Chat() {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
       setFile(selectedFile);
-      
+
       if (selectedFile.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onloadend = () => setFilePreview(reader.result);
@@ -220,7 +253,7 @@ export default function Chat() {
 
     const formData = new FormData();
     formData.append('body', newMessage);
-    
+
     if (audioBlob) {
       formData.append('type', 'audio');
       formData.append('file', audioBlob, 'audio.webm');
@@ -246,7 +279,7 @@ export default function Chat() {
     };
 
     setMessages(prev => [...prev, tempMessage]);
-    
+
     const messageText = newMessage;
     setNewMessage('');
     clearFile();
@@ -319,7 +352,7 @@ export default function Chat() {
 
   const updateGroupInfo = () => {
     if (!editingGroup) return;
-    
+
     router.put(route('profesor.chat.update-group', selectedConversation.id), {
       name: editingGroup.name,
     }, {
@@ -360,7 +393,7 @@ export default function Chat() {
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = (now - date) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 24) {
       return date.toLocaleTimeString('es-CO', {
         hour: 'numeric',
@@ -403,47 +436,43 @@ export default function Chat() {
                   </button>
                 )}
               </div>
-              
+
               {/* Filtros */}
               {!searchQuery && (
                 <div className="flex gap-2 mt-3">
                   <button
                     onClick={() => setFilterChat('all')}
-                    className={`px-3 py-1.5 text-xs rounded-full transition ${
-                      filterChat === 'all' 
-                        ? 'bg-blue-600 text-white' 
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    className={`px-3 py-1.5 text-xs rounded-full transition ${filterChat === 'all'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                   >
                     Todos
                   </button>
                   <button
                     onClick={() => setFilterChat('unread')}
-                    className={`px-3 py-1.5 text-xs rounded-full transition ${
-                      filterChat === 'unread' 
-                        ? 'bg-blue-600 text-white' 
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    className={`px-3 py-1.5 text-xs rounded-full transition ${filterChat === 'unread'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                   >
                     No leído
                   </button>
                   <button
                     onClick={() => setFilterChat('chats')}
-                    className={`px-3 py-1.5 text-xs rounded-full transition ${
-                      filterChat === 'chats' 
-                        ? 'bg-blue-600 text-white' 
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    className={`px-3 py-1.5 text-xs rounded-full transition ${filterChat === 'chats'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                   >
                     Chats
                   </button>
                   <button
                     onClick={() => setFilterChat('groups')}
-                    className={`px-3 py-1.5 text-xs rounded-full transition ${
-                      filterChat === 'groups' 
-                        ? 'bg-blue-600 text-white' 
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    className={`px-3 py-1.5 text-xs rounded-full transition ${filterChat === 'groups'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                      }`}
                   >
                     Grupos
                   </button>
@@ -528,8 +557,8 @@ export default function Chat() {
                   <MessageSquare className="h-10 w-10 text-gray-300 mb-3" />
                   <p className="font-medium">No hay conversaciones</p>
                   <p className="text-sm mt-1">
-                    {filterChat === 'unread' 
-                      ? 'No tienes mensajes sin leer' 
+                    {filterChat === 'unread'
+                      ? 'No tienes mensajes sin leer'
                       : 'Busca un usuario o crea un grupo'}
                   </p>
                 </div>
@@ -539,15 +568,14 @@ export default function Chat() {
                     ? conv.participants.find(p => p.user_id !== user.id)?.user
                     : null;
                   const hasUnread = conv.unread_count > 0;
-                  
+
                   return (
                     <div
                       key={conv.id}
-                      className={`p-4 border-b cursor-pointer hover:bg-gray-100 transition ${
-                        selectedConversation?.id === conv.id 
-                          ? 'bg-blue-50 border-l-4 border-l-blue-500' 
-                          : ''
-                      }`}
+                      className={`p-4 border-b cursor-pointer hover:bg-gray-100 transition ${selectedConversation?.id === conv.id
+                        ? 'bg-blue-50 border-l-4 border-l-blue-500'
+                        : ''
+                        }`}
                       onClick={() => selectConversation(conv)}
                     >
                       <div className="flex items-center gap-3">
@@ -567,7 +595,7 @@ export default function Chat() {
                               <span className="text-white font-semibold">
                                 {otherParticipant
                                   ? (otherParticipant.name?.[0] || '').toUpperCase() +
-                                    (otherParticipant.last_name?.[0] || '').toUpperCase()
+                                  (otherParticipant.last_name?.[0] || '').toUpperCase()
                                   : 'U'}
                               </span>
                             </div>
@@ -600,7 +628,7 @@ export default function Chat() {
                                   <span className="font-medium text-gray-700">Tú: </span>
                                 ) : conv.type === 'group' ? (
                                   <span className="font-medium text-gray-700">
-                                    {conv.messages[0].user?.name || 'Usuario'}: 
+                                    {conv.messages[0].user?.name || 'Usuario'}:
                                   </span>
                                 ) : null}
                                 <span>
@@ -655,7 +683,7 @@ export default function Chat() {
                               <span className="text-white font-semibold">
                                 {otherParticipant
                                   ? (otherParticipant.name?.[0] || '').toUpperCase() +
-                                    (otherParticipant.last_name?.[0] || '').toUpperCase()
+                                  (otherParticipant.last_name?.[0] || '').toUpperCase()
                                   : 'U'}
                               </span>
                             </div>
@@ -668,8 +696,8 @@ export default function Chat() {
                         {selectedConversation.type === 'group'
                           ? selectedConversation.name
                           : selectedConversation.participants.find(p => p.user_id !== user.id)?.user.name +
-                            ' ' +
-                            selectedConversation.participants.find(p => p.user_id !== user.id)?.user.last_name}
+                          ' ' +
+                          selectedConversation.participants.find(p => p.user_id !== user.id)?.user.last_name}
                       </h2>
                       <p className="text-xs text-gray-500">
                         {selectedConversation.type === 'group'
@@ -714,34 +742,33 @@ export default function Chat() {
                   ) : (
                     messages.map(msg => {
                       const isRead = msg.read_by && msg.read_by.length > 1;
-                      
+
                       return (
                         <div
                           key={msg.id}
                           className={`flex ${msg.user_id === user.id ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
-                            className={`max-w-[70%] p-4 rounded-2xl shadow-sm ${
-                              msg.user_id === user.id
-                                ? 'bg-blue-600 text-white rounded-br-none'
-                                : 'bg-white rounded-bl-none border border-gray-200'
-                            }`}
+                            className={`max-w-[70%] p-4 rounded-2xl shadow-sm ${msg.user_id === user.id
+                              ? 'bg-blue-600 text-white rounded-br-none'
+                              : 'bg-white rounded-bl-none border border-gray-200'
+                              }`}
                           >
                             {selectedConversation.type === 'group' && msg.user_id !== user.id && (
                               <p className="text-xs font-semibold mb-1 opacity-70">
                                 {msg.user?.name} {msg.user?.last_name}
                               </p>
                             )}
-                            
+
                             {msg.type === 'text' && <p className="leading-relaxed">{msg.body}</p>}
-                            
+
                             {msg.type === 'audio' && (
                               <div className="flex items-center gap-3">
                                 <Mic className="h-5 w-5" />
                                 <audio controls src={`/storage/${msg.attachment}`} className="max-w-xs" />
                               </div>
                             )}
-                            
+
                             {msg.type === 'file' && (
                               <a
                                 href={`/storage/${msg.attachment}`}
@@ -756,14 +783,14 @@ export default function Chat() {
                                 <span>Ver archivo</span>
                               </a>
                             )}
-                            
+
                             {msg.type === 'call' && (
                               <p className="italic flex items-center gap-2">
                                 <Phone className="h-4 w-4" />
                                 {msg.body}
                               </p>
                             )}
-                            
+
                             <div className="flex items-center justify-between mt-2">
                               <p className="text-xs opacity-70">
                                 {new Date(msg.created_at).toLocaleTimeString([], {
@@ -822,7 +849,7 @@ export default function Chat() {
                     onChange={handleFileSelect}
                     accept="image/*,.pdf,.doc,.docx,.txt"
                   />
-                  
+
                   <label
                     htmlFor="chat-file"
                     className="cursor-pointer p-3 hover:bg-gray-100 rounded-full transition"
@@ -889,18 +916,18 @@ export default function Chat() {
                     <X className="h-5 w-5" />
                   </button>
                 </div>
-                
+
                 <div className="flex flex-col items-center">
                   <div className="w-20 h-20 bg-gradient-to-br from-purple-400 to-purple-600 rounded-full flex items-center justify-center mb-3">
                     <Users className="h-10 w-10 text-white" />
                   </div>
-                  
+
                   {editingGroup ? (
                     <div className="w-full">
                       <input
                         type="text"
                         value={editingGroup.name}
-                        onChange={e => setEditingGroup({...editingGroup, name: e.target.value})}
+                        onChange={e => setEditingGroup({ ...editingGroup, name: e.target.value })}
                         className="w-full px-3 py-2 border rounded-lg mb-2"
                       />
                       <div className="flex gap-2">
@@ -922,7 +949,7 @@ export default function Chat() {
                     <div className="text-center">
                       <h4 className="font-semibold text-lg">{selectedConversation.name}</h4>
                       <button
-                        onClick={() => setEditingGroup({name: selectedConversation.name})}
+                        onClick={() => setEditingGroup({ name: selectedConversation.name })}
                         className="text-sm text-blue-600 hover:underline mt-1"
                       >
                         Editar nombre
@@ -1072,11 +1099,10 @@ export default function Chat() {
                           <button
                             onClick={() => addToGroup(u.id)}
                             disabled={groupParticipants.includes(u.id)}
-                            className={`px-4 py-2 rounded-lg transition font-medium min-w-[90px] text-center ${
-                              groupParticipants.includes(u.id)
-                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                            }`}
+                            className={`px-4 py-2 rounded-lg transition font-medium min-w-[90px] text-center ${groupParticipants.includes(u.id)
+                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                              : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                              }`}
                           >
                             {groupParticipants.includes(u.id) ? 'Agregado' : 'Agregar'}
                           </button>

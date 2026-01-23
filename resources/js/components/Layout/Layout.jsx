@@ -10,21 +10,23 @@ import {
   X as CloseIcon,
 } from "lucide-react";
 import SidebarMenu from "./SidebarMenu";
+import ChatNotification from './ChatNotification';
 
 export default function Layout({ title, children }) {
   
   const { auth, app } = usePage().props;
   const currentUrl = usePage().url;
   const user = auth?.user;
-
-   const [previewImage, setPreviewImage] = useState(user?.photo ? `/storage/${user.photo}` : null);
+  const [previewImage, setPreviewImage] = useState(user?.photo ? `/storage/${user.photo}` : null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  
   const appName = app?.name;
   const appFullName = app?.fullName || appName;
-
+  
   const handleLogout = () => router.post("/logout");
   const handleEditProfile = () => router.visit("/perfil/editar");
+  
   const navigateToDashboard = () => {
     const rol = user?.roles?.[0]?.toLowerCase();
     router.visit(`/${rol}/dashboard`);
@@ -33,6 +35,7 @@ export default function Layout({ title, children }) {
   return (
     <>
       <Head title={title ? `${title} | ${appName}` : appFullName} />
+      
       <div className="min-h-screen bg-gray-100 flex flex-col">
         {/* Navbar */}
         <nav className="bg-white shadow-md fixed w-full top-0 z-50">
@@ -82,8 +85,9 @@ export default function Layout({ title, children }) {
                     )}
                   </div>
                   <ChevronDown
-                    className={`h-4 w-4 text-gray-600 transition-transform ${showProfileMenu ? "rotate-180" : ""
-                      }`}
+                    className={`h-4 w-4 text-gray-600 transition-transform ${
+                      showProfileMenu ? "rotate-180" : ""
+                    }`}
                   />
                 </button>
 
@@ -124,7 +128,7 @@ export default function Layout({ title, children }) {
           {/* Sidebar */}
           <aside
             className={`bg-white shadow-lg lg:w-72 w-64 fixed top-16 z-40 h-[calc(100vh-4rem)] transform transition-transform duration-300 ease-in-out overflow-y-auto
-  ${sidebarOpen
+              ${sidebarOpen
                 ? "translate-x-0"
                 : "-translate-x-full lg:translate-x-0"
               }`}
@@ -133,7 +137,6 @@ export default function Layout({ title, children }) {
               <h2 className="text-sm sm:text-base font-semibold text-gray-500 uppercase tracking-wider mb-6">
                 Menú Principal
               </h2>
-
               {/* Menú con scroll */}
               <nav className="space-y-3 pb-6">
                 {user?.roles?.map((role, index) => (
@@ -150,6 +153,9 @@ export default function Layout({ title, children }) {
             {children}
           </main>
         </div>
+
+        {/* Notificaciones de Chat - Fuera del contenedor principal */}
+        <ChatNotification />
       </div>
     </>
   );
