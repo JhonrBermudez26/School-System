@@ -171,10 +171,10 @@ Route::middleware(['auth'])->group(function () {
             ->name('profesor.chat.delete-message');
         
         Route::post('/chat/{id}/leave', [ChatController::class, 'leaveGroup'])
-            ->name('profesor.chat.leave');
+            ->name('profesor.chat.leaveGroup');
         
         Route::post('/chat/{id}/add-participant', [ChatController::class, 'addParticipant'])
-            ->name('profesor.chat.add-participant');
+            ->name('profesor.chat.addParticipant');
         
         Route::put('/chat/{id}/update-group', [ChatController::class, 'updateGroup'])
             ->name('profesor.chat.update-group');
