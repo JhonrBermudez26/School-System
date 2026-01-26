@@ -148,6 +148,7 @@ Route::middleware(['auth'])->group(function () {
         //CHAT
         Route::get('/chat', [ChatController::class, 'index'])
             ->name('profesor.chat');
+            
             Route::get('/chat/conversations/json', [ChatController::class, 'conversationsJson'])
             ->name('profesor.chat.conversations.json');
 
@@ -171,7 +172,7 @@ Route::middleware(['auth'])->group(function () {
             ->name('profesor.chat.delete-message');
         
         Route::post('/chat/{id}/leave', [ChatController::class, 'leaveGroup'])
-            ->name('profesor.chat.leaveGroup');
+            ->name('profesor.chat.leave');
         
         Route::post('/chat/{id}/add-participant', [ChatController::class, 'addParticipant'])
             ->name('profesor.chat.addParticipant');

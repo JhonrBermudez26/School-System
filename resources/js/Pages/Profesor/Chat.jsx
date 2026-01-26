@@ -3,15 +3,15 @@ import { usePage, router } from '@inertiajs/react';
 import {
   Search, User, Users, Send, Paperclip, Phone, X, MessageSquare,
   Mic, StopCircle, Check, CheckCheck, Image, File, Edit2, Trash2,
-  UserPlus, Settings, Camera, ArrowLeft, Menu
+  UserPlus, Settings, Camera, ArrowLeft, Menu, LogOut
 } from 'lucide-react';
 import Layout from '@/Components/Layout/Layout';
-import { LogOut } from 'lucide-react';
-
 
 export default function Chat() {
   const { props } = usePage();
   const user = props.auth.user;
+
+  // Estados principales
   const [searchQuery, setSearchQuery] = useState('');
   const [searchedUsers, setSearchedUsers] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -19,46 +19,54 @@ export default function Chat() {
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
+
+  // Estados para crear grupo
   const [showNewGroup, setShowNewGroup] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [groupParticipants, setGroupParticipants] = useState([]);
+
+  // Estados para archivos y audio
   const [file, setFile] = useState(null);
   const [filePreview, setFilePreview] = useState(null);
-  const [filterChat, setFilterChat] = useState('all');
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
   const [mediaRecorder, setMediaRecorder] = useState(null);
+  const [recordingTime, setRecordingTime] = useState(0);
+
+  // Estados de UI
+  const [filterChat, setFilterChat] = useState('all');
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [editingGroup, setEditingGroup] = useState(null);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [isMobileView, setIsMobileView] = useState(false);
+  const [floatingDate, setFloatingDate] = useState(null);
+
+  // Estados para agregar usuarios al grupo
+  const [addingUser, setAddingUser] = useState(false);
+  const [userSearchQuery, setUserSearchQuery] = useState('');
+  const [userSearchResults, setUserSearchResults] = useState([]);
+
+  // Referencias
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
-  const [floatingDate, setFloatingDate] = useState(null);
   const scrollRef = useRef(null);
-  const [recordingTime, setRecordingTime] = useState(0);
   const recordingIntervalRef = useRef(null);
-  const [showGroupPanel, setShowGroupPanel] = useState(false);
-  const [addingUser, setAddingUser] = useState(false);
-  const [userQuery, setUserQuery] = useState('');
-  const [userResults, setUserResults] = useState([]);
-  
 
-
-
+  // Cargar conversaciones al montar
   useEffect(() => {
     fetchConversations();
   }, []);
 
-  // Efecto separado SOLO para Echo (escucha en tiempo real)
+  // Echo: escucha mensajes en tiempo real
   useEffect(() => {
     if (!selectedConversation?.id || !window.Echo) {
       console.warn('Echo no disponible o sin conversación');
       return;
     }
-    console.log('📡 Conectándose al canal:', `conversation.${selectedConversation.id}`);
 
+    console.log('📡 Conectándose al canal:', `conversation.${selectedConversation.id}`);
     const channel = window.Echo.channel(`conversation.${selectedConversation.id}`);
+
     channel.listen('.message.sent', (data) => {
       console.log('📨 Mensaje recibido en tiempo real:', data);
       if (data.message.user_id !== user.id) {
@@ -77,21 +85,40 @@ export default function Chat() {
     };
   }, [selectedConversation?.id, user.id]);
 
-
+  // Búsqueda de usuarios para agregar al grupo
   useEffect(() => {
-    if (userQuery.length < 2) {
-      setUserResults([]);
+    if (userSearchQuery.length < 2) {
+      setUserSearchResults([]);
       return;
     }
 
-    axios
-      .get(route('profesor.chat.searchUsers'), {
-        params: { query: userQuery }
-      })
-      .then(res => setUserResults(res.data.users));
-  }, [userQuery]);
+    const timeout = setTimeout(async () => {
+      try {
+        // ✅ USAR LA MISMA RUTA QUE PARA BÚSQUEDA PERSONAL
+        const res = await axios.get(route('profesor.chat.search'), {
+          params: { query: userSearchQuery }
+        });
 
+        // Filtrar usuarios que ya son participantes
+        if (selectedConversation) {
+          const existingParticipantIds = selectedConversation.participants.map(p => p.user_id);
+          const filteredUsers = (res.data.users || []).filter(
+            u => !existingParticipantIds.includes(u.id)
+          );
+          setUserSearchResults(filteredUsers);
+        } else {
+          setUserSearchResults(res.data.users || []);
+        }
+      } catch (error) {
+        console.error('Error buscando usuarios:', error);
+        setUserSearchResults([]);
+      }
+    }, 300);
 
+    return () => clearTimeout(timeout);
+  }, [userSearchQuery, selectedConversation]);
+
+  // Fecha flotante al hacer scroll
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -99,14 +126,12 @@ export default function Chat() {
     const handler = () => {
       const separators = el.querySelectorAll('[data-date]');
       let current = null;
-
       separators.forEach(sep => {
         const rect = sep.getBoundingClientRect();
         if (rect.top < 120) {
           current = sep.dataset.date;
         }
       });
-
       setFloatingDate(current);
     };
 
@@ -114,16 +139,16 @@ export default function Chat() {
     return () => el.removeEventListener('scroll', handler);
   }, [messages]);
 
-
-  // Efecto de notificaciones globales
+  // Echo: notificaciones globales
   useEffect(() => {
     if (!user?.id || !window.Echo) {
       console.warn('Echo no disponible o sin usuario');
       return;
     }
-    console.log('📡 Escuchando notificaciones globales para usuario:', user.id);
 
+    console.log('📡 Escuchando notificaciones globales para usuario:', user.id);
     const userChannel = window.Echo.private(`user.${user.id}`);
+
     userChannel.listen('.chat.notification', (data) => {
       console.log('🔔 Notificación recibida:', data);
       fetchConversations();
@@ -135,29 +160,19 @@ export default function Chat() {
     };
   }, [user.id]);
 
+  // Scroll automático a último mensaje
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const fetchConversations = async () => {
-    const res = await axios.get(route('profesor.chat.conversations.json'));
-    setConversations(res.data);
-  };
-
-  const markAsRead = async (conversationId) => {
-    try {
-      await axios.post(route('profesor.chat.read', conversationId));
-    } catch (e) {
-      console.error('Error al marcar como leído', e);
-    }
-  };
-
+  // Búsqueda de usuarios para chat personal
   useEffect(() => {
     if (searchQuery.trim().length < 2) {
       setSearchedUsers([]);
       setIsSearching(false);
       return;
     }
+
     const timeout = setTimeout(async () => {
       setIsSearching(true);
       try {
@@ -170,8 +185,26 @@ export default function Chat() {
         setIsSearching(false);
       }
     }, 300);
+
     return () => clearTimeout(timeout);
   }, [searchQuery]);
+
+  const fetchConversations = async () => {
+    try {
+      const res = await axios.get(route('profesor.chat.conversations.json'));
+      setConversations(res.data);
+    } catch (error) {
+      console.error('Error cargando conversaciones:', error);
+    }
+  };
+
+  const markAsRead = async (conversationId) => {
+    try {
+      await axios.post(route('profesor.chat.read', conversationId));
+    } catch (e) {
+      console.error('Error al marcar como leído', e);
+    }
+  };
 
   const clearSearch = () => {
     setSearchQuery('');
@@ -201,6 +234,7 @@ export default function Chat() {
       alert('El grupo debe tener al menos 2 participantes');
       return;
     }
+
     router.post(route('profesor.chat.create'), {
       type: 'group',
       name: groupName,
@@ -219,7 +253,8 @@ export default function Chat() {
     console.log('👆 Click en conversación:', conv.id);
     setShowGroupInfo(false);
     setIsLoadingMessages(true);
-    setIsMobileView(true); // Activar vista móvil al seleccionar conversación
+    setIsMobileView(true);
+
     try {
       const res = await axios.get(
         route('profesor.chat.show', conv.id),
@@ -264,8 +299,10 @@ export default function Chat() {
 
   const sendMessage = async () => {
     if (!newMessage.trim() && !file && !audioBlob) return;
+
     const formData = new FormData();
     formData.append('body', newMessage);
+
     if (audioBlob) {
       formData.append('type', 'audio');
       formData.append('file', audioBlob, 'audio.webm');
@@ -275,6 +312,7 @@ export default function Chat() {
     } else {
       formData.append('type', 'text');
     }
+
     const tempMessage = {
       id: `temp-${Date.now()}`,
       user_id: user.id,
@@ -283,10 +321,12 @@ export default function Chat() {
       created_at: new Date().toISOString(),
       user: user
     };
+
     setMessages(prev => [...prev, tempMessage]);
     setNewMessage('');
     clearFile();
     setAudioBlob(null);
+
     try {
       const res = await axios.post(
         route('profesor.chat.message', selectedConversation.id),
@@ -317,7 +357,6 @@ export default function Chat() {
       const chunks = [];
 
       recorder.ondataavailable = e => chunks.push(e.data);
-
       recorder.onstop = () => {
         const blob = new Blob(chunks, { type: 'audio/webm' });
         setAudioBlob(blob);
@@ -330,16 +369,13 @@ export default function Chat() {
       setMediaRecorder(recorder);
       setIsRecording(true);
 
-      // ⏱️ contador
       recordingIntervalRef.current = setInterval(() => {
         setRecordingTime(prev => prev + 1);
       }, 1000);
-
     } catch (err) {
       alert('No se pudo acceder al micrófono');
     }
   };
-
 
   const stopRecording = () => {
     if (mediaRecorder) {
@@ -360,6 +396,7 @@ export default function Chat() {
 
   const updateGroupInfo = () => {
     if (!editingGroup) return;
+
     router.put(route('profesor.chat.update-group', selectedConversation.id), {
       name: editingGroup.name,
     }, {
@@ -370,22 +407,76 @@ export default function Chat() {
     });
   };
 
-  const addParticipantToGroup = (userId) => {
-    router.post(route('profesor.chat.addParticipant', selectedConversation.id), {
-      user_id: userId
-    }, {
-      onSuccess: () => {
-        selectConversation(selectedConversation);
+  const addParticipantToGroup = async (userId) => {
+    if (!selectedConversation) return;
+
+    try {
+      const response = await axios.post(
+        route('profesor.chat.addParticipant', selectedConversation.id),
+        { user_id: userId }
+      );
+
+      if (response.data.success) {
+        // Limpiar búsqueda
+        setUserSearchQuery('');
+        setUserSearchResults([]);
+        setAddingUser(false);
+
+        // Recargar la conversación para mostrar el nuevo participante
+        await selectConversation(selectedConversation);
+
+        // Actualizar la lista de conversaciones
+        await fetchConversations();
+
+        alert('Participante agregado exitosamente');
       }
-    });
+    } catch (error) {
+      console.error('Error agregando participante:', error);
+
+      // Mostrar mensaje de error específico si está disponible
+      const errorMessage = error.response?.data?.message || 'Error al agregar participante';
+      alert(errorMessage);
+    }
   };
 
+  const leaveGroup = async () => {
+    if (!selectedConversation) return;
+
+    if (!confirm('¿Seguro que deseas salir de este grupo?')) return;
+
+    try {
+      const response = await axios.post(
+        route('profesor.chat.leave', selectedConversation.id)
+      );
+
+      if (response.data.success) {
+        // Cerrar panel de información
+        setShowGroupInfo(false);
+
+        // Limpiar conversación seleccionada
+        setSelectedConversation(null);
+        setMessages([]);
+
+        // Volver a la vista de conversaciones en móvil
+        setIsMobileView(false);
+
+        // Actualizar lista de conversaciones
+        await fetchConversations();
+
+        alert('Has salido del grupo exitosamente');
+      }
+    } catch (error) {
+      console.error('Error saliendo del grupo:', error);
+
+      // Mostrar mensaje de error específico si está disponible
+      const errorMessage = error.response?.data?.message || 'Error al salir del grupo';
+      alert(errorMessage);
+    }
+  };
   const getFilteredConversations = () => {
     return conversations.filter(conv => {
       if (filterChat === 'all') return true;
-      if (filterChat === 'unread') {
-        return conv.unread_count > 0;
-      }
+      if (filterChat === 'unread') return conv.unread_count > 0;
       if (filterChat === 'chats') return conv.type === 'personal';
       if (filterChat === 'groups') return conv.type === 'group';
       return true;
@@ -398,6 +489,7 @@ export default function Chat() {
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = (now - date) / (1000 * 60 * 60);
+
     if (diffInHours < 24) {
       return date.toLocaleTimeString('es-CO', {
         hour: 'numeric',
@@ -417,17 +509,12 @@ export default function Chat() {
   const getDateLabel = (dateString) => {
     const date = new Date(dateString);
     const today = new Date();
-
     const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-
-    const diffDays = Math.floor(
-      (startOfToday - startOfDate) / (1000 * 60 * 60 * 24)
-    );
+    const diffDays = Math.floor((startOfToday - startOfDate) / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) return 'Hoy';
     if (diffDays === 1) return 'Ayer';
-
     return date.toLocaleDateString('es-CO', {
       day: 'numeric',
       month: 'long',
@@ -441,45 +528,6 @@ export default function Chat() {
     acc[label].push(msg);
     return acc;
   }, {});
-
-  const leaveGroup = () => {
-    if (!selectedConversation) return;
-    if (!confirm('¿Seguro que deseas salir de este grupo?')) return;
-
-    router.post(
-      route('profesor.chat.leave', selectedConversation.id),
-      {},
-      {
-        onSuccess: () => {
-          setShowGroupInfo(false);
-          setSelectedConversation(null);
-          setIsMobileView(false);
-          fetchConversations();
-        }
-      }
-    );
-  };
-
-  const addParticipant = (userId) => {
-    if (!selectedConversation) return;
-
-    router.post(
-      route('profesor.chat.addParticipant', selectedConversation.id),
-      { user_id: userId },
-      {
-        preserveScroll: true,
-        onSuccess: () => {
-          setUserQuery('');
-          setUserResults([]);
-          setAddingUser(false);
-          selectConversation(selectedConversation);
-        }
-      }
-    );
-  };
-
-
-
 
   return (
     <Layout title="Chat - Profesor">
@@ -1028,15 +1076,15 @@ export default function Chat() {
                 </div>
               )}
             </div>
-            {/* Panel lateral de info de grupo - Oculto en móvil */}
+            {/* Panel lateral de info de grupo */}
             {showGroupInfo && selectedConversation?.type === 'group' && (
               <div className={`
-      fixed inset-y-0 right-0 z-50
-      w-[90%] max-w-sm
-      bg-white shadow-2xl
-      transform transition-transform duration-300
-      ${isMobileView ? 'translate-x-0' : 'lg:static lg:translate-x-0'}
-    `}>
+    fixed inset-y-0 right-0 z-50
+    w-[90%] max-w-sm
+    bg-white shadow-2xl
+    transform transition-transform duration-300
+    ${isMobileView ? 'translate-x-0' : 'lg:static lg:translate-x-0'}
+  `}>
                 <div className="p-4 border-b">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-lg">Información del grupo</h3>
@@ -1087,117 +1135,156 @@ export default function Chat() {
                     )}
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4">
-                  {addingUser && (
-                    <div className="space-y-3">
-                      <input
-                        type="text"
-                        value={userQuery}
-                        onChange={e => setUserQuery(e.target.value)}
-                        placeholder="Buscar usuario..."
-                        className="w-full border rounded-lg px-3 py-2"
-                      />
 
-                      <div className="max-h-56 overflow-y-auto space-y-1">
-                        {userResults.map(u => (
-                          <button
-                            key={u.id}
-                            onClick={() => addParticipant(u.id)}
-                            className="w-full flex items-center gap-3 p-2 hover:bg-gray-100 rounded-lg"
-                          >
-                            {u.photo ? (
-                              <img
-                                src={`/storage/${u.photo}`}
-                                className="w-8 h-8 rounded-full"
-                              />
-                            ) : (
-                              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white text-sm">
-                                {u.name[0]}
-                              </div>
-                            )}
-                            <span className="text-sm font-medium">
-                              {u.name} {u.last_name}
-                            </span>
-                          </button>
-                        ))}
+                <div className="flex-1 overflow-y-auto p-4 max-h-[calc(100vh-300px)]">
+                  {/* ✅ SECCIÓN DE AGREGAR USUARIO (IGUAL QUE CREAR GRUPO) */}
+                  {addingUser && (
+                    <div className="mb-6 p-4 bg-blue-50 rounded-lg border-2 border-blue-200">
+                      <div className="flex items-center justify-between mb-3">
+                        <h5 className="font-semibold text-sm">Agregar participante</h5>
+                        <button
+                          onClick={() => {
+                            setAddingUser(false);
+                            setUserSearchQuery('');
+                            setUserSearchResults([]);
+                          }}
+                          className="text-gray-500 hover:text-gray-700"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
                       </div>
 
-                      <button
-                        onClick={() => {
-                          setAddingUser(false);
-                          setUserQuery('');
-                          setUserResults([]);
-                        }}
-                        className="w-full text-sm text-gray-500 hover:underline"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                  )}
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4 className="font-semibold">Participantes ({selectedConversation.participants.length})</h4>
-                      <button
-                        onClick={() => {
-                          setAddingUser(true);
-                          setUserQuery('');
-                          setUserResults([]);
-                        }}
-                        className="text-blue-600 hover:text-blue-700"
-                      >
-                        <UserPlus className="h-5 w-5" />
-                      </button>
-                    </div>
-                    <div className="space-y-2">
-                      {selectedConversation.participants.map(participant => (
-                        <div key={participant.id} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg">
-                          {participant.user?.photo ? (
-                            <img
-                              src={`/storage/${participant.user.photo}`}
-                              alt={participant.user.name}
-                              className="w-10 h-10 rounded-full object-cover"
-                            />
+                      {/* Buscador */}
+                      <div className="relative mb-3">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          type="text"
+                          value={userSearchQuery}
+                          onChange={e => setUserSearchQuery(e.target.value)}
+                          placeholder="Buscar por nombre o correo..."
+                          className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                          autoFocus
+                        />
+                      </div>
+
+                      {/* Resultados de búsqueda */}
+                      {userSearchQuery.length >= 2 && (
+                        <div className="space-y-1 max-h-64 overflow-y-auto">
+                          {userSearchResults.length > 0 ? (
+                            userSearchResults.map(u => (
+                              <button
+                                key={u.id}
+                                onClick={() => addParticipantToGroup(u.id)}
+                                className="w-full flex items-center gap-3 p-2 hover:bg-blue-100 rounded-lg transition"
+                              >
+                                {u.photo ? (
+                                  <img
+                                    src={`/storage/${u.photo}`}
+                                    alt={`${u.name} ${u.last_name}`}
+                                    className="w-10 h-10 rounded-full object-cover border-2 border-white"
+                                  />
+                                ) : (
+                                  <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center border-2 border-white">
+                                    <span className="text-white font-semibold text-sm">
+                                      {(u.name?.[0] || '').toUpperCase() + (u.last_name?.[0] || '').toUpperCase()}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex-1 text-left">
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {u.name} {u.last_name}
+                                  </p>
+                                  <p className="text-xs text-gray-500 truncate">
+                                    {u.email}
+                                  </p>
+                                </div>
+                                <UserPlus className="h-4 w-4 text-blue-600" />
+                              </button>
+                            ))
                           ) : (
-                            <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
-                              <span className="text-white font-semibold text-sm">
-                                {(participant.user?.name?.[0] || '').toUpperCase()}
-                              </span>
+                            <div className="text-center py-4 text-sm text-gray-500">
+                              <Search className="h-8 w-8 text-gray-300 mx-auto mb-2" />
+                              <p>No se encontraron usuarios</p>
                             </div>
                           )}
-                          <div className="flex-1">
-                            <p className="font-medium text-sm">
-                              {participant.user?.name} {participant.user?.last_name}
-                            </p>
-                            <p className="text-xs text-gray-500">{participant.user?.email}</p>
-                          </div>
-                          {participant.user_id === selectedConversation.created_by && (
-                            <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">Admin</span>
-                          )}
                         </div>
-                      ))}
+                      )}
+
+                      {userSearchQuery.length < 2 && (
+                        <div className="text-center py-4 text-xs text-gray-500">
+                          Escribe al menos 2 caracteres para buscar
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  )}
+
+                  {/* Lista de participantes */}
+                  {!addingUser && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="font-semibold text-sm">
+                          Participantes ({selectedConversation.participants.length})
+                        </h4>
+                      </div>
+                      <div className="space-y-2">
+                        {selectedConversation.participants.map(participant => (
+                          <div
+                            key={participant.id}
+                            className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg transition"
+                          >
+                            {participant.user?.photo ? (
+                              <img
+                                src={`/storage/${participant.user.photo}`}
+                                alt={participant.user.name}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                                <span className="text-white font-semibold text-sm">
+                                  {(participant.user?.name?.[0] || '').toUpperCase()}
+                                </span>
+                              </div>
+                            )}
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">
+                                {participant.user?.name} {participant.user?.last_name}
+                              </p>
+                              <p className="text-xs text-gray-500 truncate">
+                                {participant.user?.email}
+                              </p>
+                            </div>
+                            {participant.user_id === selectedConversation.created_by && (
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded font-medium">
+                                Admin
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <div className="p-4 border-t space-y-3">
-                  <button
-                    onClick={() => setAddingUser(true)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5
-               bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-                  >
-                    <UserPlus className="h-4 w-4" />
-                    Agregar participante
-                  </button>
+
+                {/* Botones de acción */}
+                <div className="p-3 border-t gap-5 flex bg-gray-50">
+                  {!addingUser && (
+                    <button
+                      onClick={() => setAddingUser(true)}
+                      className="flex-1 w-180px flex items-center justify-center px-4 py-2.5
+            bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
+                    >
+                      <UserPlus className="h-4 w-4" />
+                    </button>
+                  )}
 
                   <button
                     onClick={leaveGroup}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2.5
-               bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition"
+                    className="flex-1 w-1/2 flex items-center justify-center gap-2 px-4 py-2.5
+          bg-red-500 text-white rounded-lg hover:bg-red-700 transition font-medium"
                   >
                     <LogOut className="h-4 w-4" />
-                    Salir del grupo
                   </button>
                 </div>
-
               </div>
             )}
           </div>
@@ -1347,16 +1434,9 @@ export default function Chat() {
           </div>
         </div>
       )}
-
-      {/* Acciones */}
     </Layout>
   );
 }
-
-
-
-
-// Logica de grupo
 
 //llamadas
 

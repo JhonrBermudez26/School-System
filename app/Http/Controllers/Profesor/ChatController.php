@@ -113,10 +113,10 @@ public function conversationsJson()
     $request->validate([
         'query' => 'required|string|min:1|max:100',
     ]);
-
+    
     $rawQuery = $request->query('query');
     $query = $this->normalize($rawQuery);
-
+    
     $users = User::whereHas('roles', function ($q) {
             $q->whereIn('name', ['estudiante', 'profesor']);
         })
@@ -124,15 +124,15 @@ public function conversationsJson()
         ->where(function ($q) use ($query) {
             $q->whereRaw(
                 "LOWER(
-        CONCAT(
-            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(name,
-            'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),
-            ' ',
-            REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(last_name,
-            'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u')
-        )
-    ) LIKE ?",
-    ["%{$query}%"]
+                    CONCAT(
+                        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(name,
+                        'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u'),
+                        ' ',
+                        REPLACE(REPLACE(REPLACE(REPLACE(REPLACE(last_name,
+                        'á','a'),'é','e'),'í','i'),'ó','o'),'ú','u')
+                    )
+                ) LIKE ?",
+                ["%{$query}%"]
             )
             ->orWhereRaw(
                 "LOWER(
@@ -152,7 +152,7 @@ public function conversationsJson()
         ->select('id', 'name', 'last_name', 'email', 'photo')
         ->limit(20)
         ->get();
-
+    
     return response()->json([
         'users' => $users,
     ]);
@@ -457,41 +457,128 @@ public function conversationsJson()
      * Salir de un grupo
      */
     public function leaveGroup($conversationId)
-    {
-        $conversation = Conversation::findOrFail($conversationId);
-
-        if ($conversation->type !== 'group') {
-            return redirect()->back()->withErrors(['error' => 'Solo se puede salir de grupos']);
-        }
-
-        $conversation->participants()->where('user_id', Auth::id())->delete();
-
-        return redirect()->back();
+{
+    $conversation = Conversation::findOrFail($conversationId);
+    
+    if ($conversation->type !== 'group') {
+        return response()->json([
+            'success' => false,
+            'message' => 'Solo se puede salir de grupos'
+        ], 400);
     }
+    
+    // Verificar que el usuario es participante
+    if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'No eres parte de este grupo'
+        ], 403);
+    }
+    
+    // Verificar que no sea el último participante
+    $participantCount = $conversation->participants()->count();
+    if ($participantCount <= 1) {
+        return response()->json([
+            'success' => false,
+            'message' => 'No puedes salir porque eres el único participante. Elimina el grupo en su lugar.'
+        ], 400);
+    }
+    
+    // Eliminar participante
+    $conversation->participants()->where('user_id', Auth::id())->delete();
+    
+    // Notificar a los demás participantes
+    try {
+        $participants = $conversation->participants()
+            ->where('user_id', '!=', Auth::id())
+            ->with('user')
+            ->get();
+        
+        foreach ($participants as $participant) {
+            broadcast(new ChatNotification(
+                $participant->user_id,
+                $conversationId,
+                Auth::user()->name . ' ' . Auth::user()->last_name,
+                'Ha salido del grupo: ' . $conversation->name
+            ))->toOthers();
+        }
+    } catch (\Exception $e) {
+        \Log::error('Error notificando salida de grupo:', [
+            'error' => $e->getMessage()
+        ]);
+    }
+    
+    \Log::info('✅ Usuario salió del grupo', [
+        'conversation_id' => $conversationId,
+        'user_id' => Auth::id()
+    ]);
+    
+    return response()->json([
+        'success' => true,
+        'message' => 'Has salido del grupo exitosamente'
+    ]);
+}
 
     /**
      * Agregar participante a un grupo
      */
     public function addParticipant(Request $request, $conversationId)
-    {
-        $conversation = Conversation::findOrFail($conversationId);
-
-        if ($conversation->type !== 'group') {
-            return redirect()->back()->withErrors(['error' => 'Solo se pueden agregar participantes a grupos']);
-        }
-
-        $data = $request->validate([
-            'user_id' => 'required|integer|exists:users,id'
-        ]);
-
-        if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
-            abort(403);
-        }
-
-        $conversation->addParticipant($data['user_id']);
-
-        return redirect()->back();
+{
+    $conversation = Conversation::findOrFail($conversationId);
+    
+    if ($conversation->type !== 'group') {
+        return response()->json([
+            'success' => false,
+            'message' => 'Solo se pueden agregar participantes a grupos'
+        ], 400);
     }
+    
+    $data = $request->validate([
+        'user_id' => 'required|integer|exists:users,id'
+    ]);
+    
+    if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'No tienes permiso para agregar participantes'
+        ], 403);
+    }
+    
+    // Verificar si el usuario ya es participante
+    if ($conversation->participants()->where('user_id', $data['user_id'])->exists()) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Este usuario ya es participante del grupo'
+        ], 400);
+    }
+    
+    // Agregar participante
+    $conversation->addParticipant($data['user_id']);
+    
+    // Enviar notificación al nuevo participante
+    try {
+        broadcast(new ChatNotification(
+            $data['user_id'],
+            $conversationId,
+            Auth::user()->name . ' ' . Auth::user()->last_name,
+            'Te ha agregado al grupo: ' . $conversation->name
+        ))->toOthers();
+    } catch (\Exception $e) {
+        \Log::error('Error enviando notificación de nuevo participante:', [
+            'error' => $e->getMessage()
+        ]);
+    }
+    
+    \Log::info('✅ Participante agregado', [
+        'conversation_id' => $conversationId,
+        'new_user_id' => $data['user_id']
+    ]);
+    
+    return response()->json([
+        'success' => true,
+        'message' => 'Participante agregado exitosamente'
+    ]);
+}
 
     /**
      * Actualizar información del grupo
