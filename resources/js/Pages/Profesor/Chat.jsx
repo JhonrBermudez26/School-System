@@ -1,9 +1,11 @@
+
 import { useEffect, useState, useRef } from 'react';
 import { usePage, router } from '@inertiajs/react';
 import {
   Search, User, Users, Send, Paperclip, Phone, X, MessageSquare,
   Mic, StopCircle, Check, CheckCheck, Image, File, Edit2, Trash2,
-  UserPlus, Settings, Camera, ArrowLeft, Menu, LogOut
+  UserPlus, Settings, ArrowLeft, LogOut, MoreVertical,
+  Info, Copy, Clock
 } from 'lucide-react';
 import Layout from '@/Components/Layout/Layout';
 
@@ -46,29 +48,36 @@ export default function Chat() {
   const [userSearchQuery, setUserSearchQuery] = useState('');
   const [userSearchResults, setUserSearchResults] = useState([]);
 
+  // **Estados para gestión de mensajes estilo WhatsApp**
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [showMessageMenu, setShowMessageMenu] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDeleteChatModal, setShowDeleteChatModal] = useState(false);
+  const [deleteType, setDeleteType] = useState(null);
+  const [editingMessage, setEditingMessage] = useState(null);
+  const [editedText, setEditedText] = useState('');
+  const [showMessageInfo, setShowMessageInfo] = useState(false);
+  const [messageMenuPosition, setMessageMenuPosition] = useState({ x: 0, y: 0 });
+
+
   // Referencias
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const scrollRef = useRef(null);
   const recordingIntervalRef = useRef(null);
+  const messageMenuRef = useRef(null);
 
-  // Cargar conversaciones al montar
+  // Cargar conversaciones
   useEffect(() => {
     fetchConversations();
   }, []);
 
-  // Echo: escucha mensajes en tiempo real
+  // Echo real-time
   useEffect(() => {
-    if (!selectedConversation?.id || !window.Echo) {
-      console.warn('Echo no disponible o sin conversación');
-      return;
-    }
+    if (!selectedConversation?.id || !window.Echo) return;
 
-    console.log('📡 Conectándose al canal:', `conversation.${selectedConversation.id}`);
     const channel = window.Echo.channel(`conversation.${selectedConversation.id}`);
-
     channel.listen('.message.sent', (data) => {
-      console.log('📨 Mensaje recibido en tiempo real:', data);
       if (data.message.user_id !== user.id) {
         setMessages(prev => {
           const exists = prev.some(m => m.id === data.message.id);
@@ -79,13 +88,10 @@ export default function Chat() {
       }
     });
 
-    return () => {
-      console.log('🔌 Desconectándose del canal:', `conversation.${selectedConversation.id}`);
-      window.Echo.leave(`conversation.${selectedConversation.id}`);
-    };
+    return () => window.Echo.leave(`conversation.${selectedConversation.id}`);
   }, [selectedConversation?.id, user.id]);
 
-  // Búsqueda de usuarios para agregar al grupo
+  // Búsqueda de usuarios para grupo
   useEffect(() => {
     if (userSearchQuery.length < 2) {
       setUserSearchResults([]);
@@ -94,12 +100,9 @@ export default function Chat() {
 
     const timeout = setTimeout(async () => {
       try {
-        // ✅ USAR LA MISMA RUTA QUE PARA BÚSQUEDA PERSONAL
         const res = await axios.get(route('profesor.chat.search'), {
           params: { query: userSearchQuery }
         });
-
-        // Filtrar usuarios que ya son participantes
         if (selectedConversation) {
           const existingParticipantIds = selectedConversation.participants.map(p => p.user_id);
           const filteredUsers = (res.data.users || []).filter(
@@ -110,7 +113,6 @@ export default function Chat() {
           setUserSearchResults(res.data.users || []);
         }
       } catch (error) {
-        console.error('Error buscando usuarios:', error);
         setUserSearchResults([]);
       }
     }, 300);
@@ -118,7 +120,7 @@ export default function Chat() {
     return () => clearTimeout(timeout);
   }, [userSearchQuery, selectedConversation]);
 
-  // Fecha flotante al hacer scroll
+  // Fecha flotante
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -128,9 +130,7 @@ export default function Chat() {
       let current = null;
       separators.forEach(sep => {
         const rect = sep.getBoundingClientRect();
-        if (rect.top < 120) {
-          current = sep.dataset.date;
-        }
+        if (rect.top < 120) current = sep.dataset.date;
       });
       setFloatingDate(current);
     };
@@ -139,33 +139,22 @@ export default function Chat() {
     return () => el.removeEventListener('scroll', handler);
   }, [messages]);
 
-  // Echo: notificaciones globales
+  // Notificaciones globales
   useEffect(() => {
-    if (!user?.id || !window.Echo) {
-      console.warn('Echo no disponible o sin usuario');
-      return;
-    }
+    if (!user?.id || !window.Echo) return;
 
-    console.log('📡 Escuchando notificaciones globales para usuario:', user.id);
     const userChannel = window.Echo.private(`user.${user.id}`);
+    userChannel.listen('.chat.notification', () => fetchConversations());
 
-    userChannel.listen('.chat.notification', (data) => {
-      console.log('🔔 Notificación recibida:', data);
-      fetchConversations();
-    });
-
-    return () => {
-      console.log('🔌 Desconectándose de notificaciones globales');
-      window.Echo.leave(`user.${user.id}`);
-    };
+    return () => window.Echo.leave(`user.${user.id}`);
   }, [user.id]);
 
-  // Scroll automático a último mensaje
+  // Scroll automático
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Búsqueda de usuarios para chat personal
+  // Búsqueda de usuarios
   useEffect(() => {
     if (searchQuery.trim().length < 2) {
       setSearchedUsers([]);
@@ -176,10 +165,9 @@ export default function Chat() {
     const timeout = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const res = await axios.get(
-          route('profesor.chat.search'),
-          { params: { query: searchQuery } }
-        );
+        const res = await axios.get(route('profesor.chat.search'), {
+          params: { query: searchQuery }
+        });
         setSearchedUsers(res.data.users || []);
       } finally {
         setIsSearching(false);
@@ -188,6 +176,21 @@ export default function Chat() {
 
     return () => clearTimeout(timeout);
   }, [searchQuery]);
+
+  // Cerrar menú al hacer click fuera
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (messageMenuRef.current && !messageMenuRef.current.contains(e.target)) {
+        setShowMessageMenu(false);
+      }
+    };
+
+    if (showMessageMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showMessageMenu]);
 
   const fetchConversations = async () => {
     try {
@@ -213,20 +216,16 @@ export default function Chat() {
   };
 
   const startPersonalChat = (userId) => {
-    router.post(
-      route('profesor.chat.create'),
-      {
-        type: 'personal',
-        participants: [userId],
-      },
-      {
-        preserveScroll: true,
-        onSuccess: () => {
-          setSearchQuery('');
-          setSearchedUsers([]);
-        }
+    router.post(route('profesor.chat.create'), {
+      type: 'personal',
+      participants: [userId],
+    }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setSearchQuery('');
+        setSearchedUsers([]);
       }
-    );
+    });
   };
 
   const createGroup = () => {
@@ -250,22 +249,20 @@ export default function Chat() {
   };
 
   const selectConversation = async (conv) => {
-    console.log('👆 Click en conversación:', conv.id);
     setShowGroupInfo(false);
     setIsLoadingMessages(true);
     setIsMobileView(true);
 
     try {
-      const res = await axios.get(
-        route('profesor.chat.show', conv.id),
-        { headers: { Accept: 'application/json' } }
-      );
+      const res = await axios.get(route('profesor.chat.show', conv.id), {
+        headers: { Accept: 'application/json' }
+      });
       const conversation = res.data.conversation;
       setSelectedConversation(conversation);
       setMessages(conversation.messages);
       markAsRead(conversation.id);
     } catch (e) {
-      console.error('❌ Error cargando conversación', e);
+      console.error('Error cargando conversación', e);
     } finally {
       setIsLoadingMessages(false);
     }
@@ -301,8 +298,30 @@ export default function Chat() {
     if (!newMessage.trim() && !file && !audioBlob) return;
 
     const formData = new FormData();
-    formData.append('body', newMessage);
 
+    // Si estamos editando, usar endpoint diferente
+    if (editingMessage) {
+      try {
+        await axios.put(
+          route('profesor.chat.edit-message', editingMessage.id),
+          { body: newMessage }
+        );
+        setMessages(prev => prev.map(m =>
+          m.id === editingMessage.id
+            ? { ...m, body: newMessage, edited: true }
+            : m
+        ));
+        setNewMessage('');
+        cancelEdit();
+        fetchConversations();
+        return;
+      } catch (error) {
+        alert('Error al editar el mensaje');
+        return;
+      }
+    }
+
+    formData.append('body', newMessage);
     if (audioBlob) {
       formData.append('type', 'audio');
       formData.append('file', audioBlob, 'audio.webm');
@@ -417,23 +436,14 @@ export default function Chat() {
       );
 
       if (response.data.success) {
-        // Limpiar búsqueda
         setUserSearchQuery('');
         setUserSearchResults([]);
         setAddingUser(false);
-
-        // Recargar la conversación para mostrar el nuevo participante
         await selectConversation(selectedConversation);
-
-        // Actualizar la lista de conversaciones
         await fetchConversations();
-
         alert('Participante agregado exitosamente');
       }
     } catch (error) {
-      console.error('Error agregando participante:', error);
-
-      // Mostrar mensaje de error específico si está disponible
       const errorMessage = error.response?.data?.message || 'Error al agregar participante';
       alert(errorMessage);
     }
@@ -441,7 +451,6 @@ export default function Chat() {
 
   const leaveGroup = async () => {
     if (!selectedConversation) return;
-
     if (!confirm('¿Seguro que deseas salir de este grupo?')) return;
 
     try {
@@ -450,29 +459,145 @@ export default function Chat() {
       );
 
       if (response.data.success) {
-        // Cerrar panel de información
         setShowGroupInfo(false);
-
-        // Limpiar conversación seleccionada
         setSelectedConversation(null);
         setMessages([]);
-
-        // Volver a la vista de conversaciones en móvil
         setIsMobileView(false);
-
-        // Actualizar lista de conversaciones
         await fetchConversations();
-
         alert('Has salido del grupo exitosamente');
       }
     } catch (error) {
-      console.error('Error saliendo del grupo:', error);
-
-      // Mostrar mensaje de error específico si está disponible
       const errorMessage = error.response?.data?.message || 'Error al salir del grupo';
       alert(errorMessage);
     }
   };
+
+  // ========== FUNCIONES ESTILO WHATSAPP ==========
+
+  // Abrir menú contextual del mensaje
+  const handleMessageContext = (e, message) => {
+    e.preventDefault();
+
+    if (message.deleted) {
+      return;
+    }
+
+    // Evitar menú en mensajes no-texto o muy antiguos (ej: > 15 min)
+    const isRecent = (new Date() - new Date(message.created_at)) < 15 * 60 * 1000;
+    const canEditOrDelete = message.user_id === user.id && message.type === 'text' && isRecent;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    let x = rect.left + 300;
+    if (message.user_id === user.id) {
+      x = rect.left + 200; // Menú a la izquierda si es mensaje propio
+    }
+
+    setMessageMenuPosition({ x: Math.max(10, x), y: rect.top - 10 });
+    setSelectedMessage(message);
+    setShowMessageMenu(true);
+  };
+
+  // Eliminar mensaje
+  const handleDeleteMessage = async () => {
+    if (!selectedMessage || !deleteType) return;
+
+    try {
+      await axios.delete(route('profesor.chat.delete-message', selectedMessage.id), {
+        data: { delete_for: deleteType }
+      });
+
+      if (deleteType === 'everyone') {
+        setMessages(prev => prev.map(m =>
+          m.id === selectedMessage.id
+            ? { ...m, body: 'Este mensaje fue eliminado', deleted: true }
+            : m
+        ));
+      } else {
+        setMessages(prev => prev.filter(m => m.id !== selectedMessage.id));
+      }
+
+      closeDeleteModal();
+      fetchConversations();
+    } catch (error) {
+      alert('Error al eliminar el mensaje');
+    }
+  };
+
+  // Editar mensaje
+  const handleEditMessage = async () => {
+    if (!editingMessage || !editedText.trim()) return;
+
+    try {
+      await axios.put(
+        route('profesor.chat.edit-message', editingMessage.id),
+        { body: editedText }
+      );
+
+      setMessages(prev => prev.map(m =>
+        m.id === editingMessage.id
+          ? { ...m, body: editedText, edited: true }
+          : m
+      ));
+
+      cancelEdit();
+      fetchConversations();
+    } catch (error) {
+      alert('Error al editar el mensaje');
+    }
+  };
+
+  // Eliminar chat completo
+  const handleDeleteChat = async () => {
+    if (!selectedConversation) return;
+
+    try {
+      await axios.delete(route('profesor.chat.delete-conversation', selectedConversation.id));
+
+      setShowDeleteChatModal(false);
+      setSelectedConversation(null);
+      setMessages([]);
+      setIsMobileView(false);
+      await fetchConversations();
+      alert('Chat eliminado exitosamente');
+    } catch (error) {
+      alert('Error al eliminar el chat');
+    }
+  };
+
+  const openDeleteModal = (type) => {
+    setDeleteType(type);
+    setShowDeleteModal(true);
+    setShowMessageMenu(false);
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setDeleteType(null);
+    setSelectedMessage(null);
+  };
+
+  const startEdit = () => {
+    setEditingMessage(selectedMessage);
+    setEditedText(selectedMessage.body);
+    setShowMessageMenu(false);
+  };
+
+  const cancelEdit = () => {
+    setEditingMessage(null);
+    setEditedText('');
+  };
+
+  const showInfo = () => {
+    setShowMessageInfo(true);
+    setShowMessageMenu(false);
+  };
+
+  const copyMessage = () => {
+    navigator.clipboard.writeText(selectedMessage.body);
+    setShowMessageMenu(false);
+    alert('Mensaje copiado');
+  };
+
   const getFilteredConversations = () => {
     return conversations.filter(conv => {
       if (filterChat === 'all') return true;
@@ -487,23 +612,11 @@ export default function Chat() {
 
   const formatTime = (dateString) => {
     const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = (now - date) / (1000 * 60 * 60);
-
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString('es-CO', {
-        hour: 'numeric',
-        minute: '2-digit',
-        hour12: true
-      });
-    } else if (diffInHours < 48) {
-      return 'Ayer';
-    } else {
-      return date.toLocaleDateString('es-CO', {
-        day: 'numeric',
-        month: 'short'
-      });
-    }
+    return date.toLocaleTimeString('es-CO', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
   };
 
   const getDateLabel = (dateString) => {
@@ -841,6 +954,13 @@ export default function Chat() {
                         </button>
                       )}
                       <button
+                        onClick={() => setShowDeleteChatModal(true)}
+                        className="p-2 hover:bg-red-50 rounded-full transition"
+                        title="Eliminar chat"
+                      >
+                        <Trash2 className="h-5 w-5 text-red-600" />
+                      </button>
+                      <button
                         onClick={startCall}
                         className="hidden sm:flex items-center gap-2 px-4 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition"
                       >
@@ -899,11 +1019,12 @@ export default function Chat() {
                               <div
                                 key={msg.id}
                                 className={`flex ${msg.user_id === user.id ? 'justify-end' : 'justify-start'}`}
+                                onContextMenu={(e) => handleMessageContext(e, msg)}
                               >
                                 <div
-                                  className={`max-w-[85%] sm:max-w-[70%] p-3 sm:p-4 rounded-2xl shadow-sm ${msg.user_id === user.id
+                                  className={`max-w-[85%] sm:max-w-[70%] p-3 mt-1 sm:p-4 rounded-2xl shadow-sm ${msg.user_id === user.id
                                     ? 'bg-blue-600 text-white rounded-br-none'
-                                    : 'bg-white rounded-bl-none border border-gray-200'
+                                    : 'bg-white rounded-bl-none border border-gray-300'
                                     }`}
                                 >
                                   {selectedConversation.type === 'group' && msg.user_id !== user.id && (
@@ -911,33 +1032,45 @@ export default function Chat() {
                                       {msg.user?.name} {msg.user?.last_name}
                                     </p>
                                   )}
-                                  {msg.type === 'text' && <p className="leading-relaxed">{msg.body}</p>}
-                                  {msg.type === 'audio' && (
-                                    <div className="flex items-center gap-3">
-                                      <Mic className="h-5 w-5" />
-                                      <audio controls src={`/storage/${msg.attachment}`} className="max-w-xs" />
-                                    </div>
-                                  )}
-                                  {msg.type === 'file' && (
-                                    <a
-                                      href={`/storage/${msg.attachment}`}
-                                      download
-                                      className="flex items-center gap-3 hover:underline"
-                                    >
-                                      {msg.attachment?.match(/\.(jpg|jpeg|png|gif)$/i) ? (
-                                        <Image className="h-5 w-5" />
-                                      ) : (
-                                        <File className="h-5 w-5" />
-                                      )}
-                                      <span>Ver archivo</span>
-                                    </a>
-                                  )}
-                                  {msg.type === 'call' && (
-                                    <p className="italic flex items-center gap-2">
-                                      <Phone className="h-4 w-4" />
+
+                                  {/* Verificar si el mensaje fue eliminado para todos */}
+                                  {msg.deleted ? (
+                                    <p className="italic opacity-60 flex items-center gap-2">
+                                      <Trash2 className="h-4 w-4" />
                                       {msg.body}
                                     </p>
+                                  ) : (
+                                    <>
+                                      {msg.type === 'text' && <p className="leading-relaxed">{msg.body}</p>}
+                                      {msg.type === 'audio' && (
+                                        <div className="flex items-center gap-3">
+                                          <Mic className="h-5 w-5" />
+                                          <audio controls src={`/storage/${msg.attachment}`} className="max-w-xs" />
+                                        </div>
+                                      )}
+                                      {msg.type === 'file' && (
+                                        <a
+                                          href={`/storage/${msg.attachment}`}
+                                          download
+                                          className="flex items-center gap-3 hover:underline"
+                                        >
+                                          {msg.attachment?.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+                                            <Image className="h-5 w-5" />
+                                          ) : (
+                                            <File className="h-5 w-5" />
+                                          )}
+                                          <span>Ver archivo</span>
+                                        </a>
+                                      )}
+                                      {msg.type === 'call' && (
+                                        <p className="italic flex items-center gap-2">
+                                          <Phone className="h-4 w-4" />
+                                          {msg.body}
+                                        </p>
+                                      )}
+                                    </>
                                   )}
+
                                   <div className="flex items-center justify-between mt-2">
                                     <p className="text-xs opacity-70">
                                       {new Date(msg.created_at).toLocaleTimeString([], {
@@ -964,6 +1097,62 @@ export default function Chat() {
                     )}
                     <div ref={messagesEndRef} />
                   </div>
+
+                  {showMessageMenu && selectedMessage && (
+                    <div
+                      ref={messageMenuRef}
+                      className="fixed bg-white shadow-xl rounded-xl py-1.5 min-w-[180px] z-[999] border border-gray-200 divide-y divide-gray-100 text-sm"
+                      style={{ top: `${messageMenuPosition.y}px`, left: `${messageMenuPosition.x}px` }}
+                    >
+                      {selectedMessage.user_id === user.id && (
+                        <>
+                          {/* Copiar solo para mensajes de texto */}
+                          {selectedMessage.type === 'text' && (
+                            <button
+                              onClick={copyMessage}
+                              className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3"
+                            >
+                              <Copy size={18} /> Copiar
+                            </button>
+                          )}
+
+                          {/* Editar solo para mensajes de texto */}
+                          {selectedMessage.type === 'text' && (
+                            <button
+                              onClick={startEdit}
+                              className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3"
+                            >
+                              <Edit2 size={18} /> Editar
+                            </button>
+                          )}
+
+                          {/* Eliminar para mí - TODOS LOS TIPOS */}
+                          <button
+                            onClick={() => openDeleteModal('me')}
+                            className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 text-red-600"
+                          >
+                            <Trash2 size={18} /> Eliminar para mí
+                          </button>
+
+                          {/* Eliminar para todos - TODOS LOS TIPOS */}
+                          <button
+                            onClick={() => openDeleteModal('everyone')}
+                            className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3 text-red-600"
+                          >
+                            <Trash2 size={18} /> Eliminar para todos
+                          </button>
+                        </>
+                      )}
+
+                      {/* Info del mensaje - PARA TODOS */}
+                      <button
+                        onClick={showInfo}
+                        className="w-full text-left px-4 py-2.5 hover:bg-gray-50 flex items-center gap-3"
+                      >
+                        <Info size={18} /> Info del mensaje
+                      </button>
+                    </div>
+                  )}
                   {/* Preview de archivo */}
                   {(file || audioBlob) && (
                     <div className="px-4 py-3 bg-gray-100 border-t flex items-center gap-3">
@@ -1004,66 +1193,84 @@ export default function Chat() {
                     </div>
                   )}
                   {/* Barra de escritura */}
-                  <div className="p-3 sm:p-4 border-t bg-white flex items-center gap-2 sm:gap-3">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      onChange={handleFileSelect}
-                      accept="image/*,.pdf,.doc,.docx,.txt"
-                    />
-                    <label
-                      htmlFor="chat-file"
-                      className="cursor-pointer p-2 sm:p-3 hover:bg-gray-100 rounded-full transition"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Paperclip className="h-5 w-5 text-gray-600" />
-                    </label>
-                    {isRecording ? (
-                      <div className="flex items-center gap-3 px-3 py-2 bg-red-50 rounded-full">
-                        <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
-                        <span className="text-sm text-red-700 font-medium">
-                          Grabando {recordingTime}s
-                        </span>
+                  <div className="p-3 sm:p-4 border-t bg-white">
+                    {/* Indicador de grabación */}
+                    {isRecording && (
+                      <div className="mb-3 flex items-center justify-between px-4 py-3 bg-red-50 rounded-lg border-2 border-red-200">
+                        <div className="flex items-center gap-3">
+                          <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse" />
+                          <span className="text-sm text-red-700 font-medium">
+                            Grabando {recordingTime}s
+                          </span>
+                        </div>
                         <button
                           onClick={stopRecording}
-                          className="p-2 bg-red-100 hover:bg-red-200 rounded-full transition"
+                          className="p-2 bg-red-600 hover:bg-red-700 text-white rounded-full transition"
+                          title="Detener grabación"
                         >
-                          <StopCircle className="h-5 w-5 text-red-600" />
+                          <StopCircle className="h-5 w-5" />
                         </button>
                       </div>
-                    ) : (
-                      <button
-                        onClick={startRecording}
-                        className="p-2 sm:p-3 hover:bg-gray-100 rounded-full transition"
-                      >
-                        <Mic className="h-5 w-5 text-gray-600" />
-                      </button>
-                    )}
-                    <input
-                      className="flex-1 px-3 sm:px-5 py-2 sm:py-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm sm:text-base"
-                      placeholder="Escribe un mensaje..."
-                      value={newMessage}
-                      onChange={e => setNewMessage(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), sendMessage())}
-                      disabled={isRecording}
-                    />
-                    {(newMessage.trim() || file || audioBlob) ? (
-                      <button
-                        onClick={sendMessage}
-                        className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition"
-                      >
-                        <Send className="h-5 w-5" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={startRecording}
-                        className="p-3 hover:bg-gray-100 rounded-full transition"
-                      >
-                        <Mic className="h-5 w-5 text-gray-600" />
-                      </button>
                     )}
 
+                    {/* Barra de controles */}
+                    <div className="flex items-center gap-2 sm:gap-3">
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                        accept="image/*,.pdf,.doc,.docx,.txt"
+                      />
+
+                      {!isRecording && (
+                        <label
+                          htmlFor="chat-file"
+                          className="cursor-pointer p-2 sm:p-3 hover:bg-gray-100 rounded-full transition flex-shrink-0"
+                          onClick={() => fileInputRef.current?.click()}
+                        >
+                          <Paperclip className="h-5 w-5 text-gray-600" />
+                        </label>
+                      )}
+
+                      <input
+                        className="flex-1 px-3 sm:px-5 py-2 sm:py-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-sm sm:text-base"
+                        placeholder={editingMessage ? "Editando mensaje..." : "Escribe un mensaje..."}
+                        value={editingMessage ? editedText : newMessage}
+                        onChange={e => editingMessage ? setEditedText(e.target.value) : setNewMessage(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            if (editingMessage) {
+                              handleEditMessage();
+                            } else {
+                              sendMessage();
+                            }
+                          } else if (e.key === 'Escape' && editingMessage) {
+                            cancelEdit();
+                          }
+                        }}
+                        disabled={isRecording}
+                      />
+
+                      {(newMessage.trim() || file || audioBlob || editingMessage) ? (
+                        <button
+                          onClick={editingMessage ? handleEditMessage : sendMessage}
+                          className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition flex-shrink-0"
+                          title={editingMessage ? "Guardar cambios" : "Enviar mensaje"}
+                        >
+                          <Send className="h-5 w-5" />
+                        </button>
+                      ) : !isRecording ? (
+                        <button
+                          onClick={startRecording}
+                          className="p-3 hover:bg-gray-100 rounded-full transition flex-shrink-0"
+                          title="Grabar audio"
+                        >
+                          <Mic className="h-5 w-5 text-gray-600" />
+                        </button>
+                      ) : null}
+                    </div>
                   </div>
                 </>
               ) : (
@@ -1291,153 +1498,242 @@ export default function Chat() {
         </div>
       </div>
       {/* Modal Crear Grupo */}
-      {showNewGroup && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[95vh] overflow-hidden flex flex-col">
-            <div className="p-6 border-b bg-gray-50 flex items-center justify-between flex-shrink-0">
-              <h3 className="text-xl font-bold text-gray-900">Crear nuevo grupo</h3>
-              <button
-                onClick={() => setShowNewGroup(false)}
-                className="p-2 hover:bg-gray-200 rounded-full transition"
-              >
-                <X className="h-6 w-6 text-gray-600" />
-              </button>
-            </div>
-            <div className="p-6 space-y-6 flex-1 overflow-y-auto">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Nombre del grupo *
-                </label>
-                <input
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Ej: Matemáticas 10° - Proyecto Final"
-                  value={groupName}
-                  onChange={e => setGroupName(e.target.value)}
-                />
+      {
+        showNewGroup && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[95vh] overflow-hidden flex flex-col">
+              <div className="p-6 border-b bg-gray-50 flex items-center justify-between flex-shrink-0">
+                <h3 className="text-xl font-bold text-gray-900">Crear nuevo grupo</h3>
+                <button
+                  onClick={() => setShowNewGroup(false)}
+                  className="p-2 hover:bg-gray-200 rounded-full transition"
+                >
+                  <X className="h-6 w-6 text-gray-600" />
+                </button>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Buscar participantes
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre del grupo *
+                  </label>
                   <input
-                    className="w-full pl-12 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Nombre o correo..."
-                    value={searchQuery}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setSearchQuery(value);
-                      if (value.trim() === '') {
-                        setSearchedUsers([]);
-                        setIsSearching(false);
-                      }
-                    }}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Ej: Matemáticas 10° - Proyecto Final"
+                    value={groupName}
+                    onChange={e => setGroupName(e.target.value)}
                   />
-                  {searchQuery && (
-                    <button
-                      onClick={clearSearch}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full transition"
-                    >
-                      <X className="h-4 w-4 text-gray-500" />
-                    </button>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Buscar participantes
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                    <input
+                      className="w-full pl-12 pr-10 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Nombre o correo..."
+                      value={searchQuery}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setSearchQuery(value);
+                        if (value.trim() === '') {
+                          setSearchedUsers([]);
+                          setIsSearching(false);
+                        }
+                      }}
+                    />
+                    {searchQuery && (
+                      <button
+                        onClick={clearSearch}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded-full transition"
+                      >
+                        <X className="h-4 w-4 text-gray-500" />
+                      </button>
+                    )}
+                  </div>
+                  {searchedUsers.length > 0 && (
+                    <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
+                      <div className="max-h-80 overflow-y-auto divide-y divide-gray-200">
+                        {searchedUsers.map(u => (
+                          <div
+                            key={u.id}
+                            className="flex items-center justify-between p-4 hover:bg-gray-50 transition"
+                          >
+                            <div className="flex items-center gap-3">
+                              {u.photo ? (
+                                <img
+                                  src={`/storage/${u.photo}`}
+                                  alt={`${u.name} ${u.last_name}`}
+                                  className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
+                                  <span className="text-white font-medium text-sm">
+                                    {(u.name?.[0] || '').toUpperCase() + (u.last_name?.[0] || '').toUpperCase()}
+                                  </span>
+                                </div>
+                              )}
+                              <div>
+                                <p className="font-medium">{u.name} {u.last_name}</p>
+                                <p className="text-sm text-gray-500 truncate max-w-[180px]">{u.email}</p>
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => addToGroup(u.id)}
+                              disabled={groupParticipants.includes(u.id)}
+                              className={`px-4 py-2 rounded-lg transition font-medium min-w-[90px] text-center ${groupParticipants.includes(u.id)
+                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+                                }`}
+                            >
+                              {groupParticipants.includes(u.id) ? 'Agregado' : 'Agregar'}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   )}
                 </div>
-                {searchedUsers.length > 0 && (
-                  <div className="mt-4 border border-gray-200 rounded-xl overflow-hidden">
-                    <div className="max-h-80 overflow-y-auto divide-y divide-gray-200">
-                      {searchedUsers.map(u => (
-                        <div
-                          key={u.id}
-                          className="flex items-center justify-between p-4 hover:bg-gray-50 transition"
-                        >
-                          <div className="flex items-center gap-3">
-                            {u.photo ? (
-                              <img
-                                src={`/storage/${u.photo}`}
-                                alt={`${u.name} ${u.last_name}`}
-                                className="w-10 h-10 rounded-full object-cover border-2 border-gray-200"
-                              />
-                            ) : (
-                              <div className="w-10 h-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
-                                <span className="text-white font-medium text-sm">
-                                  {(u.name?.[0] || '').toUpperCase() + (u.last_name?.[0] || '').toUpperCase()}
-                                </span>
-                              </div>
-                            )}
-                            <div>
-                              <p className="font-medium">{u.name} {u.last_name}</p>
-                              <p className="text-sm text-gray-500 truncate max-w-[180px]">{u.email}</p>
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => addToGroup(u.id)}
-                            disabled={groupParticipants.includes(u.id)}
-                            className={`px-4 py-2 rounded-lg transition font-medium min-w-[90px] text-center ${groupParticipants.includes(u.id)
-                              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                              : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
-                              }`}
+                {groupParticipants.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Participantes ({groupParticipants.length})
+                    </label>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {groupParticipants.map(id => {
+                        const participant = props.availableUsers?.find(u => u.id === id);
+                        if (!participant) return null;
+                        return (
+                          <div
+                            key={id}
+                            className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
                           >
-                            {groupParticipants.includes(u.id) ? 'Agregado' : 'Agregar'}
-                          </button>
-                        </div>
-                      ))}
+                            <span className="font-medium">
+                              {participant.name} {participant.last_name}
+                            </span>
+                            <button
+                              onClick={() => removeFromGroup(id)}
+                              className="text-red-600 hover:text-red-800 p-1"
+                            >
+                              <X className="h-5 w-5" />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 )}
               </div>
-              {groupParticipants.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Participantes ({groupParticipants.length})
-                  </label>
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
-                    {groupParticipants.map(id => {
-                      const participant = props.availableUsers?.find(u => u.id === id);
-                      if (!participant) return null;
-                      return (
-                        <div
-                          key={id}
-                          className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
-                        >
-                          <span className="font-medium">
-                            {participant.name} {participant.last_name}
-                          </span>
-                          <button
-                            onClick={() => removeFromGroup(id)}
-                            className="text-red-600 hover:text-red-800 p-1"
-                          >
-                            <X className="h-5 w-5" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="p-6 border-t bg-gray-50 flex justify-end gap-4 flex-shrink-0">
-              <button
-                onClick={() => setShowNewGroup(false)}
-                className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-100 transition font-medium"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={createGroup}
-                disabled={!groupName.trim() || groupParticipants.length < 2}
-                className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Crear grupo
-              </button>
+              <div className="p-6 border-t bg-gray-50 flex justify-end gap-4 flex-shrink-0">
+                <button
+                  onClick={() => setShowNewGroup(false)}
+                  className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-100 transition font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={createGroup}
+                  disabled={!groupName.trim() || groupParticipants.length < 2}
+                  className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Crear grupo
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </Layout>
+        )
+      }
+
+
+      {
+        showDeleteModal && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl w-full max-w-md mx-4 p-6 shadow-2xl">
+              <h3 className="text-xl font-bold mb-4">¿Eliminar mensaje?</h3>
+              <p className="text-gray-600 mb-6">
+                {deleteType === 'everyone'
+                  ? 'Se eliminará para todos los participantes.'
+                  : 'Solo se eliminará de tu dispositivo.'}
+              </p>
+              <div className="flex justify-end gap-4">
+                <button onClick={closeDeleteModal} className="px-6 py-2.5 hover:bg-gray-100 rounded-lg">Cancelar</button>
+                <button onClick={handleDeleteMessage} className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700">Eliminar</button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {
+        showMessageInfo && selectedMessage && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl w-full max-w-md mx-4 p-6 shadow-2xl">
+              <div className="flex justify-between items-center mb-5">
+                <h3 className="text-xl font-bold">Info del mensaje</h3>
+                <button onClick={() => setShowMessageInfo(false)}><X size={24} /></button>
+              </div>
+
+              <div className="space-y-4 text-sm">
+                <div>
+                  <p className="font-medium text-gray-700">Enviado</p>
+                  <p>{new Date(selectedMessage.created_at).toLocaleString('es-CO', { dateStyle: 'long', timeStyle: 'short' })}</p>
+                </div>
+
+                {selectedMessage.user_id === user.id && (
+                  <div>
+                    <p className="font-medium text-gray-700">Estado</p>
+                    <p>
+                      {selectedMessage.read_by?.length > 1
+                        ? `Leído por ${selectedMessage.read_by.length - 1} personas`
+                        : 'Enviado ✓'}
+                    </p>
+                  </div>
+                )}
+
+                <div>
+                  <p className="font-medium text-gray-700">Tipo</p>
+                  <p>{selectedMessage.type === 'text' ? 'Texto' : selectedMessage.type}</p>
+                </div>
+              </div>
+            </div>
+
+
+          </div>
+        )
+      }
+
+      {
+        showDeleteChatModal && (
+          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl w-full max-w-md mx-4 p-6 shadow-2xl">
+              <h3 className="text-xl font-bold mb-4">¿Eliminar chat?</h3>
+              <p className="text-gray-600 mb-6">
+                {selectedConversation?.type === 'group'
+                  ? 'Saldrás del grupo y se eliminará de tu lista de conversaciones.'
+                  : 'Se eliminará esta conversación de tu lista.'}
+              </p>
+              <div className="flex justify-end gap-4">
+                <button
+                  onClick={() => setShowDeleteChatModal(false)}
+                  className="px-6 py-2.5 hover:bg-gray-100 rounded-lg font-medium"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleDeleteChat}
+                  className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </Layout >
   );
 }
 
 //llamadas
-
+// eliminar mensajes, editar y demas
 //php artisan reverb:start

@@ -179,6 +179,15 @@ Route::middleware(['auth'])->group(function () {
         
         Route::put('/chat/{id}/update-group', [ChatController::class, 'updateGroup'])
             ->name('profesor.chat.update-group');
+
+        Route::put('/chat/message/{id}/edit', [ChatController::class, 'editMessage'])
+            ->name('profesor.chat.edit-message');
+
+        Route::delete('/chat/message/{id}', [ChatController::class, 'deleteMessage'])
+            ->name('profesor.chat.delete-message');
+
+        Route::delete('/chat/conversation/{id}', [ChatController::class, 'deleteConversation'])
+            ->name('profesor.chat.delete-conversation');
         
         // Mis Clases
         Route::get('/clases', [ClassController::class, 'index'])->name('profesor.clases.index');

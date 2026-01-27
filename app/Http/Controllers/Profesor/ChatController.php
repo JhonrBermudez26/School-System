@@ -433,25 +433,84 @@ public function conversationsJson()
         return response()->json(['success' => true]);
     }
 
-    /**
-     * Eliminar un mensaje
-     */
-    public function deleteMessage($messageId)
-    {
-        $message = Message::findOrFail($messageId);
 
-        if ($message->user_id !== Auth::id()) {
-            abort(403);
-        }
-
-        if ($message->attachment && in_array($message->type, ['file', 'audio'])) {
-            Storage::disk('public')->delete($message->attachment);
-        }
-
-        $message->delete();
-
-        return redirect()->back();
+/**
+ * Eliminar conversación completa
+ */
+public function deleteConversation($conversationId)
+{
+    $conversation = Conversation::findOrFail($conversationId);
+    
+    if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
+        abort(403, 'No tienes acceso a esta conversación');
     }
+    
+    // Eliminar participación del usuario
+    $conversation->participants()->where('user_id', Auth::id())->delete();
+    
+    // Si no quedan participantes, eliminar conversación completa
+    if ($conversation->participants()->count() === 0) {
+        // Eliminar archivos adjuntos
+        foreach ($conversation->messages as $message) {
+            if ($message->attachment && in_array($message->type, ['file', 'audio'])) {
+                Storage::disk('public')->delete($message->attachment);
+            }
+        }
+        $conversation->delete();
+    }
+    
+    return response()->json(['success' => true]);
+}
+
+
+    /**
+ * Eliminar mensaje
+ */
+/**
+ * Eliminar mensaje
+ */
+public function deleteMessage(Request $request, $messageId)
+{
+    $message = Message::findOrFail($messageId);
+    
+    if ($message->user_id !== Auth::id()) {
+        abort(403, 'No tienes permiso para eliminar este mensaje');
+    }
+    
+    $data = $request->validate([
+        'delete_for' => 'required|in:me,everyone'
+    ]);
+    
+    if ($data['delete_for'] === 'everyone') {
+        // Eliminar para todos
+        if ($message->type === 'text') {
+            // Para texto: mostrar mensaje de eliminado
+            $message->update([
+                'body' => 'Este mensaje fue eliminado',
+                'deleted' => true
+            ]);
+        } else {
+            // Para audio/archivo: eliminar archivo físico y marcar como eliminado
+            if ($message->attachment && in_array($message->type, ['file', 'audio'])) {
+                Storage::disk('public')->delete($message->attachment);
+            }
+            $message->update([
+                'body' => $message->type === 'audio' ? '🎤 Audio eliminado' : '📎 Archivo eliminado',
+                'attachment' => null,
+                'deleted' => true
+            ]);
+        }
+    } else {
+        // Eliminar solo para el usuario actual
+        $hiddenBy = $message->hidden_by ?? [];
+        if (!in_array(Auth::id(), $hiddenBy)) {
+            $hiddenBy[] = Auth::id();
+            $message->update(['hidden_by' => $hiddenBy]);
+        }
+    }
+    
+    return response()->json(['success' => true]);
+}
 
     /**
      * Salir de un grupo
@@ -580,6 +639,34 @@ public function conversationsJson()
     ]);
 }
 
+
+/**
+ * Editar mensaje
+ */
+public function editMessage(Request $request, $messageId)
+{
+    $message = Message::findOrFail($messageId);
+    
+    if ($message->user_id !== Auth::id()) {
+        abort(403, 'No tienes permiso para editar este mensaje');
+    }
+    
+    if ($message->type !== 'text') {
+        return response()->json(['error' => 'Solo se pueden editar mensajes de texto'], 400);
+    }
+    
+    $data = $request->validate([
+        'body' => 'required|string|max:5000'
+    ]);
+    
+    $message->update([
+        'body' => $data['body'],
+        'edited' => true
+    ]);
+    
+    return response()->json(['success' => true, 'message' => $message]);
+}
+
     /**
      * Actualizar información del grupo
      */
@@ -605,4 +692,6 @@ public function conversationsJson()
 
         return redirect()->back();
     }
+
+    
 }
