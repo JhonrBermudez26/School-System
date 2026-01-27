@@ -84,6 +84,19 @@ export default function Chat() {
           if (exists) return prev;
           return [...prev, data.message];
         });
+
+        // ✅ Notificación especial para llamadas
+        if (data.message.type === 'call') {
+          // Reproducir sonido o mostrar notificación más prominente
+          if (window.Notification && Notification.permission === 'granted') {
+            new Notification('Llamada entrante', {
+              body: `${data.message.user.name} inició una llamada`,
+              icon: '/favicon.ico',
+              tag: 'call'
+            });
+          }
+        }
+
         markAsRead(selectedConversation.id);
       }
     });
@@ -140,13 +153,40 @@ export default function Chat() {
   }, [messages]);
 
   // Notificaciones globales
+
   useEffect(() => {
     if (!user?.id || !window.Echo) return;
 
     const userChannel = window.Echo.private(`user.${user.id}`);
-    userChannel.listen('.chat.notification', () => fetchConversations());
 
-    return () => window.Echo.leave(`user.${user.id}`);
+    // Listener para notificaciones de chat (ya existente)
+    userChannel.listen('.chat.notification', () => {
+      console.log('📬 Nueva notificación de chat recibida');
+      fetchConversations();
+    });
+
+    // ✅ NUEVO: Listener para cuando te agregan a un grupo
+    userChannel.listen('.group.added', (data) => {
+      console.log('🎉 Fuiste agregado a un grupo:', data);
+
+      // Recargar conversaciones
+      fetchConversations();
+
+      // Mostrar notificación al usuario (opcional)
+      if (window.Notification && Notification.permission === 'granted') {
+        new Notification('Nuevo grupo', {
+          body: `${data.addedBy} te agregó al grupo "${data.conversationName}"`,
+          icon: '/favicon.ico'
+        });
+      } else {
+        // Alternativa: mostrar un toast o alerta en la UI
+        console.log(`${data.addedBy} te agregó al grupo "${data.conversationName}"`);
+      }
+    });
+
+    return () => {
+      window.Echo.leave(`user.${user.id}`);
+    };
   }, [user.id]);
 
   // Scroll automático
@@ -215,37 +255,82 @@ export default function Chat() {
     setIsSearching(false);
   };
 
-  const startPersonalChat = (userId) => {
-    router.post(route('profesor.chat.create'), {
-      type: 'personal',
-      participants: [userId],
-    }, {
-      preserveScroll: true,
-      onSuccess: () => {
-        setSearchQuery('');
-        setSearchedUsers([]);
+  const startPersonalChat = async (userId) => {
+    try {
+      // Primero crear/obtener la conversación
+      const response = await axios.post(route('profesor.chat.create'), {
+        type: 'personal',
+        participants: [userId],
+      });
+
+      // Limpiar búsqueda
+      setSearchQuery('');
+      setSearchedUsers([]);
+
+      // Recargar conversaciones
+      await fetchConversations();
+
+      // Si la respuesta incluye el ID de la conversación, abrirla
+      if (response.data?.conversation_id) {
+        const conv = conversations.find(c => c.id === response.data.conversation_id);
+        if (conv) {
+          await selectConversation(conv);
+        } else {
+          // Si no está en la lista aún, hacer fetch manual
+          const convResponse = await axios.get(
+            route('profesor.chat.show', response.data.conversation_id),
+            { headers: { Accept: 'application/json' } }
+          );
+          setSelectedConversation(convResponse.data.conversation);
+          setMessages(convResponse.data.conversation.messages);
+          setIsMobileView(true);
+        }
       }
-    });
+    } catch (error) {
+      console.error('Error al iniciar chat:', error);
+      alert('Error al iniciar la conversación');
+    }
   };
 
-  const createGroup = () => {
+  const createGroup = async () => {
     if (groupParticipants.length < 2) {
       alert('El grupo debe tener al menos 2 participantes');
       return;
     }
 
-    router.post(route('profesor.chat.create'), {
-      type: 'group',
-      name: groupName,
-      participants: groupParticipants,
-    }, {
-      preserveState: false,
-      onSuccess: () => {
+    try {
+      // ✅ Cambiar de router.post a axios.post
+      const response = await axios.post(route('profesor.chat.create'), {
+        type: 'group',
+        name: groupName,
+        participants: groupParticipants,
+      });
+
+      if (response.data?.success && response.data?.conversation_id) {
+        // Cerrar modal
         setShowNewGroup(false);
         setGroupName('');
         setGroupParticipants([]);
+        setSearchQuery('');
+        setSearchedUsers([]);
+
+        // Recargar conversaciones
+        await fetchConversations();
+
+        // Abrir el grupo recién creado
+        const convResponse = await axios.get(
+          route('profesor.chat.show', response.data.conversation_id),
+          { headers: { Accept: 'application/json' } }
+        );
+
+        setSelectedConversation(convResponse.data.conversation);
+        setMessages(convResponse.data.conversation.messages);
+        setIsMobileView(true);
       }
-    });
+    } catch (error) {
+      console.error('Error al crear grupo:', error);
+      alert('Error al crear el grupo: ' + (error.response?.data?.message || 'Error desconocido'));
+    }
   };
 
   const selectConversation = async (conv) => {
@@ -361,12 +446,29 @@ export default function Chat() {
     }
   };
 
-  const startCall = () => {
-    router.post(route('profesor.chat.message', selectedConversation.id), {
-      type: 'call',
-    }, {
-      onSuccess: () => fetchConversations()
-    });
+  const startCall = async () => {
+    try {
+      const response = await axios.post(
+        route('profesor.chat.message', selectedConversation.id),
+        { type: 'call' }
+      );
+
+      // Agregar el mensaje de llamada al chat
+      if (response.data?.message) {
+        setMessages(prev => [...prev, response.data.message]);
+
+        // Abrir la llamada en una nueva ventana
+        if (response.data.message.attachment) {
+          window.open(response.data.message.attachment, '_blank', 'noopener,noreferrer');
+        }
+
+        // Actualizar la lista de conversaciones
+        fetchConversations();
+      }
+    } catch (error) {
+      console.error('Error al iniciar llamada:', error);
+      alert('Error al iniciar la llamada');
+    }
   };
 
   const startRecording = async () => {
@@ -870,7 +972,11 @@ export default function Chat() {
                                         ? '🎤 Mensaje de voz'
                                         : conv.messages[0].type === 'file'
                                           ? '📎 Archivo adjunto'
-                                          : '📞 Llamada'
+                                          : conv.messages[0].type === 'call'
+                                            ? '📞 Llamada'
+                                            : conv.messages[0].type === 'system' // ✅ AGREGAR ESTO
+                                              ? conv.messages[0].body
+                                              : 'Nuevo mensaje'
                                     }
                                   </span>
                                 </>
@@ -1014,7 +1120,24 @@ export default function Chat() {
 
                           {msgs.map(msg => {
                             const isRead = msg.read_by && msg.read_by.length > 1;
-
+                            // ✅ NUEVO: Renderizado especial para mensajes de sistema
+                            if (msg.type === 'system') {
+                              return (
+                                <div key={msg.id} className="flex justify-center my-2">
+                                  <div className="px-4 py-2 bg-yellow-50 border border-yellow-200 rounded-lg max-w-[85%] sm:max-w-md">
+                                    <p className="text-xs text-center text-gray-700 leading-relaxed">
+                                      {msg.body}
+                                    </p>
+                                    <p className="text-[10px] text-center text-gray-400 mt-1">
+                                      {new Date(msg.created_at).toLocaleTimeString([], {
+                                        hour: '2-digit',
+                                        minute: '2-digit'
+                                      })}
+                                    </p>
+                                  </div>
+                                </div>
+                              );
+                            }
                             return (
                               <div
                                 key={msg.id}
@@ -1063,10 +1186,23 @@ export default function Chat() {
                                         </a>
                                       )}
                                       {msg.type === 'call' && (
-                                        <p className="italic flex items-center gap-2">
-                                          <Phone className="h-4 w-4" />
-                                          {msg.body}
-                                        </p>
+                                        <div className="flex flex-col gap-2">
+                                          <p className="italic flex items-center gap-2">
+                                            <Phone className="h-4 w-4" />
+                                            Llamada iniciada
+                                          </p>
+                                          {msg.attachment && (
+                                            <a
+                                              href={msg.attachment}
+                                              target="_blank"
+                                              rel="noopener noreferrer"
+                                              className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-medium"
+                                            >
+                                              <Phone className="h-4 w-4" />
+                                              Unirse a la llamada
+                                            </a>
+                                          )}
+                                        </div>
                                       )}
                                     </>
                                   )}
@@ -1702,38 +1838,41 @@ export default function Chat() {
         )
       }
 
-      {
-        showDeleteChatModal && (
-          <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-            <div className="bg-white rounded-2xl w-full max-w-md mx-4 p-6 shadow-2xl">
-              <h3 className="text-xl font-bold mb-4">¿Eliminar chat?</h3>
-              <p className="text-gray-600 mb-6">
-                {selectedConversation?.type === 'group'
-                  ? 'Saldrás del grupo y se eliminará de tu lista de conversaciones.'
-                  : 'Se eliminará esta conversación de tu lista.'}
-              </p>
-              <div className="flex justify-end gap-4">
-                <button
-                  onClick={() => setShowDeleteChatModal(false)}
-                  className="px-6 py-2.5 hover:bg-gray-100 rounded-lg font-medium"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={handleDeleteChat}
-                  className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
-                >
-                  Eliminar
-                </button>
-              </div>
+      {showDeleteChatModal && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl w-full max-w-md mx-4 p-6 shadow-2xl">
+            <h3 className="text-xl font-bold mb-4">
+              {selectedConversation?.type === 'group'
+                ? '¿Salir del grupo?'
+                : '¿Eliminar chat?'}
+            </h3>
+            <p className="text-gray-600 mb-6">
+              {selectedConversation?.type === 'group'
+                ? 'Saldrás del grupo y dejarás de recibir mensajes.'
+                : 'Solo se eliminará de tu lista. La otra persona seguirá viendo la conversación.'}
+            </p>
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={() => setShowDeleteChatModal(false)}
+                className="px-6 py-2.5 hover:bg-gray-100 rounded-lg font-medium"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={selectedConversation?.type === 'group' ? leaveGroup : handleDeleteChat}
+                className="px-6 py-2.5 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium"
+              >
+                {selectedConversation?.type === 'group' ? 'Salir' : 'Eliminar'}
+              </button>
             </div>
           </div>
-        )
-      }
+        </div>
+      )}
     </Layout >
   );
 }
 
-//llamadas
-// eliminar mensajes, editar y demas
+//Acomodar las llamadas, tanto de aqui como de publicaciones, para entender y saber que libreria es la mejor
 //php artisan reverb:start
+
+

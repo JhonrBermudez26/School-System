@@ -12,6 +12,12 @@ class Participant extends Model
         'conversation_id',
         'user_id',
         'joined_at',
+         'hidden_at',
+    ];
+
+    protected $casts = [
+        'joined_at' => 'datetime',
+        'hidden_at' => 'datetime', // ✅ AGREGAR
     ];
 
     public function conversation()

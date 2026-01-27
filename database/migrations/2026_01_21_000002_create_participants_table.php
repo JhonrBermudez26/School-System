@@ -12,9 +12,11 @@ return new class extends Migration
             $table->foreignId('conversation_id')->constrained()->onDelete('cascade');
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->timestamp('joined_at')->useCurrent();
+            $table->timestamp('hidden_at')->nullable();
             $table->timestamps();
             
             $table->unique(['conversation_id', 'user_id']);
+            $table->index(['user_id', 'hidden_at']);
         });
     }
 
