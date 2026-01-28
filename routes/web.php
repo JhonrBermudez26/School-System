@@ -21,6 +21,7 @@ use App\Http\Controllers\Profesor\FileController;
 use App\Http\Controllers\Profesor\MeetingController;
 use App\Http\Controllers\Profesor\PostController;
 use App\Http\Controllers\Profesor\ChatController;
+use App\Http\Controllers\Profesor\ScheduleTeacherController;
 
 // Página principal (pública)
 Route::get('/', function () {
@@ -211,6 +212,10 @@ Route::middleware(['auth'])->group(function () {
         // Reuniones (CRUD)
         Route::post('/clases/meetings', [MeetingController::class, 'store'])->name('profesor.meetings.store');
         Route::delete('/clases/meetings/{meeting}', [MeetingController::class, 'destroy'])->name('profesor.meetings.destroy');
+    
+    
+        //HORARIO
+        Route::get('/horario', [ScheduleTeacherController::class, 'index'])->name('profesor.horario');
     });
 
     //ESTUDIANTE

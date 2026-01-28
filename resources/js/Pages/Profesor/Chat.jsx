@@ -1873,6 +1873,7 @@ export default function Chat() {
 }
 
 //Acomodar las llamadas, tanto de aqui como de publicaciones, para entender y saber que libreria es la mejor
+// hacer notficacion para la llamada y pueda unirse en la llamada
 //php artisan reverb:start
 
 
