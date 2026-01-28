@@ -1,349 +1,495 @@
-import { Head, useForm } from '@inertiajs/react';
-import { Settings, Save, Bell, Shield, Database, Mail } from 'lucide-react';
-import { useState } from 'react';
+import { useForm } from '@inertiajs/react';
+import { School, MapPin, Phone, Mail, Users, FileText, Upload, X, Check } from 'lucide-react';
+import { useState, useRef } from 'react';
 import Layout from '@/Components/Layout/Layout';
 
-export default function Configuracion() {
-    const [activeTab, setActiveTab] = useState('general');
+export default function Configuracion({ settings }) {
+    const [previewLogo, setPreviewLogo] = useState(
+        settings?.logo_path ? `/storage/${settings.logo_path}` : null
+    );
+    const fileInputRef = useRef(null);
 
-    const { data, setData, post, processing } = useForm({
-        // General
-        nombre_colegio: 'Colegio San Martín',
-        direccion_colegio: 'Calle 123 #45-67',
-        telefono_colegio: '+57 1 234 5678',
-        email_colegio: 'info@colegiosanmartin.edu.co',
+    const { data, setData, post, processing, errors } = useForm({
+        // Información básica
+        nombre_colegio: settings?.nombre_colegio || '',
+        abreviacion: settings?.abreviacion || '',
+        lema: settings?.lema || '',
+        logo: null,
         
-        // Notificaciones
-        notif_nuevos_estudiantes: true,
-        notif_pagos: true,
-        notif_notas: false,
+        // Ubicación
+        direccion: settings?.direccion || '',
+        ciudad: settings?.ciudad || '',
+        departamento: settings?.departamento || '',
+        pais: settings?.pais || 'Colombia',
         
-        // Sistema
-        max_estudiantes_grado: 35,
-        periodos_año: 4,
+        // Contacto
+        telefono: settings?.telefono || '',
+        celular: settings?.celular || '',
+        email: settings?.email || '',
+        sitio_web: settings?.sitio_web || '',
         
-        // Email
-        smtp_host: 'smtp.gmail.com',
-        smtp_port: '587',
-        smtp_user: '',
-        smtp_password: ''
+        // Información administrativa
+        rector: settings?.rector || '',
+        coordinador: settings?.coordinador || '',
+        secretario: settings?.secretario || '',
+        
+        // Información académica
+        calendario: settings?.calendario || 'A',
+        jornada: settings?.jornada || 'Completa',
+        nivel_educativo: settings?.nivel_educativo || '',
+        caracter: settings?.caracter || 'Mixto',
+        
+        // Legal
+        nit: settings?.nit || '',
+        dane: settings?.dane || '',
+        resolucion: settings?.resolucion || '',
+        fecha_fundacion: settings?.fecha_fundacion || '',
     });
+
+    const handleLogoChange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            setData('logo', file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewLogo(reader.result);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post('/secretaria/configuracion/actualizar', {
+        post('/secretaria/configuracion', {
+            forceFormData: true,
             onSuccess: () => {
-                alert('Configuración actualizada correctamente');
-            }
+                // Éxito manejado por Laravel
+            },
         });
     };
 
+    const removeLogo = () => {
+        setPreviewLogo(null);
+        setData('logo', null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
     return (
-        <Layout title="Configuración - Secretaria">          
-            <div>
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-gray-900">Configuración del Sistema</h1>
-                    <p className="text-gray-600 mt-2">Administra las configuraciones generales</p>
+        <Layout title="Configuración">
+            <div className="max-w-7xl mx-auto">
+                {/* Header */}
+                <div className="mb-8">
+                    <div className="flex items-center space-x-4 mb-3">
+                        <div className="p-3 bg-gradient-to-br from-green-500 to-emerald-600 rounded-2xl shadow-lg">
+                            <School className="h-8 w-8 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-4xl font-bold text-gray-900">
+                                Configuración Institucional
+                            </h1>
+                            <p className="text-gray-600 mt-1">
+                                Administra la información y datos del colegio
+                            </p>
+                        </div>
+                    </div>
                 </div>
 
-                {/* Tabs */}
-                <div className="bg-white rounded-xl shadow-md mb-6">
-                    <div className="border-b border-gray-200">
-                        <nav className="flex space-x-8 px-6" aria-label="Tabs">
-                            <button
-                                onClick={() => setActiveTab('general')}
-                                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                                    activeTab === 'general'
-                                        ? 'border-green-500 text-green-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <Settings className="inline h-5 w-5 mr-2" />
-                                General
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('notificaciones')}
-                                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                                    activeTab === 'notificaciones'
-                                        ? 'border-green-500 text-green-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <Bell className="inline h-5 w-5 mr-2" />
-                                Notificaciones
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('sistema')}
-                                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                                    activeTab === 'sistema'
-                                        ? 'border-green-500 text-green-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <Database className="inline h-5 w-5 mr-2" />
-                                Sistema
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('email')}
-                                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                                    activeTab === 'email'
-                                        ? 'border-green-500 text-green-600'
-                                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                                }`}
-                            >
-                                <Mail className="inline h-5 w-5 mr-2" />
-                                Correo
-                            </button>
-                        </nav>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="p-6">
-                        {/* General Tab */}
-                        {activeTab === 'general' && (
-                            <div className="space-y-6">
-                                <h3 className="text-lg font-semibold text-gray-900">Información General del Colegio</h3>
+                <form onSubmit={handleSubmit}>
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        {/* Columna izquierda - Logo y datos básicos */}
+                        <div className="lg:col-span-1 space-y-6">
+                            {/* Logo */}
+                            <div className="bg-white rounded-2xl shadow-md p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                    <Upload className="h-5 w-5 mr-2 text-green-600" />
+                                    Logo Institucional
+                                </h3>
                                 
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Nombre del Colegio
-                                    </label>
+                                <div className="flex flex-col items-center">
+                                    {previewLogo ? (
+                                        <div className="relative group">
+                                            <img
+                                                src={previewLogo}
+                                                alt="Logo"
+                                                className="w-48 h-48 object-contain rounded-xl border-4 border-gray-100 shadow-sm"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={removeLogo}
+                                                className="absolute -top-2 -right-2 bg-red-500 text-white p-2 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="w-48 h-48 border-4 border-dashed border-gray-300 rounded-xl flex items-center justify-center bg-gray-50">
+                                            <School className="h-20 w-20 text-gray-400" />
+                                        </div>
+                                    )}
+                                    
                                     <input
-                                        type="text"
-                                        value={data.nombre_colegio}
-                                        onChange={(e) => setData('nombre_colegio', e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleLogoChange}
+                                        className="hidden"
+                                        id="logo-upload"
                                     />
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Dirección
+                                    <label
+                                        htmlFor="logo-upload"
+                                        className="mt-4 cursor-pointer bg-green-600 text-white px-6 py-2.5 rounded-lg hover:bg-green-700 transition flex items-center space-x-2 shadow-md"
+                                    >
+                                        <Upload className="h-4 w-4" />
+                                        <span>Subir Logo</span>
                                     </label>
-                                    <input
-                                        type="text"
-                                        value={data.direccion_colegio}
-                                        onChange={(e) => setData('direccion_colegio', e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                    />
+                                    <p className="text-xs text-gray-500 mt-2 text-center">
+                                        PNG, JPG o GIF (máx. 2MB)
+                                    </p>
                                 </div>
+                            </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Información Legal */}
+                            <div className="bg-white rounded-2xl shadow-md p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                    <FileText className="h-5 w-5 mr-2 text-green-600" />
+                                    Información Legal
+                                </h3>
+                                <div className="space-y-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            NIT
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={data.nit}
+                                            onChange={(e) => setData('nit', e.target.value)}
+                                            placeholder="900.123.456-7"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Código DANE
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={data.dane}
+                                            onChange={(e) => setData('dane', e.target.value)}
+                                            placeholder="111001234567"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Resolución
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={data.resolucion}
+                                            onChange={(e) => setData('resolucion', e.target.value)}
+                                            placeholder="Nro. 12345 de 2020"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Fecha de Fundación
+                                        </label>
+                                        <input
+                                            type="date"
+                                            value={data.fecha_fundacion}
+                                            onChange={(e) => setData('fecha_fundacion', e.target.value)}
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Columna derecha - Formularios */}
+                        <div className="lg:col-span-2 space-y-6">
+                            {/* Información General */}
+                            <div className="bg-white rounded-2xl shadow-md p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                    <School className="h-5 w-5 mr-2 text-green-600" />
+                                    Información General
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Nombre del Colegio *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={data.nombre_colegio}
+                                            onChange={(e) => setData('nombre_colegio', e.target.value)}
+                                            placeholder="Institución Educativa Las Palmas"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Abreviación *
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={data.abreviacion}
+                                            onChange={(e) => setData('abreviacion', e.target.value.toUpperCase())}
+                                            placeholder="IELPA"
+                                            maxLength="20"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent uppercase"
+                                        />
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            Aparecerá en los títulos de las pestañas
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Carácter
+                                        </label>
+                                        <select
+                                            value={data.caracter}
+                                            onChange={(e) => setData('caracter', e.target.value)}
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        >
+                                            <option value="Mixto">Mixto</option>
+                                            <option value="Femenino">Femenino</option>
+                                            <option value="Masculino">Masculino</option>
+                                        </select>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Lema Institucional
+                                        </label>
+                                        <textarea
+                                            value={data.lema}
+                                            onChange={(e) => setData('lema', e.target.value)}
+                                            placeholder="Educando con amor y excelencia"
+                                            rows="2"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent resize-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Ubicación */}
+                            <div className="bg-white rounded-2xl shadow-md p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                    <MapPin className="h-5 w-5 mr-2 text-green-600" />
+                                    Ubicación
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Dirección
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={data.direccion}
+                                            onChange={(e) => setData('direccion', e.target.value)}
+                                            placeholder="Calle 123 #45-67"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Ciudad
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={data.ciudad}
+                                            onChange={(e) => setData('ciudad', e.target.value)}
+                                            placeholder="Bogotá"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Departamento
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={data.departamento}
+                                            onChange={(e) => setData('departamento', e.target.value)}
+                                            placeholder="Cundinamarca"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Contacto */}
+                            <div className="bg-white rounded-2xl shadow-md p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                    <Phone className="h-5 w-5 mr-2 text-green-600" />
+                                    Información de Contacto
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
                                             Teléfono
                                         </label>
                                         <input
                                             type="tel"
-                                            value={data.telefono_colegio}
-                                            onChange={(e) => setData('telefono_colegio', e.target.value)}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                            value={data.telefono}
+                                            onChange={(e) => setData('telefono', e.target.value)}
+                                            placeholder="(601) 234 5678"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                         />
                                     </div>
-
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Email
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Celular
+                                        </label>
+                                        <input
+                                            type="tel"
+                                            value={data.celular}
+                                            onChange={(e) => setData('celular', e.target.value)}
+                                            placeholder="320 123 4567"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Correo Electrónico
                                         </label>
                                         <input
                                             type="email"
-                                            value={data.email_colegio}
-                                            onChange={(e) => setData('email_colegio', e.target.value)}
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                            value={data.email}
+                                            onChange={(e) => setData('email', e.target.value)}
+                                            placeholder="info@colegio.edu.co"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Sitio Web
+                                        </label>
+                                        <input
+                                            type="url"
+                                            value={data.sitio_web}
+                                            onChange={(e) => setData('sitio_web', e.target.value)}
+                                            placeholder="https://www.colegio.edu.co"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                         />
                                     </div>
                                 </div>
                             </div>
-                        )}
 
-                        {/* Notificaciones Tab */}
-                        {activeTab === 'notificaciones' && (
-                            <div className="space-y-6">
-                                <h3 className="text-lg font-semibold text-gray-900">Preferencias de Notificaciones</h3>
-                                <p className="text-sm text-gray-600">Configura qué notificaciones deseas recibir</p>
-
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                        <div>
-                                            <p className="font-medium text-gray-900">Nuevos Estudiantes</p>
-                                            <p className="text-sm text-gray-600">Recibe notificación cuando se registre un nuevo estudiante</p>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={data.notif_nuevos_estudiantes}
-                                                onChange={(e) => setData('notif_nuevos_estudiantes', e.target.checked)}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                                        </label>
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                        <div>
-                                            <p className="font-medium text-gray-900">Pagos Recibidos</p>
-                                            <p className="text-sm text-gray-600">Notificación cuando se registre un pago</p>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={data.notif_pagos}
-                                                onChange={(e) => setData('notif_pagos', e.target.checked)}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                                        </label>
-                                    </div>
-
-                                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                                        <div>
-                                            <p className="font-medium text-gray-900">Carga de Notas</p>
-                                            <p className="text-sm text-gray-600">Notificación cuando un profesor cargue notas</p>
-                                        </div>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input
-                                                type="checkbox"
-                                                checked={data.notif_notas}
-                                                onChange={(e) => setData('notif_notas', e.target.checked)}
-                                                className="sr-only peer"
-                                            />
-                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-green-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-                                        </label>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Sistema Tab */}
-                        {activeTab === 'sistema' && (
-                            <div className="space-y-6">
-                                <h3 className="text-lg font-semibold text-gray-900">Configuración del Sistema</h3>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Máximo de Estudiantes por Grado
-                                    </label>
-                                    <input
-                                        type="number"
-                                        value={data.max_estudiantes_grado}
-                                        onChange={(e) => setData('max_estudiantes_grado', e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                        min="1"
-                                        max="100"
-                                    />
-                                    <p className="text-sm text-gray-500 mt-1">Número máximo de estudiantes permitidos por grado</p>
-                                </div>
-
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Periodos Académicos por Año
-                                    </label>
-                                    <select
-                                        value={data.periodos_año}
-                                        onChange={(e) => setData('periodos_año', e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                    >
-                                        <option value="2">2 Periodos (Semestres)</option>
-                                        <option value="3">3 Periodos (Trimestres)</option>
-                                        <option value="4">4 Periodos (Bimestres)</option>
-                                    </select>
-                                </div>
-
-                                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                    <div className="flex">
-                                        <Shield className="h-5 w-5 text-blue-600 mt-0.5" />
-                                        <div className="ml-3">
-                                            <h4 className="text-sm font-medium text-blue-900">Información de Seguridad</h4>
-                                            <p className="text-sm text-blue-700 mt-1">
-                                                Los cambios en la configuración del sistema afectarán a todos los usuarios. Asegúrate de revisar cuidadosamente antes de guardar.
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Email Tab */}
-                        {activeTab === 'email' && (
-                            <div className="space-y-6">
-                                <h3 className="text-lg font-semibold text-gray-900">Configuración de Correo SMTP</h3>
-                                <p className="text-sm text-gray-600">Configura el servidor SMTP para envío de correos</p>
-
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Información Administrativa */}
+                            <div className="bg-white rounded-2xl shadow-md p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                    <Users className="h-5 w-5 mr-2 text-green-600" />
+                                    Equipo Administrativo
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Servidor SMTP
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Rector(a)
                                         </label>
                                         <input
                                             type="text"
-                                            value={data.smtp_host}
-                                            onChange={(e) => setData('smtp_host', e.target.value)}
-                                            placeholder="smtp.gmail.com"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                            value={data.rector}
+                                            onChange={(e) => setData('rector', e.target.value)}
+                                            placeholder="Nombre del rector"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                         />
                                     </div>
-
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Puerto
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Coordinador(a)
                                         </label>
                                         <input
                                             type="text"
-                                            value={data.smtp_port}
-                                            onChange={(e) => setData('smtp_port', e.target.value)}
-                                            placeholder="587"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                            value={data.coordinador}
+                                            onChange={(e) => setData('coordinador', e.target.value)}
+                                            placeholder="Nombre del coordinador"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                         />
                                     </div>
-
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Usuario
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Secretario(a)
                                         </label>
                                         <input
-                                            type="email"
-                                            value={data.smtp_user}
-                                            onChange={(e) => setData('smtp_user', e.target.value)}
-                                            placeholder="usuario@gmail.com"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Contraseña
-                                        </label>
-                                        <input
-                                            type="password"
-                                            value={data.smtp_password}
-                                            onChange={(e) => setData('smtp_password', e.target.value)}
-                                            placeholder="••••••••"
-                                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                            type="text"
+                                            value={data.secretario}
+                                            onChange={(e) => setData('secretario', e.target.value)}
+                                            placeholder="Nombre del secretario"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                                         />
                                     </div>
                                 </div>
+                            </div>
 
+                            {/* Información Académica */}
+                            <div className="bg-white rounded-2xl shadow-md p-6">
+                                <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                                    <School className="h-5 w-5 mr-2 text-green-600" />
+                                    Información Académica
+                                </h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Calendario
+                                        </label>
+                                        <select
+                                            value={data.calendario}
+                                            onChange={(e) => setData('calendario', e.target.value)}
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        >
+                                            <option value="A">Calendario A</option>
+                                            <option value="B">Calendario B</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Jornada
+                                        </label>
+                                        <select
+                                            value={data.jornada}
+                                            onChange={(e) => setData('jornada', e.target.value)}
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        >
+                                            <option value="Mañana">Mañana</option>
+                                            <option value="Tarde">Tarde</option>
+                                            <option value="Completa">Completa</option>
+                                            <option value="Nocturna">Nocturna</option>
+                                        </select>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            Niveles Educativos
+                                        </label>
+                                        <input
+                                            type="text"
+                                            value={data.nivel_educativo}
+                                            onChange={(e) => setData('nivel_educativo', e.target.value)}
+                                            placeholder="Preescolar, Básica Primaria, Secundaria, Media"
+                                            className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Botón de Guardar */}
+                            <div className="flex justify-end">
                                 <button
-                                    type="button"
-                                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
+                                    type="submit"
+                                    disabled={processing}
+                                    className="flex items-center space-x-2 bg-gradient-to-r from-green-600 to-emerald-600 text-white px-8 py-3 rounded-xl hover:from-green-700 hover:to-emerald-700 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    Probar Conexión
+                                    <Check className="h-5 w-5" />
+                                    <span className="font-semibold">
+                                        {processing ? 'Guardando...' : 'Guardar Configuración'}
+                                    </span>
                                 </button>
                             </div>
-                        )}
-
-                        {/* Save Button */}
-                        <div className="mt-8 pt-6 border-t border-gray-200 flex justify-end">
-                            <button
-                                type="submit"
-                                disabled={processing}
-                                className="flex items-center space-x-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition disabled:opacity-50"
-                            >
-                                <Save className="h-5 w-5" />
-                                <span>{processing ? 'Guardando...' : 'Guardar Cambios'}</span>
-                            </button>
                         </div>
-                    </form>
-                </div>
+                    </div>
+                </form>
             </div>
         </Layout>
     );

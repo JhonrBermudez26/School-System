@@ -1,10 +1,12 @@
 import { Head, router } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 import { BookOpen, ClipboardList, Users, CheckSquare, Calendar, LogOut, GraduationCap } from 'lucide-react';
 import Layout from '@/Components/Layout/Layout';
 export default function Dashboard() {
-    const handleLogout = () => {
-        router.post('/logout');
-    };
+
+    const { props } = usePage();
+    const { stats = {}, asignaciones = [] } = props;
+    const { misMaterias = 0, totalEstudiantes = 0, tareasActivas = 0, porCalificar = 0 } = stats;
 
     return (
         
@@ -23,7 +25,7 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-gray-500 text-sm">Mis Materias</p>
-                                <p className="text-3xl font-bold text-gray-900">5</p>
+                                <p className="text-3xl font-bold text-gray-900">{misMaterias}</p>
                             </div>
                             <div className="bg-blue-100 p-3 rounded-lg">
                                 <BookOpen className="h-8 w-8 text-blue-600" />
@@ -36,7 +38,7 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-gray-500 text-sm">Estudiantes</p>
-                                <p className="text-3xl font-bold text-gray-900">145</p>
+                                <p className="text-3xl font-bold text-gray-900">{totalEstudiantes}</p>
                             </div>
                             <div className="bg-green-100 p-3 rounded-lg">
                                 <Users className="h-8 w-8 text-green-600" />
@@ -49,7 +51,7 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-gray-500 text-sm">Tareas Activas</p>
-                                <p className="text-3xl font-bold text-gray-900">8</p>
+                                <p className="text-3xl font-bold text-gray-900">{tareasActivas}</p>
                             </div>
                             <div className="bg-purple-100 p-3 rounded-lg">
                                 <ClipboardList className="h-8 w-8 text-purple-600" />
@@ -62,7 +64,7 @@ export default function Dashboard() {
                         <div className="flex items-center justify-between">
                             <div>
                                 <p className="text-gray-500 text-sm">Por Calificar</p>
-                                <p className="text-3xl font-bold text-gray-900">23</p>
+                                <p className="text-3xl font-bold text-gray-900">{porCalificar}</p>
                             </div>
                             <div className="bg-orange-100 p-3 rounded-lg">
                                 <CheckSquare className="h-8 w-8 text-orange-600" />
@@ -100,59 +102,33 @@ export default function Dashboard() {
                     </div>
                 </div>
 
-                {/* My Classes and Assignments */}
+                {/* Mis Materias y Grupos */}
                 <div className="grid md:grid-cols-2 gap-6">
                     <div className="bg-white rounded-xl shadow-md p-6">
                         <h2 className="text-xl font-bold text-gray-900 mb-4">Mis Materias</h2>
                         <div className="space-y-3">
-                            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="font-semibold text-gray-900">Matemáticas</h3>
-                                    <span className="text-sm text-gray-600">Grado 8A</span>
+                            {asignaciones.length === 0 && (
+                                <p className="text-sm text-gray-600">No tienes asignaciones registradas.</p>
+                            )}
+                            {asignaciones.map((item, idx) => (
+                                <div key={`${item.subject_id}-${item.group_id}-${idx}`} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <h3 className="font-semibold text-gray-900">{item.subject_name}</h3>
+                                        <span className="text-sm text-gray-600">{item.group_name}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-gray-600">{item.students_count} estudiantes</span>
+                                        <button className="text-blue-600 hover:text-blue-700 font-medium">Ver grupo</button>
+                                    </div>
                                 </div>
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-600">30 estudiantes</span>
-                                    <button className="text-blue-600 hover:text-blue-700 font-medium">Ver grupo</button>
-                                </div>
-                            </div>
-                            <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="font-semibold text-gray-900">Física</h3>
-                                    <span className="text-sm text-gray-600">Grado 10B</span>
-                                </div>
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-600">28 estudiantes</span>
-                                    <button className="text-green-600 hover:text-green-700 font-medium">Ver grupo</button>
-                                </div>
-                            </div>
+                            ))}
                         </div>
                     </div>
 
                     <div className="bg-white rounded-xl shadow-md p-6">
                         <h2 className="text-xl font-bold text-gray-900 mb-4">Tareas Próximas a Vencer</h2>
                         <div className="space-y-3">
-                            <div className="p-4 bg-orange-50 rounded-lg border border-orange-200">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="font-semibold text-gray-900">Taller de Ecuaciones</h3>
-                                    <span className="text-xs bg-orange-200 text-orange-800 px-2 py-1 rounded-full">2 días</span>
-                                </div>
-                                <p className="text-sm text-gray-600 mb-2">Matemáticas - Grado 8A</p>
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-600">12/30 entregas</span>
-                                    <button className="text-orange-600 hover:text-orange-700 font-medium">Ver</button>
-                                </div>
-                            </div>
-                            <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                                <div className="flex items-center justify-between mb-2">
-                                    <h3 className="font-semibold text-gray-900">Laboratorio de Movimiento</h3>
-                                    <span className="text-xs bg-yellow-200 text-yellow-800 px-2 py-1 rounded-full">5 días</span>
-                                </div>
-                                <p className="text-sm text-gray-600 mb-2">Física - Grado 10B</p>
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-600">8/28 entregas</span>
-                                    <button className="text-yellow-600 hover:text-yellow-700 font-medium">Ver</button>
-                                </div>
-                            </div>
+                            <p className="text-sm text-gray-600">Aún no hay tareas próximas configuradas.</p>
                         </div>
                     </div>
                 </div>

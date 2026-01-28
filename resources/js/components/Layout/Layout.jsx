@@ -10,16 +10,23 @@ import {
   X as CloseIcon,
 } from "lucide-react";
 import SidebarMenu from "./SidebarMenu";
+import ChatNotification from './ChatNotification';
 
 export default function Layout({ title, children }) {
-  const { auth } = usePage().props;
+  
+  const { auth, app } = usePage().props;
   const currentUrl = usePage().url;
   const user = auth?.user;
+  const [previewImage, setPreviewImage] = useState(user?.photo ? `/storage/${user.photo}` : null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-
+  
+  const appName = app?.name;
+  const appFullName = app?.fullName || appName;
+  
   const handleLogout = () => router.post("/logout");
   const handleEditProfile = () => router.visit("/perfil/editar");
+  
   const navigateToDashboard = () => {
     const rol = user?.roles?.[0]?.toLowerCase();
     router.visit(`/${rol}/dashboard`);
@@ -27,7 +34,8 @@ export default function Layout({ title, children }) {
 
   return (
     <>
-      <Head title={title} />
+      <Head title={title ? `${title} | ${appName}` : appFullName} />
+      
       <div className="min-h-screen bg-gray-100 flex flex-col">
         {/* Navbar */}
         <nav className="bg-white shadow-md fixed w-full top-0 z-50">
@@ -40,7 +48,7 @@ export default function Layout({ title, children }) {
               >
                 <GraduationCap className="h-8 w-8 text-green-600" />
                 <span className="ml-2 text-lg sm:text-xl font-bold text-gray-900">
-                  Colegio San Martín
+                  {appName}
                 </span>
               </div>
 
@@ -62,10 +70,10 @@ export default function Layout({ title, children }) {
                   onClick={() => setShowProfileMenu(!showProfileMenu)}
                   className="flex items-center space-x-2 focus:outline-none"
                 >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br flex items-center justify-center text-white font-bold border-2 border-blue-300 shadow-md">
-                    {user?.photo ? (
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br flex items-center justify-center text-black font-bold border-2 border-blue-300 shadow-md">
+                    {previewImage ? (
                       <img
-                        src={`/storage/${user?.photo}`}
+                        src={previewImage || "/default-user.png"}
                         alt="Foto de perfil"
                         className="w-10 h-10 rounded-full object-cover"
                       />
@@ -119,20 +127,18 @@ export default function Layout({ title, children }) {
         <div className="flex flex-1 pt-16">
           {/* Sidebar */}
           <aside
-            className={`bg-white shadow-lg lg:w-72 w-64 fixed top-16 z-40 h-full transform transition-transform duration-300 ease-in-out
-            ${
-              sidebarOpen
+            className={`bg-white shadow-lg lg:w-72 w-64 fixed top-16 z-40 h-[calc(100vh-4rem)] transform transition-transform duration-300 ease-in-out overflow-y-auto
+              ${sidebarOpen
                 ? "translate-x-0"
                 : "-translate-x-full lg:translate-x-0"
-            }`}
+              }`}
           >
             <div className="p-6">
               <h2 className="text-sm sm:text-base font-semibold text-gray-500 uppercase tracking-wider mb-6">
                 Menú Principal
               </h2>
-
-              <nav className="space-y-3">
-                {/* Menú según rol */}
+              {/* Menú con scroll */}
+              <nav className="space-y-3 pb-6">
                 {user?.roles?.map((role, index) => (
                   <div key={index}>
                     <SidebarMenu role={role} />
@@ -141,12 +147,15 @@ export default function Layout({ title, children }) {
               </nav>
             </div>
           </aside>
-
+          
           {/* Contenido principal */}
           <main className="flex-1 lg:ml-72 p-6 sm:p-8 transition-all duration-300">
             {children}
           </main>
         </div>
+
+        {/* Notificaciones de Chat - Fuera del contenedor principal */}
+        <ChatNotification />
       </div>
     </>
   );

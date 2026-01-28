@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 import { GraduationCap, BookOpen, Users, Award, Calendar, MapPin, Phone, Mail, Clock, Trophy, CheckCircle, X, Lock, Eye, EyeOff } from 'lucide-react';
 
@@ -6,11 +6,14 @@ export default function Welcome() {
     const [showLoginModal, setShowLoginModal] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const { data, setData, post, processing, errors } = useForm({ email: '', password: '', remember: false });
+    const { app } = usePage().props;
+    const appName = app?.name;
+    const appFullName = app?.fullName || appName;
 
     const submit = (e) => { e.preventDefault(); post('/login'); };
 
     return (<>
-        <Head title="Bienvenid@s" />
+        <Head title={appName ? `Bienvenid@s | ${appName}` : 'Bienvenid@s'} />
         
         {/* Navbar */}
         <nav className="bg-white shadow-md fixed w-full top-0 z-50">
@@ -18,7 +21,7 @@ export default function Welcome() {
                 <div className="flex justify-between items-center h-20">
                     <div className="flex items-center space-x-3">
                         <div className="bg-blue-600 p-2 rounded-lg"><GraduationCap className="h-8 w-8 text-white" /></div>
-                        <div><h1 className="text-2xl font-bold text-gray-900">Colegio San Martín</h1><p className="text-xs text-gray-600">Formando líderes del mañana</p></div>
+                        <div><h1 className="text-2xl font-bold text-gray-900">{appFullName || 'School System'}</h1><p className="text-xs text-gray-600">Formando líderes del mañana</p></div>
                     </div>
                     <div className="hidden md:flex items-center space-x-8">
                         <a href="#inicio" className="text-gray-700 hover:text-blue-600 font-medium">Inicio</a>

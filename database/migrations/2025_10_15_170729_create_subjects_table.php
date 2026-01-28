@@ -16,8 +16,6 @@ return new class extends Migration
             $table->string('name'); // Ej: "Matemáticas", "Español", "Ciencias"
             $table->string('code')->unique(); // Ej: "MAT-01"
             $table->text('description')->nullable();
-            $table->foreignId('grade_id')->constrained()->onDelete('cascade');
-            $table->foreignId('teacher_id')->nullable()->constrained('users')->onDelete('set null');
             $table->integer('hours_per_week')->default(4);
             $table->boolean('is_active')->default(true);
             $table->timestamps();

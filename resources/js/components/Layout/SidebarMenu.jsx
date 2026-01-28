@@ -11,10 +11,14 @@ import {
   UserCheck,
   UserCog,
   ChartPie,
+  Book,
+  MessageSquare,
 } from "lucide-react";
 
 export default function SidebarMenu({ role }) {
   const rol = role.toLowerCase();
+  const { props } = usePage();
+  const modules = props.modules || {};
 
   const sections = {
     rector: [
@@ -31,14 +35,19 @@ export default function SidebarMenu({ role }) {
     ],
     secretaria: [
       { icon: GraduationCap, label: "Inicio", path: "/secretaria/dashboard" },
+      { icon: Users, label: "Gestionar usuarios", path: "/secretaria/usuarios" },
       { icon: Users, label: "Gestionar estudiantes", path: "/secretaria/estudiantes" },
-      { icon: UserPlus, label: "Nuevo estudiante", path: "/secretaria/nuevo/estudiante" },
+      { icon: Users, label: "Gestionar profesores", path: "/secretaria/profesores" },
+      { icon: Book, label: "Gestionar Asignaturas", path: "/secretaria/asignaturas" },
+      { icon: ClipboardList, label: "Gestionar Grupos", path: "/secretaria/grupos" },
+      { icon: Calendar, label: "Horarios", path: "/secretaria/horarios" },
       { icon: Calendar, label: "Periodos académicos", path: "/secretaria/periodos" },
-      { icon: FileText, label: "Generar boletines", path: "/secretaria/boletines" },
+      { icon: FileText, label: "Generar boletines", path: "/secretaria/boletines", module: "boletines" },
       { icon: Settings, label: "Configuración", path: "/secretaria/configuracion" },
     ],
     profesor: [
       { icon: GraduationCap, label: "Dashboard", path: "/profesor/dashboard" },
+      { icon: MessageSquare, label: "Chat", path: "/profesor/chat" },
       { icon: BookOpen, label: "Mis clases", path: "/profesor/clases" },
       { icon: ClipboardList, label: "Registro de notas", path: "/profesor/notas" },
       { icon: UserCheck, label: "Asistencias", path: "/profesor/asistencias" },
@@ -52,7 +61,16 @@ export default function SidebarMenu({ role }) {
     ],
   };
 
-  const menu = sections[rol] || [];
+  const menu = (sections[rol] || []).filter(item => {
+    // Si no pide módulo → siempre visible
+    if (!item.module) return true;
+
+    // Si pide módulo → mostramos SOLO si existe y es truthy
+    return !!modules[item.module];
+  });
+
+
+
   if (menu.length === 0) {
     return <p className="text-gray-500 text-sm">No hay menú disponible para este rol</p>;
   }
@@ -79,10 +97,9 @@ function MenuItem({ icon: Icon, label, path }) {
     <button
       onClick={handleClick}
       className={`w-full flex items-center space-x-4 px-5 py-3 rounded-lg text-left transition-all duration-200 text-[15px]
-        ${
-          isActive
-            ? "bg-blue-50 text-blue-700 border-l-4 border-blue-600 font-semibold shadow-sm"
-            : "text-gray-700 hover:bg-gray-100 hover:text-blue-600"
+        ${isActive
+          ? "bg-blue-50 text-blue-700 border-l-4 border-blue-600 font-semibold shadow-sm"
+          : "text-gray-700 hover:bg-gray-100 hover:text-blue-600"
         }`}
     >
       <Icon
