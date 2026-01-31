@@ -21,6 +21,10 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+
+        date_default_timezone_set('America/Bogota');
+        \Carbon\Carbon::setLocale('es');
+
         $settings = null;
         if (Schema::hasTable('school_settings')) {
             $settings = SchoolSetting::first();

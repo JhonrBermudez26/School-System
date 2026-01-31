@@ -22,6 +22,9 @@ use App\Http\Controllers\Profesor\MeetingController;
 use App\Http\Controllers\Profesor\PostController;
 use App\Http\Controllers\Profesor\ChatController;
 use App\Http\Controllers\Profesor\ScheduleTeacherController;
+use App\Http\Controllers\Profesor\AsistenciasController;
+use App\Http\Controllers\Profesor\RegistrarNotasController;
+use App\Http\Controllers\Profesor\TaskController;
 
 // Página principal (pública)
 Route::get('/', function () {
@@ -213,10 +216,33 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/clases/meetings', [MeetingController::class, 'store'])->name('profesor.meetings.store');
         Route::delete('/clases/meetings/{meeting}', [MeetingController::class, 'destroy'])->name('profesor.meetings.destroy');
     
-    
+        // Agregar estas rutas dentro del grupo Route::middleware('role:profesor')->prefix('profesor')
+
+        // TAREAS
+        Route::get('/clases/tasks', [TaskController::class, 'index'])->name('profesor.tasks.index');
+        Route::post('/clases/tasks', [TaskController::class, 'store'])->name('profesor.tasks.store');
+        Route::get('/clases/tasks/{task}', [TaskController::class, 'show'])->name('profesor.tasks.show');
+        Route::put('/clases/tasks/{task}', [TaskController::class, 'update'])->name('profesor.tasks.update');
+        Route::delete('/clases/tasks/{task}', [TaskController::class, 'destroy'])->name('profesor.tasks.destroy');
+        Route::delete('/clases/tasks/attachments/{attachment}', [TaskController::class, 'deleteAttachment'])
+            ->name('profesor.tasks.deleteAttachment');
+        
         //HORARIO
         Route::get('/horario', [ScheduleTeacherController::class, 'index'])->name('profesor.horario');
-    });
+
+         // ASISTENCIAS
+        Route::get('/asistencias', [AsistenciasController::class, 'index'])
+            ->name('profesor.asistencias');
+        Route::post('/asistencias/bulk', [AsistenciasController::class, 'bulkStore'])
+            ->name('profesor.asistencias.bulk');
+        Route::delete('/asistencias/{id}', [AsistenciasController::class, 'destroy'])
+            ->name('profesor.asistencias.destroy');
+
+
+             //REGISTRAR NOTAS
+            Route::get('/registrarNotas', [RegistrarNotasController::class, 'index'])
+            ->name('profesor.registrarNotas');
+        });
 
     //ESTUDIANTE
     Route::middleware('role:estudiante')->prefix('estudiante')->group(function () {
