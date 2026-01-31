@@ -1,0 +1,481 @@
+<?php
+
+namespace App\Http\Controllers\Profesor;
+
+use App\Http\Controllers\Controller;
+use App\Models\Attendance;
+use App\Models\AcademicPeriod;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Inertia\Inertia;
+use Carbon\Carbon;
+
+class AsistenciasController extends Controller
+{
+    /**
+     * Vista principal de asistencias
+     */
+    public function index(Request $request)
+    {
+        $user = Auth::user();
+        
+        // Obtener el período académico activo
+        $currentPeriod = AcademicPeriod::getPeriodoActivo();
+
+        if (!$currentPeriod) {
+            return Inertia::render('Profesor/Asistencias', [
+                'error' => 'No hay un período académico activo. Contacta a la secretaría.',
+                'asignaciones' => [],
+                'estudiantes' => [],
+                'selectedClass' => null,
+                'classDates' => [],
+                'attendanceHistory' => [],
+                'currentPeriod' => null,
+                'filters' => [],
+            ]);
+        }
+
+        // Obtener horario del profesor con días y franjas
+        $horario = DB::table('timetable_slots as ts')
+            ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
+            ->join('groups as g', 'g.id', '=', 'tt.group_id')
+            ->join('subjects as s', 's.id', '=', 'ts.subject_id')
+            ->join('time_slots as tsl', 'tsl.id', '=', 'ts.time_slot_id')
+            ->select(
+                'ts.subject_id',
+                'ts.day',
+                'ts.time_slot_id',
+                'g.id as group_id',
+                'g.nombre as group_name',
+                's.name as subject_name',
+                's.code as subject_code',
+                'tsl.start_time',
+                'tsl.end_time'
+            )
+            ->where('ts.user_id', $user->id)
+            ->orderBy('s.name')
+            ->orderBy('g.nombre')
+            ->get();
+
+        // Agrupar por materia-grupo (asignaciones únicas)
+        $asignaciones = $horario->groupBy(function($item) {
+            return $item->subject_id . '-' . $item->group_id;
+        })->map(function($items) {
+            $first = $items->first();
+            return [
+                'subject_id' => $first->subject_id,
+                'group_id' => $first->group_id,
+                'subject_name' => $first->subject_name,
+                'subject_code' => $first->subject_code,
+                'group_name' => $first->group_name,
+                'schedules' => $items->map(function($item) {
+                    return [
+                        'day' => $item->day,
+                        'time_slot_id' => $item->time_slot_id,
+                        'start_time' => $item->start_time,
+                        'end_time' => $item->end_time,
+                    ];
+                })->values()
+            ];
+        })->values();
+
+        $subjectId = $request->integer('subject_id');
+        $groupId = $request->integer('group_id');
+        $view = $request->input('view', 'register');
+
+        $estudiantes = collect();
+        $selectedClass = null;
+        $classDates = collect();
+        $attendanceHistory = collect();
+
+        if ($subjectId && $groupId) {
+            $hasAssignment = DB::table('timetable_slots as ts')
+                ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
+                ->where('ts.user_id', $user->id)
+                ->where('ts.subject_id', $subjectId)
+                ->where('tt.group_id', $groupId)
+                ->exists();
+
+            if (!$hasAssignment) {
+                return back()->with('error', '❌ No tienes permiso para ver este grupo');
+            }
+
+            $selectedClass = $asignaciones->first(function ($item) use ($subjectId, $groupId) {
+                return $item['subject_id'] == $subjectId && $item['group_id'] == $groupId;
+            });
+
+            if ($view === 'register') {
+                // Generar TODAS las fechas de clase dentro del período
+                $classDates = $this->generateClassDates(
+                    $subjectId, 
+                    $groupId, 
+                    $user->id, 
+                    $currentPeriod
+                );
+                
+                $selectedDate = $request->input('date');
+                if ($selectedDate) {
+                    $estudiantes = $this->getStudentsWithAttendance($groupId, $subjectId, $selectedDate);
+                }
+            } else {
+                // Historial: solo mostrar asistencias del período actual
+                $attendanceHistory = $this->getAttendanceHistory($subjectId, $groupId, $currentPeriod);
+            }
+        }
+
+        return Inertia::render('Profesor/Asistencias', [
+            'asignaciones' => $asignaciones,
+            'estudiantes' => $estudiantes,
+            'selectedClass' => $selectedClass,
+            'classDates' => $classDates,
+            'attendanceHistory' => $attendanceHistory,
+            'currentPeriod' => [
+                'id' => $currentPeriod->id,
+                'name' => $currentPeriod->name,
+                'start_date' => $currentPeriod->start_date->format('Y-m-d'),
+                'end_date' => $currentPeriod->end_date->format('Y-m-d'),
+                'formatted_range' => $currentPeriod->start_date->locale('es')->isoFormat('D MMM YYYY') . ' - ' . 
+                                    $currentPeriod->end_date->locale('es')->isoFormat('D MMM YYYY'),
+                'duracion_dias' => $currentPeriod->getDuracionDias(),
+                'dias_restantes' => $currentPeriod->getDiasRestantes(),
+            ],
+            'filters' => [
+                'subject_id' => $subjectId,
+                'group_id' => $groupId,
+                'date' => $request->input('date'),
+                'view' => $view,
+            ],
+        ]);
+    }
+
+    /**
+     * Generar TODAS las fechas de clase según horario y período académico
+     */
+    private function generateClassDates($subjectId, $groupId, $teacherId, $currentPeriod)
+    {
+        // Obtener los días de la semana donde hay clases con sus horarios
+        $schedules = DB::table('timetable_slots as ts')
+            ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
+            ->join('time_slots as tsl', 'tsl.id', '=', 'ts.time_slot_id')
+            ->where('ts.user_id', $teacherId)
+            ->where('ts.subject_id', $subjectId)
+            ->where('tt.group_id', $groupId)
+            ->select('ts.day', 'tsl.start_time', 'tsl.end_time')
+            ->get();
+
+        // Mapeo de días en español a números ISO (1=Lunes, 7=Domingo)
+        $dayMap = [
+            'Lunes' => 1,
+            'Martes' => 2,
+            'Miercoles' => 3,
+            'Miércoles' => 3,
+            'Jueves' => 4,
+            'Viernes' => 5,
+            'Sábado' => 6,
+            'Sabado' => 6,
+            'Domingo' => 7,
+        ];
+
+        // Agrupar horarios por día
+        $schedulesByDay = $schedules->groupBy('day')->map(function ($daySchedules) {
+            return $daySchedules->map(function ($schedule) {
+                return [
+                    'start_time' => $schedule->start_time,
+                    'end_time' => $schedule->end_time,
+                ];
+            })->values();
+        });
+
+        // Obtener fechas del período
+        $periodStart = Carbon::parse($currentPeriod->start_date);
+        $periodEnd = Carbon::parse($currentPeriod->end_date);
+        
+        // No mostrar fechas futuras más allá de hoy
+        $today = Carbon::today();
+        $effectiveEnd = $periodEnd->gt($today) ? $today : $periodEnd;
+
+        $classDates = collect();
+
+        // Iterar por cada día del período
+        for ($date = $periodStart->copy(); $date->lte($effectiveEnd); $date->addDay()) {
+            $dayOfWeek = $date->dayOfWeekIso; // 1=Lunes, 7=Domingo
+            
+            // Buscar el nombre del día en español
+            $spanishDay = array_search($dayOfWeek, $dayMap);
+            
+            if (!$spanishDay || !isset($schedulesByDay[$spanishDay])) {
+                continue; // No hay clase este día
+            }
+
+            // Verificar si ya existe asistencia registrada para esta fecha
+            $hasAttendance = DB::table('attendances')
+                ->where('subject_id', $subjectId)
+                ->where('group_id', $groupId)
+                ->where('date', $date->format('Y-m-d'))
+                ->exists();
+
+            // Contar estudiantes que asistieron
+            $attendanceStats = null;
+            if ($hasAttendance) {
+                $stats = DB::table('attendances')
+                    ->where('subject_id', $subjectId)
+                    ->where('group_id', $groupId)
+                    ->where('date', $date->format('Y-m-d'))
+                    ->select(
+                        DB::raw('COUNT(*) as total'),
+                        DB::raw('SUM(CASE WHEN status = "present" THEN 1 ELSE 0 END) as present'),
+                        DB::raw('SUM(CASE WHEN status = "absent" THEN 1 ELSE 0 END) as absent'),
+                        DB::raw('SUM(CASE WHEN status = "late" THEN 1 ELSE 0 END) as late'),
+                        DB::raw('SUM(CASE WHEN status = "excused" THEN 1 ELSE 0 END) as excused')
+                    )
+                    ->first();
+
+                $attendanceStats = [
+                    'total' => $stats->total,
+                    'present' => $stats->present,
+                    'absent' => $stats->absent,
+                    'late' => $stats->late,
+                    'excused' => $stats->excused,
+                ];
+            }
+
+            // Obtener los horarios de este día
+            $daySchedules = $schedulesByDay[$spanishDay];
+
+            $classDates->push([
+                'date' => $date->format('Y-m-d'),
+                'day_name' => $date->locale('es')->isoFormat('dddd'),
+                'formatted' => $date->locale('es')->isoFormat('D [de] MMMM, YYYY'),
+                'short_date' => $date->locale('es')->isoFormat('D MMM'),
+                'is_past' => $date->isPast(),
+                'is_today' => $date->isToday(),
+                'is_future' => $date->isFuture(),
+                'schedules' => $daySchedules,
+                'has_attendance' => $hasAttendance,
+                'attendance_stats' => $attendanceStats,
+                'week_number' => $date->weekOfYear,
+            ]);
+        }
+
+        // Ordenar por fecha descendente (más reciente primero)
+        return $classDates->sortByDesc('date')->values();
+    }
+
+    /**
+     * Validar si una fecha está dentro del período y es día de clase
+     */
+    private function isValidClassDate($date, $subjectId, $groupId, $teacherId, $currentPeriod)
+    {
+        $carbonDate = Carbon::parse($date);
+        
+        // Validar que esté dentro del período académico
+        if (!$currentPeriod->contieneFecha($carbonDate)) {
+            return false;
+        }
+
+        // No permitir fechas futuras
+        if ($carbonDate->isFuture()) {
+            return false;
+        }
+
+        $dayOfWeek = $carbonDate->dayOfWeekIso;
+
+        $dayMap = [
+            1 => 'Lunes',
+            2 => 'Martes',
+            3 => 'Miercoles',
+            4 => 'Jueves',
+            5 => 'Viernes',
+            6 => 'Sábado',
+            7 => 'Domingo',
+        ];
+
+        $dayName = $dayMap[$dayOfWeek] ?? null;
+        if (!$dayName) return false;
+
+        // Verificar si hay una clase ese día
+        return DB::table('timetable_slots as ts')
+            ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
+            ->where('ts.user_id', $teacherId)
+            ->where('ts.subject_id', $subjectId)
+            ->where('tt.group_id', $groupId)
+            ->where('ts.day', $dayName)
+            ->exists();
+    }
+
+    /**
+     * Obtener estudiantes con su asistencia del día
+     */
+    private function getStudentsWithAttendance($groupId, $subjectId, $date)
+    {
+        return DB::table('group_user')
+            ->join('users', 'group_user.user_id', '=', 'users.id')
+            ->join('model_has_roles', function ($join) {
+                $join->on('users.id', '=', 'model_has_roles.model_id')
+                    ->where('model_has_roles.model_type', '=', 'App\\Models\\User');
+            })
+            ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
+            ->leftJoin('attendances', function ($join) use ($subjectId, $groupId, $date) {
+                $join->on('users.id', '=', 'attendances.user_id')
+                    ->where('attendances.subject_id', '=', $subjectId)
+                    ->where('attendances.group_id', '=', $groupId)
+                    ->where('attendances.date', '=', $date);
+            })
+            ->where('group_user.group_id', $groupId)
+            ->where('roles.name', 'estudiante')
+            ->where('users.is_active', true)
+            ->select(
+                'users.id',
+                'users.name',
+                'users.last_name',
+                'users.document_number',
+                'attendances.id as attendance_id',
+                'attendances.status',
+                'attendances.notes'
+            )
+            ->orderBy('users.last_name')
+            ->orderBy('users.name')
+            ->get();
+    }
+
+    /**
+     * Obtener historial de asistencias del período actual
+     */
+    private function getAttendanceHistory($subjectId, $groupId, $currentPeriod)
+    {
+        $periodStart = Carbon::parse($currentPeriod->start_date);
+        $periodEnd = Carbon::parse($currentPeriod->end_date);
+
+        return DB::table('attendances as a')
+            ->join('users as u', 'a.user_id', '=', 'u.id')
+            ->where('a.subject_id', $subjectId)
+            ->where('a.group_id', $groupId)
+            ->whereBetween('a.date', [$periodStart, $periodEnd])
+            ->select(
+                'a.id',
+                'a.date',
+                'a.status',
+                'a.notes',
+                'a.created_at',
+                'u.id as user_id',
+                'u.name',
+                'u.last_name',
+                'u.document_number'
+            )
+            ->orderBy('a.date', 'desc')
+            ->orderBy('u.last_name')
+            ->get()
+            ->groupBy('date')
+            ->map(function ($dateGroup, $date) {
+                $stats = [
+                    'present' => $dateGroup->where('status', 'present')->count(),
+                    'absent' => $dateGroup->where('status', 'absent')->count(),
+                    'late' => $dateGroup->where('status', 'late')->count(),
+                    'excused' => $dateGroup->where('status', 'excused')->count(),
+                    'total' => $dateGroup->count(),
+                ];
+
+                return [
+                    'date' => $date,
+                    'formatted_date' => Carbon::parse($date)->locale('es')->isoFormat('dddd, D [de] MMMM, YYYY'),
+                    'students' => $dateGroup->values(),
+                    'stats' => $stats,
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * Guardar asistencia masiva
+     */
+    public function bulkStore(Request $request)
+    {
+        $validated = $request->validate([
+            'subject_id' => 'required|exists:subjects,id',
+            'group_id' => 'required|exists:groups,id',
+            'date' => 'required|date',
+            'attendances' => 'required|array',
+            'attendances.*.user_id' => 'required|exists:users,id',
+            'attendances.*.status' => 'required|in:present,absent,late,excused',
+            'attendances.*.notes' => 'nullable|string|max:500',
+        ]);
+
+        $userId = Auth::id();
+
+        // Obtener el período académico activo
+        $currentPeriod = AcademicPeriod::getPeriodoActivo();
+
+        if (!$currentPeriod) {
+            return back()->with('error', '❌ No hay un período académico activo');
+        }
+
+        // Validar que la fecha esté dentro del período
+        $date = Carbon::parse($validated['date']);
+        
+        if (!$currentPeriod->contieneFecha($date)) {
+            return back()->with('error', '❌ La fecha debe estar dentro del período académico: ' . $currentPeriod->name);
+        }
+
+        // Validar que sea un día de clase según el horario
+        if (!$this->isValidClassDate($validated['date'], $validated['subject_id'], $validated['group_id'], $userId, $currentPeriod)) {
+            return back()->with('error', '❌ No puedes registrar asistencia en esta fecha. No tienes clase programada ese día.');
+        }
+
+        // Verificar permiso del profesor
+        $hasAssignment = DB::table('timetable_slots as ts')
+            ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
+            ->where('ts.user_id', $userId)
+            ->where('ts.subject_id', $validated['subject_id'])
+            ->where('tt.group_id', $validated['group_id'])
+            ->exists();
+
+        if (!$hasAssignment) {
+            return back()->with('error', '❌ No tienes permiso para registrar asistencia en este grupo');
+        }
+
+        DB::beginTransaction();
+        try {
+            foreach ($validated['attendances'] as $attendance) {
+                Attendance::updateOrCreate(
+                    [
+                        'user_id' => $attendance['user_id'],
+                        'subject_id' => $validated['subject_id'],
+                        'group_id' => $validated['group_id'],
+                        'date' => $validated['date'],
+                    ],
+                    [
+                        'teacher_id' => $userId,
+                        'status' => $attendance['status'],
+                        'notes' => $attendance['notes'] ?? null,
+                    ]
+                );
+            }
+
+            DB::commit();
+            return back()->with('success', '✅ Asistencias registradas correctamente');
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return back()->with('error', '❌ Error al registrar asistencias: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Eliminar un registro de asistencia
+     */
+    public function destroy($id)
+    {
+        try {
+            $attendance = Attendance::findOrFail($id);
+            
+            if ($attendance->teacher_id !== Auth::id()) {
+                return back()->with('error', '❌ No tienes permiso para eliminar este registro');
+            }
+
+            $attendance->delete();
+            return back()->with('success', '✅ Registro eliminado correctamente');
+        } catch (\Exception $e) {
+            return back()->with('error', '❌ Error al eliminar: ' . $e->getMessage());
+        }
+    }
+}

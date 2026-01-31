@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Http\Controllers\Profesor;
 
 use App\Http\Controllers\Controller;
@@ -10,6 +11,7 @@ use App\Models\Post;
 use App\Models\Folder;
 use App\Models\ClassFile;
 use App\Models\Meeting;
+use App\Models\Task;
 
 class ClassController extends Controller
 {
@@ -59,6 +61,7 @@ class ClassController extends Controller
         $subjectId = (int) $request->query('subject_id');
         $groupId = (int) $request->query('group_id');
 
+        // Obtener información de la clase
         $class = DB::table('subject_group as sg')
             ->join('subjects as s', 'sg.subject_id', '=', 's.id')
             ->join('groups as g', 'sg.group_id', '=', 'g.id')
@@ -75,9 +78,10 @@ class ClassController extends Controller
             ->first();
 
         if (!$class) {
-            abort(404);
+            abort(404, 'Clase no encontrada');
         }
 
+        // Contar estudiantes
         $studentsCount = DB::table('group_user as gu')
             ->join('model_has_roles as mhr', function ($join) {
                 $join->on('gu.user_id', '=', 'mhr.model_id')
@@ -115,6 +119,58 @@ class ClassController extends Controller
             ->where('is_active', true)
             ->first();
 
+        // ✅ NUEVO: Tareas
+        $tasks = Task::with('attachments')
+            ->where('subject_id', $subjectId)
+            ->where('group_id', $groupId)
+            ->where('teacher_id', $user->id)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(function ($task) use ($groupId) {
+                // Contar estudiantes del grupo para las estadísticas
+                $totalStudents = DB::table('group_user as gu')
+                    ->join('model_has_roles as mhr', function ($join) {
+                        $join->on('gu.user_id', '=', 'mhr.model_id')
+                            ->where('mhr.model_type', '=', 'App\\Models\\User');
+                    })
+                    ->join('roles as r', 'mhr.role_id', '=', 'r.id')
+                    ->where('gu.group_id', $groupId)
+                    ->where('r.name', 'estudiante')
+                    ->distinct()
+                    ->count('gu.user_id');
+
+                $submitted = $task->submissions()
+                    ->where('status', '!=', 'pending')
+                    ->count();
+
+                $graded = $task->submissions()
+                    ->where('status', 'graded')
+                    ->count();
+
+                return [
+                    'id' => $task->id,
+                    'title' => $task->title,
+                    'description' => $task->description,
+                    'work_type' => $task->work_type,
+                    'max_group_members' => $task->max_group_members,
+                    'due_date' => $task->due_date,
+                    'close_date' => $task->close_date,
+                    'allow_late_submission' => $task->allow_late_submission,
+                    'max_score' => $task->max_score,
+                    'is_active' => $task->is_active,
+                    'is_past_due' => $task->isPastDue(),
+                    'is_closed' => $task->isClosed(),
+                    'attachments' => $task->attachments,
+                    'stats' => [
+                        'total' => $totalStudents,
+                        'submitted' => $submitted,
+                        'graded' => $graded,
+                        'pending' => $totalStudents - $submitted,
+                    ],
+                    'created_at' => $task->created_at,
+                ];
+            });
+
         return Inertia::render('Profesor/Clases/Show', [
             'classInfo' => $class,
             'studentsCount' => $studentsCount,
@@ -122,6 +178,7 @@ class ClassController extends Controller
             'folders' => $folders,
             'files' => $files,
             'meeting' => $meeting,
+            'tasks' => $tasks,
         ]);
     }
 }

@@ -19,6 +19,20 @@
     border-radius: 0.5rem;
     transition: background-color 0.2s;
 }
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
 
 .btn-secondary:hover {
     background-color: #d1d5db;
