@@ -200,31 +200,12 @@ export default function Publicaciones({ publicaciones = [], classInfo }) {
               <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-5">
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-3">
-                    <span className={`
-                      inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide
-                      ${p.type === 'tarea'
-                        ? 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200'
-                        : 'bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border border-blue-200'
-                      }
-                    `}>
-                      {p.type === 'tarea' ? (
-                        <Clock className="h-3.5 w-3.5" />
-                      ) : (
-                        <MessageSquare className="h-3.5 w-3.5" />
-                      )}
-                      {p.type === 'tarea' ? 'Tarea' : 'Publicación'}
+                    <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 border border-blue-200">
+                      <MessageSquare className="h-3.5 w-3.5" />
+                      Publicación
                     </span>
-                    
-                    {p.due_at && (
-                      <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-gradient-to-r from-orange-100 to-red-100 text-orange-800 border border-orange-200">
-                        <Clock className="h-3.5 w-3.5" />
-                        Entrega: {new Date(p.due_at).toLocaleDateString('es-CO', {
-                          day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                        })}
-                      </span>
-                    )}
                   </div>
-                  
+
                   <h3 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight tracking-tight">
                     {p.title}
                   </h3>
@@ -355,43 +336,9 @@ export default function Publicaciones({ publicaciones = [], classInfo }) {
               </button>
             </div>
 
-            {/* Contenido */}
-            <form onSubmit={submitCreate} className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
-              {/* Tipo de publicación */}
-              <div>
-                <label className="block text-sm font-bold text-gray-800 mb-3">Tipo de publicación</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => form.setData('type', 'post')}
-                    className={`
-                      p-4 rounded-xl border-2 transition-all duration-200
-                      ${form.data.type === 'post'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                      }
-                    `}
-                  >
-                    <MessageSquare className="h-6 w-6 mx-auto mb-2" />
-                    <span className="font-semibold">Publicación</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => form.setData('type', 'tarea')}
-                    className={`
-                      p-4 rounded-xl border-2 transition-all duration-200
-                      ${form.data.type === 'tarea'
-                        ? 'border-amber-500 bg-amber-50 text-amber-700'
-                        : 'border-gray-200 hover:border-gray-300 text-gray-600'
-                      }
-                    `}
-                  >
-                    <Clock className="h-6 w-6 mx-auto mb-2" />
-                    <span className="font-semibold">Tarea</span>
-                  </button>
-                </div>
-              </div>
 
+            <form onSubmit={submitCreate} className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
+              <input type="hidden" name="type" value="post" />
               {/* Título */}
               <div>
                 <label className="block text-sm font-bold text-gray-800 mb-2">Título *</label>
@@ -406,36 +353,21 @@ export default function Publicaciones({ publicaciones = [], classInfo }) {
                 />
               </div>
 
-              {/* Fecha de entrega (solo para tareas) */}
-              {form.data.type === 'tarea' && (
-                <div>
-                  <label className="block text-sm font-bold text-gray-800 mb-2">Fecha de entrega</label>
-                  <input
-                    type="datetime-local"
-                    className="w-full px-5 py-3.5 border-2 border-gray-200 rounded-xl 
-                      focus:ring-4 focus:ring-blue-100 focus:border-blue-500 
-                      bg-white shadow-sm transition-all"
-                    value={form.data.due_at}
-                    onChange={e => form.setData('due_at', e.target.value)}
-                  />
-                </div>
-              )}
-
               {/* Editor de contenido */}
               <div>
                 <label className="block text-sm font-bold text-gray-800 mb-2">Contenido</label>
                 <div className="border-2 border-gray-200 rounded-xl overflow-hidden shadow-sm 
                   focus-within:ring-4 focus-within:ring-blue-100 focus-within:border-blue-500 transition-all">
                   <div className="flex gap-1 p-3 bg-gray-50 border-b-2 border-gray-100">
-                    <button type="button" onClick={() => exec('bold')} 
+                    <button type="button" onClick={() => exec('bold')}
                       className="p-2.5 hover:bg-white rounded-lg transition-colors">
                       <Bold className="h-5 w-5 text-gray-700" />
                     </button>
-                    <button type="button" onClick={() => exec('italic')} 
+                    <button type="button" onClick={() => exec('italic')}
                       className="p-2.5 hover:bg-white rounded-lg transition-colors">
                       <Italic className="h-5 w-5 text-gray-700" />
                     </button>
-                    <button type="button" onClick={() => exec('underline')} 
+                    <button type="button" onClick={() => exec('underline')}
                       className="p-2.5 hover:bg-white rounded-lg transition-colors">
                       <Underline className="h-5 w-5 text-gray-700" />
                     </button>

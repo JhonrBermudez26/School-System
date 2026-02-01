@@ -4,17 +4,16 @@ import {
   Plus,
   Calendar,
   Users,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
   Eye,
   Trash2,
   Edit,
   Award,
-  TrendingUp
 } from 'lucide-react';
 import TaskForm from './TaskForm';
 import TaskDetail from './TaskDetail';
+
+// Importar utilidades CSRF
+import { fetchWithCsrf, deleteWithCsrf } from '@/Utils/csrf-utils';
 
 export default function Tareas({ tasks: initialTasks = [], classInfo }) {
   const [tasks, setTasks] = useState(initialTasks);
@@ -58,14 +57,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
     }
 
     try {
-      // FIX: Corregir sintaxis - usar paréntesis en lugar de backticks
-      const response = await fetch(`/profesor/clases/tasks/${taskId}`, {
-        method: 'DELETE',
-        headers: {
-          'Accept': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-        },
-      });
+      const response = await deleteWithCsrf(`/profesor/clases/tasks/${taskId}`);
 
       if (response.ok) {
         loadTasks();
@@ -75,17 +67,14 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
       }
     } catch (error) {
       console.error('Error eliminando tarea:', error);
-      alert('Error al eliminar la tarea');
+      alert('Error al eliminar la tarea: ' + error.message);
     }
   };
 
   const handleViewTask = async (task) => {
     try {
-      // FIX: Corregir sintaxis - usar paréntesis en lugar de backticks
-      const response = await fetch(`/profesor/clases/tasks/${task.id}`, {
-        headers: {
-          'Accept': 'application/json',
-        }
+      const response = await fetchWithCsrf(`/profesor/clases/tasks/${task.id}`, {
+        method: 'GET',
       });
 
       if (response.ok) {
@@ -151,7 +140,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
 
   return (
     <div className="space-y-6">
-      {/* Header mejorado */}
+      {/* Header */}
       <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 border border-gray-100">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -228,7 +217,6 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
                       {task.description}
                     </p>
                   </div>
-
                   {/* Acciones */}
                   <div className="flex gap-2">
                     <button

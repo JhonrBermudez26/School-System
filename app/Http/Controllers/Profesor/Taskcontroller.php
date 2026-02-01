@@ -1,15 +1,16 @@
 <?php
+
 namespace App\Http\Controllers\Profesor;
 
 use App\Http\Controllers\Controller;
 use App\Models\Task;
 use App\Models\TaskAttachment;
+use App\Models\TaskSubmission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
-
 
 class TaskController extends Controller
 {
@@ -99,108 +100,116 @@ class TaskController extends Controller
     }
 
     /**
- * Crear nueva tarea
- */
-public function store(Request $request)
-{
-    $validated = $request->validate([
-        'subject_id' => 'required|integer',
-        'group_id' => 'required|integer',
-        'title' => 'required|string|max:255',
-        'description' => 'required|string',
-        'work_type' => 'required|in:individual,pairs,group',
-        'max_group_members' => 'nullable|integer|min:2|max:10',
-        'due_date' => 'required|date|after_or_equal:today',
-        'close_date' => 'nullable|date|after:due_date',
-        'allow_late_submission' => 'boolean',
-        'max_score' => 'required|integer|min:1|max:1000',
-        'attachments' => 'nullable|array',
-        'attachments.*' => 'file|max:10240',
-    ]);
-
-    $this->assertOwnership((int) $validated['subject_id'], (int) $validated['group_id']);
-
-    try {
-        DB::beginTransaction();
-
-        $task = Task::create([
-            'subject_id' => $validated['subject_id'],
-            'group_id' => $validated['group_id'],
-            'teacher_id' => auth()->id(),
-            'title' => $validated['title'],
-            'description' => $validated['description'],
-            'work_type' => $validated['work_type'],
-            'max_group_members' => $validated['work_type'] === 'group' ? ($validated['max_group_members'] ?? 3) : null,
-            'due_date' => $validated['due_date']
-                ? Carbon::parse($validated['due_date'])->setTimezone('America/Bogota')
-                : null,
-            'close_date' => $validated['close_date']
-                ? Carbon::parse($validated['close_date'])->setTimezone('America/Bogota')
-                : null,
-            'allow_late_submission' => $validated['allow_late_submission'] ?? true,
-            'max_score' => $validated['max_score'],
+     * Crear nueva tarea
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'subject_id' => 'required|integer',
+            'group_id' => 'required|integer',
+            'title' => 'required|string|max:255',
+            'description' => 'required|string',
+            'work_type' => 'required|in:individual,pairs,group',
+            'max_group_members' => 'nullable|integer|min:2|max:10',
+            'due_date' => 'required|date|after_or_equal:today',
+            'close_date' => 'nullable|date|after:due_date',
+            'allow_late_submission' => 'nullable|boolean',
+            'max_score' => 'required|integer|min:1|max:1000',
+            'attachments' => 'nullable|array',
+            'attachments.*' => 'file|max:10240', // 10MB
+        ], [
+            'close_date.after' => 'La fecha de cierre debe ser posterior a la fecha de entrega',
+            'due_date.after_or_equal' => 'La fecha de entrega debe ser hoy o en el futuro',
         ]);
 
-        // ★ CREACIÓN AUTOMÁTICA DE ENTREGAS "PENDIENTE" PARA CADA ESTUDIANTE ★
-        $students = DB::table('group_user as gu')
-            ->join('model_has_roles as mhr', function ($join) {
-                $join->on('gu.user_id', '=', 'mhr.model_id')
-                    ->where('mhr.model_type', '=', 'App\\Models\\User');
-            })
-            ->join('roles as r', 'mhr.role_id', '=', 'r.id')
-            ->where('gu.group_id', $validated['group_id'])
-            ->where('r.name', 'estudiante')
-            ->pluck('gu.user_id');
+        $this->assertOwnership((int) $validated['subject_id'], (int) $validated['group_id']);
 
-        foreach ($students as $studentId) {
-            // Evitar duplicados si por alguna razón se ejecuta dos veces
-            TaskSubmission::firstOrCreate(
-                [
-                    'task_id'    => $task->id,
-                    'student_id' => $studentId,
-                ],
-                [
-                    'status'     => 'pending',
-                    'is_late'    => false,
-                    // Puedes agregar más campos por defecto si los necesitas
-                ]
-            );
-        }
+        try {
+            DB::beginTransaction();
 
-        // Guardar archivos adjuntos
-        if ($request->hasFile('attachments')) {
-            foreach ($request->file('attachments') as $file) {
-                $path = $file->store('tasks/' . $task->id, 'public');
-                TaskAttachment::create([
-                    'task_id' => $task->id,
-                    'file_name' => $file->getClientOriginalName(),
-                    'file_path' => $path,
-                    'file_type' => $file->getClientMimeType(),
-                    'file_size' => $file->getSize(),
-                ]);
+            $task = Task::create([
+                'subject_id' => $validated['subject_id'],
+                'group_id' => $validated['group_id'],
+                'teacher_id' => auth()->id(),
+                'title' => $validated['title'],
+                'description' => $validated['description'],
+                'work_type' => $validated['work_type'],
+                'max_group_members' => $validated['work_type'] === 'group' 
+                    ? ($validated['max_group_members'] ?? 3) 
+                    : null,
+                'due_date' => $validated['due_date']
+                    ? Carbon::parse($validated['due_date'])->setTimezone('America/Bogota')
+                    : null,
+                'close_date' => !empty($validated['close_date'])
+                    ? Carbon::parse($validated['close_date'])->setTimezone('America/Bogota')
+                    : null,
+                'allow_late_submission' => $validated['allow_late_submission'] ?? true,
+                'max_score' => $validated['max_score'],
+            ]);
+
+            // Creación automática de entregas "PENDIENTE" para cada estudiante
+            $students = DB::table('group_user as gu')
+                ->join('model_has_roles as mhr', function ($join) {
+                    $join->on('gu.user_id', '=', 'mhr.model_id')
+                        ->where('mhr.model_type', '=', 'App\\Models\\User');
+                })
+                ->join('roles as r', 'mhr.role_id', '=', 'r.id')
+                ->where('gu.group_id', $validated['group_id'])
+                ->where('r.name', 'estudiante')
+                ->pluck('gu.user_id');
+
+            foreach ($students as $studentId) {
+                TaskSubmission::firstOrCreate(
+                    [
+                        'task_id' => $task->id,
+                        'student_id' => $studentId,
+                    ],
+                    [
+                        'status' => 'pending',
+                        'is_late' => false,
+                    ]
+                );
             }
+
+            // Guardar archivos adjuntos
+            if ($request->hasFile('attachments')) {
+                foreach ($request->file('attachments') as $file) {
+                    $path = $file->store('tasks/' . $task->id, 'public');
+                    
+                    TaskAttachment::create([
+                        'task_id' => $task->id,
+                        'file_name' => $file->getClientOriginalName(),
+                        'file_path' => $path,
+                        'file_type' => $file->getClientMimeType(),
+                        'file_size' => $file->getSize(),
+                    ]);
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Tarea creada exitosamente',
+                'task' => $task->load('attachments'),
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Error creando tarea:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'message' => 'Error al crear la tarea',
+                'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
+            ], 500);
         }
-
-        DB::commit();
-
-        return response()->json([
-            'message' => 'Tarea creada exitosamente',
-            'task' => $task->load('attachments'),
-        ], 201);
-    } catch (\Exception $e) {
-        DB::rollBack();
-        \Log::error('Error creando tarea:', ['error' => $e->getMessage()]);
-        return response()->json([
-            'message' => 'Error al crear la tarea',
-            'error' => $e->getMessage()
-        ], 500);
     }
-}
 
     /**
      * Actualizar tarea
      */
-   public function update(Request $request, Task $task)
+    public function update(Request $request, Task $task)
     {
         $this->assertOwnership((int) $task->subject_id, (int) $task->group_id);
 
@@ -215,33 +224,39 @@ public function store(Request $request)
             'max_group_members' => 'nullable|integer|min:2|max:10',
             'due_date' => 'sometimes|date|after_or_equal:today',
             'close_date' => 'nullable|date|after:due_date',
-            'allow_late_submission' => 'boolean',
+            'allow_late_submission' => 'nullable|boolean',
             'max_score' => 'sometimes|integer|min:1|max:1000',
-            'is_active' => 'boolean',
+            'is_active' => 'nullable|boolean',
             'attachments' => 'nullable|array',
             'attachments.*' => 'file|max:10240',
+        ], [
+            'close_date.after' => 'La fecha de cierre debe ser posterior a la fecha de entrega',
+            'due_date.after_or_equal' => 'La fecha de entrega debe ser hoy o en el futuro',
         ]);
 
         try {
             DB::beginTransaction();
 
-            // Preparamos los datos a actualizar
             $updates = $validated;
 
-            // ← Forzamos zona horaria si vienen las fechas
+            // Forzar zona horaria si vienen las fechas
             if (isset($validated['due_date'])) {
                 $updates['due_date'] = Carbon::parse($validated['due_date'])->setTimezone('America/Bogota');
             }
             if (isset($validated['close_date'])) {
-                $updates['close_date'] = Carbon::parse($validated['close_date'])->setTimezone('America/Bogota');
+                // Si close_date está vacío, establecer a null
+                $updates['close_date'] = !empty($validated['close_date'])
+                    ? Carbon::parse($validated['close_date'])->setTimezone('America/Bogota')
+                    : null;
             }
 
             $task->update($updates);
 
-            // Guardar nuevos archivos adjuntos (sin cambios)
+            // Guardar nuevos archivos adjuntos
             if ($request->hasFile('attachments')) {
                 foreach ($request->file('attachments') as $file) {
                     $path = $file->store('tasks/' . $task->id, 'public');
+                    
                     TaskAttachment::create([
                         'task_id' => $task->id,
                         'file_name' => $file->getClientOriginalName(),
@@ -260,10 +275,14 @@ public function store(Request $request)
             ]);
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Error actualizando tarea:', ['error' => $e->getMessage()]);
+            \Log::error('Error actualizando tarea:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'message' => 'Error al actualizar la tarea',
-                'error' => $e->getMessage()
+                'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
             ], 500);
         }
     }
@@ -273,10 +292,8 @@ public function store(Request $request)
      */
     public function destroy(Task $task)
     {
-        // Verificar acceso
         $this->assertOwnership((int) $task->subject_id, (int) $task->group_id);
 
-        // Verificar que el profesor es dueño de la tarea
         if ($task->teacher_id !== auth()->id()) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
@@ -307,67 +324,69 @@ public function store(Request $request)
             return response()->json([
                 'message' => 'Tarea eliminada exitosamente'
             ]);
-
         } catch (\Exception $e) {
             DB::rollBack();
-            \Log::error('Error eliminando tarea:', ['error' => $e->getMessage()]);
-            
+            \Log::error('Error eliminando tarea:', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             return response()->json([
                 'message' => 'Error al eliminar la tarea',
-                'error' => $e->getMessage()
+                'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
             ], 500);
         }
     }
 
     /**
- * Obtener detalles de una tarea con entregas
- */
-public function show(Task $task)
-{
-    $this->assertOwnership((int) $task->subject_id, (int) $task->group_id);
+     * Obtener detalles de una tarea con entregas
+     */
+    public function show(Task $task)
+    {
+        $this->assertOwnership((int) $task->subject_id, (int) $task->group_id);
 
-    if ($task->teacher_id !== auth()->id()) {
-        return response()->json(['message' => 'No autorizado'], 403);
+        if ($task->teacher_id !== auth()->id()) {
+            return response()->json(['message' => 'No autorizado'], 403);
+        }
+
+        $task->load([
+            'attachments',
+            'submissions.student',
+            'submissions.files',
+            'groupSubmissions.members'
+        ]);
+
+        $totalStudents = DB::table('group_user as gu')
+            ->join('model_has_roles as mhr', function ($join) {
+                $join->on('gu.user_id', '=', 'mhr.model_id')
+                    ->where('mhr.model_type', '=', 'App\\Models\\User');
+            })
+            ->join('roles as r', 'mhr.role_id', '=', 'r.id')
+            ->where('gu.group_id', $task->group_id)
+            ->where('r.name', 'estudiante')
+            ->distinct()
+            ->count('gu.user_id');
+
+        $submitted = $task->submissions()
+            ->where('status', '!=', 'pending')
+            ->count();
+
+        $graded = $task->submissions()
+            ->where('status', 'graded')
+            ->count();
+
+        // Agregar stats directamente al modelo task
+        $task->stats = [
+            'total' => $totalStudents,
+            'submitted' => $submitted,
+            'graded' => $graded,
+            'pending' => $totalStudents - $submitted,
+        ];
+
+        return response()->json([
+            'task' => $task,
+        ]);
     }
-
-    $task->load([
-        'attachments',
-        'submissions.student',      // Necesario para mostrar nombre y email
-        'submissions.files',
-        'groupSubmissions.members'
-    ]);
-
-    $totalStudents = DB::table('group_user as gu')
-        ->join('model_has_roles as mhr', function ($join) {
-            $join->on('gu.user_id', '=', 'mhr.model_id')
-                ->where('mhr.model_type', '=', 'App\\Models\\User');
-        })
-        ->join('roles as r', 'mhr.role_id', '=', 'r.id')
-        ->where('gu.group_id', $task->group_id)
-        ->where('r.name', 'estudiante')
-        ->distinct()
-        ->count('gu.user_id');
-
-    $submitted = $task->submissions()
-        ->where('status', '!=', 'pending')
-        ->count();
-
-    $graded = $task->submissions()
-        ->where('status', 'graded')
-        ->count();
-
-    // Agregar stats directamente al modelo task (consistente)
-    $task->stats = [
-        'total'     => $totalStudents,
-        'submitted' => $submitted,
-        'graded'    => $graded,
-        'pending'   => $totalStudents - $submitted,
-    ];
-
-    return response()->json([
-        'task' => $task,
-    ]);
-}
 
     /**
      * Eliminar un archivo adjunto de la tarea
@@ -376,22 +395,32 @@ public function show(Task $task)
     {
         $task = $attachment->task;
 
-        // Verificar acceso
         $this->assertOwnership((int) $task->subject_id, (int) $task->group_id);
 
-        // Verificar que el profesor es dueño de la tarea
         if ($task->teacher_id !== auth()->id()) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
-        if ($attachment->file_path && Storage::disk('public')->exists($attachment->file_path)) {
-            Storage::disk('public')->delete($attachment->file_path);
-        }
-        
-        $attachment->delete();
+        try {
+            if ($attachment->file_path && Storage::disk('public')->exists($attachment->file_path)) {
+                Storage::disk('public')->delete($attachment->file_path);
+            }
 
-        return response()->json([
-            'message' => 'Archivo eliminado exitosamente'
-        ]);
+            $attachment->delete();
+
+            return response()->json([
+                'message' => 'Archivo eliminado exitosamente'
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Error eliminando archivo adjunto:', [
+                'error' => $e->getMessage(),
+                'attachment_id' => $attachment->id
+            ]);
+
+            return response()->json([
+                'message' => 'Error al eliminar el archivo',
+                'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
+            ], 500);
+        }
     }
 }

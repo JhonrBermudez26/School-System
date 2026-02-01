@@ -1,4 +1,4 @@
-// Show.jsx - Versión actualizada con pestaña de Tareas
+// Show.jsx - Versión completamente responsive
 import { useState } from 'react';
 import { usePage } from '@inertiajs/react';
 import Layout from '@/Components/Layout/Layout';
@@ -6,7 +6,7 @@ import { MessageSquare, Folder, Video, BookOpen, GraduationCap, Users, Calendar,
 import Publicaciones from './Publicaciones';
 import Archivos from './Archivos';
 import Reunion from './Reunion';
-import Tareas from './Tareas'; // Nuevo componente
+import Tareas from './Tareas';
 
 export default function Show() {
   const { props } = usePage();
@@ -17,12 +17,12 @@ export default function Show() {
     folders = [], 
     files = [], 
     meeting = null,
-    tasks = [] // Nuevas tareas
+    tasks = []
   } = props;
 
   const tabs = [
     { key: 'publicaciones', label: 'Publicaciones', icon: MessageSquare, component: Publicaciones },
-    { key: 'tareas', label: 'Tareas', icon: ClipboardList, component: Tareas }, // Nueva pestaña
+    { key: 'tareas', label: 'Tareas', icon: ClipboardList, component: Tareas },
     { key: 'archivos', label: 'Archivos', icon: Folder, component: Archivos },
     { key: 'reunion', label: 'Reunión', icon: Video, component: Reunion },
   ];
@@ -31,85 +31,96 @@ export default function Show() {
 
   return (
     <Layout title={`${classInfo.subject_name} - ${classInfo.group_name}`}>
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 -m-6 sm:-m-8 p-4 sm:p-6 lg:p-8">
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 -m-4 sm:-m-6 md:-m-8 p-3 sm:p-4 md:p-6 lg:p-8">
         <div className="max-w-7xl mx-auto">
-          {/* Header mejorado con diseño moderno */}
-          <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-6 border border-gray-100">
-            {/* Banner superior con gradiente */} 
-            <div className="h-32 sm:h-40 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 relative overflow-hidden">
+          
+          {/* Header mejorado con diseño completamente responsive */}
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl overflow-hidden mb-4 sm:mb-6 border border-gray-100">
+            
+            {/* Banner superior con gradiente + Información de la clase */}
+            <div className="bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 relative overflow-hidden">
               {/* Efectos decorativos */}
               <div className="absolute inset-0 bg-white/10 transform -skew-y-6 origin-top-left"></div>
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32"></div>
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -ml-24 -mb-24"></div>
-            </div>
-
-            {/* Información de la clase */}
-            <div className="px-4 sm:px-8 lg:px-10 pb-6 -mt-10 sm:-mt-35 relative z-10">
-              <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
-                {/* Icono de la clase */}
-                <div className="relative">
-                  <div className="h-20 w-20 sm:h-28 sm:w-28 bg-white rounded-2xl sm:rounded-3xl shadow-2xl flex items-center justify-center border-4 border-white">
-                    <BookOpen className="h-10 w-10 sm:h-14 sm:w-14 text-blue-600" />
-                  </div>
-                  <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-green-500 rounded-full border-4 border-white flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">✓</span>
-                  </div>
-                </div>
-
-                {/* Detalles de la clase */}
-                <div className="flex-1 mt-12 sm:mt-6">
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className="inline-flex items-center gap-1.5 bg-blue-100 px-3 py-1.5 rounded-full text-blue-700 text-xs sm:text-sm font-semibold">
-                      <Calendar className="h-3.5 w-3.5" />
-                      {classInfo.subject_code || 'CURSO'}
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 bg-indigo-100 px-3 py-1.5 rounded-full text-indigo-700 text-xs sm:text-sm font-semibold">
-                      <Users className="h-3.5 w-3.5" />
-                      {studentsCount} estudiantes
-                    </span>
-                  </div>
+              <div className="absolute top-0 right-0 w-48 sm:w-64 h-48 sm:h-64 bg-white/5 rounded-full -mr-24 sm:-mr-32 -mt-24 sm:-mt-32"></div>
+              <div className="absolute bottom-0 left-0 w-32 sm:w-48 h-32 sm:h-48 bg-white/5 rounded-full -ml-16 sm:-ml-24 -mb-16 sm:-mb-24"></div>
+              
+              {/* Información de la clase - Ahora dentro del área azul */}
+              <div className="px-4 sm:px-6 md:px-8 lg:px-10 py-6 sm:py-8 md:py-10 relative z-10">
+                <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 md:gap-6">
                   
-                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white mb-2">
-                    {classInfo.subject_name}
-                  </h1>
-                  <p className="text-gray-600 text-sm sm:text-base text-white flex items-center gap-2">
-                    <GraduationCap className="h-4 w-4" />
-                    Grupo {classInfo.group_name}
-                  </p>
+                  {/* Icono de la clase - Tamaño adaptativo */}
+                  <div className="relative flex-shrink-0">
+                    <div className="h-16 w-16 xs:h-20 xs:w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 bg-white rounded-xl sm:rounded-2xl md:rounded-3xl shadow-2xl flex items-center justify-center border-3 sm:border-4 border-white">
+                      <BookOpen className="h-8 w-8 xs:h-10 xs:w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 text-blue-600" />
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 w-6 h-6 sm:w-8 sm:h-8 bg-green-500 rounded-full border-3 sm:border-4 border-white flex items-center justify-center">
+                      <span className="text-white text-[10px] sm:text-xs font-bold">✓</span>
+                    </div>
+                  </div>
+
+                  {/* Detalles de la clase */}
+                  <div className="flex-1 w-full sm:w-auto">
+                    {/* Badges - Stack en móvil si es necesario */}
+                    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
+                      <span className="inline-flex items-center gap-1 sm:gap-1.5 bg-white/20 backdrop-blur-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-white text-[11px] xs:text-xs sm:text-sm font-semibold">
+                        <Calendar className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        <span className="truncate max-w-[120px] xs:max-w-none">{classInfo.subject_code || 'CURSO'}</span>
+                      </span>
+                      <span className="inline-flex items-center gap-1 sm:gap-1.5 bg-white/20 backdrop-blur-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-white text-[11px] xs:text-xs sm:text-sm font-semibold">
+                        <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                        {studentsCount} {studentsCount === 1 ? 'estudiante' : 'estudiantes'}
+                      </span>
+                    </div>
+                    
+                    {/* Título - Tamaño de fuente adaptativo */}
+                    <h1 className="text-xl xs:text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-1 sm:mb-2 leading-tight break-words">
+                      {classInfo.subject_name}
+                    </h1>
+                    
+                    {/* Subtítulo */}
+                    <p className="text-white/90 text-xs xs:text-sm sm:text-base flex items-center gap-1.5 sm:gap-2">
+                      <GraduationCap className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                      <span>Grupo {classInfo.group_name}</span>
+                    </p>
+                  </div>
                 </div>
               </div>
+            </div>
 
-              {/* Tabs modernos y responsivos */}
-              <div className="mt-6 sm:mt-8">
-                {/* Versión móvil: Scroll horizontal */}
-                <div className="sm:hidden overflow-x-auto pb-2 -mx-4 px-4">
-                  <div className="flex gap-2 min-w-max">
-                    {tabs.map(tab => {
-                      const Icon = tab.icon;
-                      const isActive = active === tab.key;
-                      return (
-                        <button
-                          key={tab.key}
-                          onClick={() => setActive(tab.key)}
-                          className={`
-                            flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold 
-                            transition-all duration-300 whitespace-nowrap
-                            ${isActive 
-                              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg scale-105' 
-                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 active:scale-95'
-                            }
-                          `}
-                        >
-                          <Icon className="h-4 w-4" />
-                          {tab.label}
-                        </button>
-                      );
-                    })}
+            {/* Tabs modernos - Ahora en el área blanca */}
+            <div className="px-4 sm:px-6 md:px-8 lg:px-10 py-4 sm:py-6">
+                
+                {/* Versión móvil pequeña: Scroll horizontal con padding mejorado */}
+                <div className="sm:hidden">
+                  <div className="overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+                    <div className="flex gap-2 min-w-max">
+                      {tabs.map(tab => {
+                        const Icon = tab.icon;
+                        const isActive = active === tab.key;
+                        return (
+                          <button
+                            key={tab.key}
+                            onClick={() => setActive(tab.key)}
+                            className={`
+                              flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl 
+                              font-semibold transition-all duration-300 whitespace-nowrap text-sm
+                              ${isActive 
+                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg scale-105' 
+                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 active:scale-95'
+                              }
+                            `}
+                          >
+                            <Icon className="h-4 w-4" />
+                            <span>{tab.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
 
-                {/* Versión desktop: Tabs completos */}
-                <div className="hidden sm:flex gap-3">
+                {/* Versión tablet y desktop: Grid o Flex según espacio */}
+                <div className="hidden sm:grid sm:grid-cols-2 md:flex md:flex-row gap-2 md:gap-3">
                   {tabs.map(tab => {
                     const Icon = tab.icon;
                     const isActive = active === tab.key;
@@ -118,19 +129,19 @@ export default function Show() {
                         key={tab.key}
                         onClick={() => setActive(tab.key)}
                         className={`
-                          flex-1 flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl 
-                          font-semibold transition-all duration-300 relative overflow-hidden
+                          md:flex-1 flex items-center justify-center gap-2 px-4 md:px-6 py-3 md:py-3.5 
+                          rounded-xl font-semibold transition-all duration-300 relative overflow-hidden
                           ${isActive 
                             ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-xl scale-105' 
                             : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:scale-102'
                           }
                         `}
                       >
-                        {/* Efecto de brillo en hover */}
+                        {/* Efecto de brillo */}
                         <div className={`absolute inset-0 bg-white transition-opacity duration-300 ${isActive ? 'opacity-10' : 'opacity-0'}`}></div>
                         
-                        <Icon className="h-5 w-5 relative z-10" />
-                        <span className="relative z-10">{tab.label}</span>
+                        <Icon className="h-4 w-4 md:h-5 md:w-5 relative z-10 flex-shrink-0" />
+                        <span className="relative z-10 text-sm md:text-base">{tab.label}</span>
                         
                         {/* Indicador activo */}
                         {isActive && (
@@ -142,7 +153,6 @@ export default function Show() {
                 </div>
               </div>
             </div>
-          </div>
 
           {/* Contenido dinámico con animación */}
           <div className="animate-fadeIn">
@@ -153,6 +163,17 @@ export default function Show() {
           </div>
         </div>
       </div>
+
+      {/* Estilos adicionales para scroll horizontal sin barra visible */}
+      <style jsx>{`
+        .scrollbar-hide::-webkit-scrollbar {
+          display: none;
+        }
+        .scrollbar-hide {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+      `}</style>
     </Layout>
   );
 }
