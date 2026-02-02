@@ -239,10 +239,17 @@ Route::middleware(['auth'])->group(function () {
             ->name('profesor.asistencias.destroy');
 
 
-             //REGISTRAR NOTAS
-            Route::get('/registrarNotas', [RegistrarNotasController::class, 'index'])
-            ->name('profesor.registrarNotas');
+        // REGISTRAR NOTAS - RUTAS COMPLETAS
+        Route::prefix('registrarNotas')->name('profesor.registrarNotas')->group(function () {
+            // Vista principal (GET /profesor/registrarNotas)
+            Route::get('/', [RegistrarNotasController::class, 'index'])->name('');
+
+            // Acciones de evaluaciones manuales
+            Route::post('/manual/create', [RegistrarNotasController::class, 'createManualGrade'])->name('manual.create');
+            Route::post('/manual/score', [RegistrarNotasController::class, 'saveManualGradeScore'])->name('manual.score');
+            Route::delete('/manual/{id}', [RegistrarNotasController::class, 'deleteManualGrade'])->name('manual.delete');
         });
+    });
 
     //ESTUDIANTE
     Route::middleware('role:estudiante')->prefix('estudiante')->group(function () {

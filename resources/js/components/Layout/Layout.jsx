@@ -52,9 +52,79 @@ export default function Layout({ title, children }) {
                 </span>
               </div>
 
-              {/* Botón menú móvil */}
+              {/* Desktop: Solo menú de perfil */}
+              <div className="hidden lg:flex items-center">
+                <div className="relative">
+                  <button
+                    onClick={() => setShowProfileMenu(!showProfileMenu)}
+                    className="flex items-center space-x-3 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors focus:outline-none"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold shadow-md">
+                      {previewImage ? (
+                        <img
+                          src={previewImage || "/default-user.png"}
+                          alt="Foto de perfil"
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <span className="text-sm">
+                          {user?.name?.charAt(0)}
+                          {user?.last_name?.charAt(0)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-left">
+                      <p className="text-sm font-semibold text-gray-900">
+                        {user?.name} {user?.last_name}
+                      </p>
+                      <p className="text-xs text-gray-500 capitalize">
+                        {user?.roles?.[0] ?? "Sin rol"}
+                      </p>
+                    </div>
+                    <ChevronDown
+                      className={`h-4 w-4 text-gray-600 transition-transform ${
+                        showProfileMenu ? "rotate-180" : ""
+                      }`}
+                    />
+                  </button>
+
+                  {/* Dropdown de perfil - Desktop */}
+                  {showProfileMenu && (
+                    <div className="absolute right-0 top-14 w-64 bg-white rounded-xl shadow-2xl border border-gray-200 py-2">
+                      <div className="px-4 py-3 border-b border-gray-200">
+                        <p className="text-sm font-semibold text-gray-900">
+                          {user?.name} {user?.last_name}
+                        </p>
+                        <p className="text-xs text-gray-600 mt-1">{user?.email}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          handleEditProfile();
+                          setShowProfileMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 flex items-center space-x-3 transition-colors"
+                      >
+                        <UserCircle className="h-5 w-5 text-gray-600" />
+                        <span>Editar Perfil</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          handleLogout();
+                          setShowProfileMenu(false);
+                        }}
+                        className="w-full text-left px-4 py-3 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-3 transition-colors"
+                      >
+                        <LogOut className="h-5 w-5 text-red-600" />
+                        <span>Cerrar Sesión</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Mobile: Solo botón menú hamburguesa */}
               <button
-                className="lg:hidden p-2 rounded-md text-gray-700 hover:bg-gray-100"
+                className="lg:hidden p-2 rounded-lg text-gray-700 hover:bg-gray-100 transition-colors"
                 onClick={() => setSidebarOpen(!sidebarOpen)}
               >
                 {sidebarOpen ? (
@@ -63,65 +133,17 @@ export default function Layout({ title, children }) {
                   <MenuIcon className="h-6 w-6" />
                 )}
               </button>
-
-              {/* Perfil */}
-              <div className="hidden lg:flex items-center space-x-4 relative">
-                <button
-                  onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center space-x-2 focus:outline-none"
-                >
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br flex items-center justify-center text-black font-bold border-2 border-blue-300 shadow-md">
-                    {previewImage ? (
-                      <img
-                        src={previewImage || "/default-user.png"}
-                        alt="Foto de perfil"
-                        className="w-10 h-10 rounded-full object-cover"
-                      />
-                    ) : (
-                      <span>
-                        {user?.name?.charAt(0)}
-                        {user?.last_name?.charAt(0)}
-                      </span>
-                    )}
-                  </div>
-                  <ChevronDown
-                    className={`h-4 w-4 text-gray-600 transition-transform ${
-                      showProfileMenu ? "rotate-180" : ""
-                    }`}
-                  />
-                </button>
-
-                {showProfileMenu && (
-                  <div className="absolute right-0 top-12 w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-2">
-                    <div className="px-4 py-3 border-b border-gray-200">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {user?.name}
-                      </p>
-                      <p className="text-xs text-gray-600">{user?.email}</p>
-                      <p className="text-xs text-gray-500 capitalize">
-                        Rol: {user?.roles?.[0] ?? "Sin rol"}
-                      </p>
-                    </div>
-                    <button
-                      onClick={handleEditProfile}
-                      className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 flex items-center space-x-2"
-                    >
-                      <UserCircle className="h-4 w-4" />
-                      <span>Editar Perfil</span>
-                    </button>
-                    <button
-                      onClick={handleLogout}
-                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center space-x-2"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span>Cerrar Sesión</span>
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </nav>
+
+        {/* Overlay para cerrar sidebar en mobile */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/50 z-30 lg:hidden top-16"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
 
         {/* Sidebar + Contenido */}
         <div className="flex flex-1 pt-16">
@@ -133,18 +155,73 @@ export default function Layout({ title, children }) {
                 : "-translate-x-full lg:translate-x-0"
               }`}
           >
-            <div className="p-6">
-              <h2 className="text-sm sm:text-base font-semibold text-gray-500 uppercase tracking-wider mb-6">
-                Menú Principal
-              </h2>
-              {/* Menú con scroll */}
-              <nav className="space-y-3 pb-6">
-                {user?.roles?.map((role, index) => (
-                  <div key={index}>
-                    <SidebarMenu role={role} />
+            <div className="flex flex-col h-full">
+              {/* Perfil en mobile - Solo visible en pantallas pequeñas */}
+              <div className="lg:hidden border-b border-gray-200 p-4">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold shadow-md flex-shrink-0">
+                    {previewImage ? (
+                      <img
+                        src={previewImage || "/default-user.png"}
+                        alt="Foto de perfil"
+                        className="w-12 h-12 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span>
+                        {user?.name?.charAt(0)}
+                        {user?.last_name?.charAt(0)}
+                      </span>
+                    )}
                   </div>
-                ))}
-              </nav>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {user?.name} {user?.last_name}
+                    </p>
+                    <p className="text-xs text-gray-600 truncate">{user?.email}</p>
+                    <p className="text-xs text-gray-500 capitalize mt-0.5">
+                      {user?.roles?.[0] ?? "Sin rol"}
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Botones de perfil en mobile */}
+                <div className="space-y-2">
+                  <button
+                    onClick={() => {
+                      handleEditProfile();
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center space-x-2 transition-colors"
+                  >
+                    <UserCircle className="h-4 w-4 text-gray-600" />
+                    <span>Editar Perfil</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setSidebarOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center space-x-2 transition-colors"
+                  >
+                    <LogOut className="h-4 w-4 text-red-600" />
+                    <span>Cerrar Sesión</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Menú principal */}
+              <div className="flex-1 p-6 overflow-y-auto">
+                <h2 className="text-sm sm:text-base font-semibold text-gray-500 uppercase tracking-wider mb-6">
+                  Menú Principal
+                </h2>
+                <nav className="space-y-3 pb-6">
+                  {user?.roles?.map((role, index) => (
+                    <div key={index}>
+                      <SidebarMenu role={role} />
+                    </div>
+                  ))}
+                </nav>
+              </div>
             </div>
           </aside>
           

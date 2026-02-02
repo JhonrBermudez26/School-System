@@ -1,135 +1,282 @@
 import { Head, router } from '@inertiajs/react';
 import { usePage } from '@inertiajs/react';
-import { BookOpen, ClipboardList, Users, CheckSquare, Calendar, LogOut, GraduationCap } from 'lucide-react';
+import { BookOpen, ClipboardList, Users, CheckSquare, Calendar, FileText, Eye, Clock } from 'lucide-react';
 import Layout from '@/Components/Layout/Layout';
-export default function Dashboard() {
 
+export default function Dashboard() {
     const { props } = usePage();
-    const { stats = {}, asignaciones = [] } = props;
+    const { stats = {}, asignaciones = [], proximasTareas = [] } = props;
     const { misMaterias = 0, totalEstudiantes = 0, tareasActivas = 0, porCalificar = 0 } = stats;
 
+    // Función para navegar a Registrar Notas
+    const handleRegistrarNotas = () => {
+        router.visit(route('profesor.registrarNotas'));
+    };
+
+    // Función para navegar a Mis Clases (donde se pueden crear tareas)
+    const handleCrearTarea = () => {
+        router.visit(route('profesor.clases.index'));
+    };
+
+    // Función para navegar a la primera clase con entregas pendientes
+    const handleCalificarEntregas = () => {
+        if (asignaciones.length > 0) {
+            const firstClass = asignaciones[0];
+            router.visit(route('profesor.clases.show', {
+                subject_id: firstClass.subject_id,
+                group_id: firstClass.group_id
+            }));
+        } else {
+            router.visit(route('profesor.clases.index'));
+        }
+    };
+
+    // Función para ir al detalle de una clase
+    const handleVerGrupo = (subjectId, groupId) => {
+        router.visit(route('profesor.clases.show', {
+            subject_id: subjectId,
+            group_id: groupId
+        }));
+    };
+
+    // Formatear fecha
+    const formatDate = (dateString) => {
+        if (!dateString) return 'Sin fecha';
+        const date = new Date(dateString);
+        const options = { day: '2-digit', month: 'short', year: 'numeric' };
+        return date.toLocaleDateString('es-ES', options);
+    };
+
+    // Calcular días restantes
+    const getDaysRemaining = (dateString) => {
+        if (!dateString) return null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const dueDate = new Date(dateString);
+        dueDate.setHours(0, 0, 0, 0);
+        const diffTime = dueDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays;
+    };
+
+    // Obtener color según días restantes
+    const getDaysRemainingColor = (days) => {
+        if (days === null) return 'text-gray-600';
+        if (days < 0) return 'text-red-600';
+        if (days === 0) return 'text-orange-600';
+        if (days <= 3) return 'text-yellow-600';
+        return 'text-green-600';
+    };
+
     return (
-        
-            <Layout title="Dashboard - Profesor">
+        <Layout>
+            <Head title="Dashboard Profesor" />
+
             {/* Main Content */}
-            <div className="max-w-7xl mx-auto">
+            <div className="p-6 bg-gray-50 min-h-screen">
                 {/* Welcome Section */}
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-gray-900">Bienvenido, Profesor</h1>
+                    <h1 className="text-3xl font-bold text-gray-800">Bienvenido, Profesor</h1>
                     <p className="text-gray-600 mt-2">Panel de gestión académica</p>
                 </div>
 
                 {/* Stats Grid */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-white rounded-xl shadow-md p-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-gray-500 text-sm">Mis Materias</p>
-                                <p className="text-3xl font-bold text-gray-900">{misMaterias}</p>
+                                <p className="text-sm text-gray-600 mb-1">Mis Materias</p>
+                                <p className="text-3xl font-bold text-gray-800">{misMaterias}</p>
+                                <p className="text-xs text-gray-500 mt-1">Asignadas este periodo</p>
                             </div>
-                            <div className="bg-blue-100 p-3 rounded-lg">
-                                <BookOpen className="h-8 w-8 text-blue-600" />
-                            </div>
+                            <BookOpen className="w-12 h-12 text-blue-500 opacity-20" />
                         </div>
-                        <p className="text-blue-600 text-sm mt-2">Asignadas este periodo</p>
                     </div>
 
-                    <div className="bg-white rounded-xl shadow-md p-6">
+                    <div className="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-gray-500 text-sm">Estudiantes</p>
-                                <p className="text-3xl font-bold text-gray-900">{totalEstudiantes}</p>
+                                <p className="text-sm text-gray-600 mb-1">Estudiantes</p>
+                                <p className="text-3xl font-bold text-gray-800">{totalEstudiantes}</p>
+                                <p className="text-xs text-gray-500 mt-1">Total en mis grupos</p>
                             </div>
-                            <div className="bg-green-100 p-3 rounded-lg">
-                                <Users className="h-8 w-8 text-green-600" />
-                            </div>
+                            <Users className="w-12 h-12 text-green-500 opacity-20" />
                         </div>
-                        <p className="text-green-600 text-sm mt-2">Total en mis grupos</p>
                     </div>
 
-                    <div className="bg-white rounded-xl shadow-md p-6">
+                    <div className="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-gray-500 text-sm">Tareas Activas</p>
-                                <p className="text-3xl font-bold text-gray-900">{tareasActivas}</p>
+                                <p className="text-sm text-gray-600 mb-1">Tareas Activas</p>
+                                <p className="text-3xl font-bold text-gray-800">{tareasActivas}</p>
+                                <p className="text-xs text-gray-500 mt-1">En curso</p>
                             </div>
-                            <div className="bg-purple-100 p-3 rounded-lg">
-                                <ClipboardList className="h-8 w-8 text-purple-600" />
-                            </div>
+                            <ClipboardList className="w-12 h-12 text-yellow-500 opacity-20" />
                         </div>
-                        <p className="text-purple-600 text-sm mt-2">En curso</p>
                     </div>
 
-                    <div className="bg-white rounded-xl shadow-md p-6">
+                    <div className="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-gray-500 text-sm">Por Calificar</p>
-                                <p className="text-3xl font-bold text-gray-900">{porCalificar}</p>
+                                <p className="text-sm text-gray-600 mb-1">Por Calificar</p>
+                                <p className="text-3xl font-bold text-gray-800">{porCalificar}</p>
+                                <p className="text-xs text-gray-500 mt-1">Entregas pendientes</p>
                             </div>
-                            <div className="bg-orange-100 p-3 rounded-lg">
-                                <CheckSquare className="h-8 w-8 text-orange-600" />
-                            </div>
+                            <CheckSquare className="w-12 h-12 text-red-500 opacity-20" />
                         </div>
-                        <p className="text-orange-600 text-sm mt-2">Entregas pendientes</p>
                     </div>
                 </div>
 
                 {/* Quick Actions */}
-                <div className="bg-white rounded-xl shadow-md p-6 mb-8">
-                    <h2 className="text-xl font-bold text-gray-900 mb-4">Acciones Rápidas</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <button className="flex items-center space-x-3 p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition">
-                            <BookOpen className="h-6 w-6 text-blue-600" />
+                <div className="bg-white rounded-lg shadow mb-8">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                        <h2 className="text-xl font-semibold text-gray-800">Acciones Rápidas</h2>
+                    </div>
+                    <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <button 
+                            onClick={handleRegistrarNotas}
+                            className="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
+                        >
+                            <FileText className="w-10 h-10 text-blue-600 mr-4" />
                             <div className="text-left">
-                                <p className="font-semibold text-gray-900">Registrar Notas</p>
+                                <p className="font-semibold text-gray-800">Registrar Notas</p>
                                 <p className="text-sm text-gray-600">Cargar calificaciones</p>
                             </div>
                         </button>
-                        <button className="flex items-center space-x-3 p-4 border-2 border-gray-200 rounded-lg hover:border-green-500 hover:bg-green-50 transition">
-                            <ClipboardList className="h-6 w-6 text-green-600" />
+
+                        <button 
+                            onClick={handleCrearTarea}
+                            className="flex items-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition"
+                        >
+                            <Calendar className="w-10 h-10 text-green-600 mr-4" />
                             <div className="text-left">
-                                <p className="font-semibold text-gray-900">Crear Tarea</p>
+                                <p className="font-semibold text-gray-800">Crear Tarea</p>
                                 <p className="text-sm text-gray-600">Nueva actividad</p>
                             </div>
                         </button>
-                        <button className="flex items-center space-x-3 p-4 border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:bg-purple-50 transition">
-                            <CheckSquare className="h-6 w-6 text-purple-600" />
+
+                        <button 
+                            onClick={handleCalificarEntregas}
+                            className="flex items-center p-4 bg-yellow-50 hover:bg-yellow-100 rounded-lg transition"
+                        >
+                            <CheckSquare className="w-10 h-10 text-yellow-600 mr-4" />
                             <div className="text-left">
-                                <p className="font-semibold text-gray-900">Calificar Entregas</p>
-                                <p className="text-sm text-gray-600">23 pendientes</p>
+                                <p className="font-semibold text-gray-800">Calificar Entregas</p>
+                                <p className="text-sm text-gray-600">{porCalificar} pendientes</p>
                             </div>
                         </button>
                     </div>
                 </div>
 
                 {/* Mis Materias y Grupos */}
-                <div className="grid md:grid-cols-2 gap-6">
-                    <div className="bg-white rounded-xl shadow-md p-6">
-                        <h2 className="text-xl font-bold text-gray-900 mb-4">Mis Materias</h2>
-                        <div className="space-y-3">
-                            {asignaciones.length === 0 && (
-                                <p className="text-sm text-gray-600">No tienes asignaciones registradas.</p>
-                            )}
-                            {asignaciones.map((item, idx) => (
-                                <div key={`${item.subject_id}-${item.group_id}-${idx}`} className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <h3 className="font-semibold text-gray-900">{item.subject_name}</h3>
-                                        <span className="text-sm text-gray-600">{item.group_name}</span>
+                <div className="bg-white rounded-lg shadow mb-8">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                        <h2 className="text-xl font-semibold text-gray-800">Mis Materias</h2>
+                    </div>
+                    <div className="p-6">
+                        {asignaciones.length === 0 && (
+                            <p className="text-center text-gray-500 py-8">
+                                No tienes asignaciones registradas.
+                            </p>
+                        )}
+
+                        {asignaciones.map((item, idx) => (
+                            <div 
+                                key={idx} 
+                                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg mb-3 last:mb-0 hover:bg-gray-100 transition"
+                            >
+                                <div className="flex items-center">
+                                    <div className="bg-blue-500 rounded-lg p-3 mr-4">
+                                        <BookOpen className="w-6 h-6 text-white" />
                                     </div>
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-gray-600">{item.students_count} estudiantes</span>
-                                        <button className="text-blue-600 hover:text-blue-700 font-medium">Ver grupo</button>
+                                    <div>
+                                        <p className="font-semibold text-gray-800">{item.subject_name}</p>
+                                        <p className="text-sm text-gray-600">{item.group_name}</p>
+                                        <p className="text-xs text-gray-500 mt-1">
+                                            <Users className="w-3 h-3 inline mr-1" />
+                                            {item.students_count} estudiantes
+                                        </p>
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                                <button 
+                                    onClick={() => handleVerGrupo(item.subject_id, item.group_id)}
+                                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                                >
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    Ver grupo
+                                </button>
+                            </div>
+                        ))}
                     </div>
+                </div>
 
-                    <div className="bg-white rounded-xl shadow-md p-6">
-                        <h2 className="text-xl font-bold text-gray-900 mb-4">Tareas Próximas a Vencer</h2>
-                        <div className="space-y-3">
-                            <p className="text-sm text-gray-600">Aún no hay tareas próximas configuradas.</p>
-                        </div>
+                {/* Tareas Próximas a Vencer */}
+                <div className="bg-white rounded-lg shadow">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                        <h2 className="text-xl font-semibold text-gray-800">Tareas Próximas a Vencer</h2>
+                    </div>
+                    <div className="p-6">
+                        {(!proximasTareas || proximasTareas.length === 0) && (
+                            <p className="text-center text-gray-500 py-8">
+                                No hay tareas próximas a vencer.
+                            </p>
+                        )}
+
+                        {proximasTareas && proximasTareas.map((tarea, idx) => {
+                            const daysRemaining = getDaysRemaining(tarea.due_date);
+                            const colorClass = getDaysRemainingColor(daysRemaining);
+
+                            return (
+                                <div 
+                                    key={idx} 
+                                    className="flex items-center justify-between p-4 bg-gray-50 rounded-lg mb-3 last:mb-0 hover:bg-gray-100 transition"
+                                >
+                                    <div className="flex items-center flex-1">
+                                        <div className={`rounded-lg p-3 mr-4 ${
+                                            daysRemaining < 0 ? 'bg-red-100' :
+                                            daysRemaining === 0 ? 'bg-orange-100' :
+                                            daysRemaining <= 3 ? 'bg-yellow-100' : 'bg-green-100'
+                                        }`}>
+                                            <ClipboardList className={`w-6 h-6 ${
+                                                daysRemaining < 0 ? 'text-red-600' :
+                                                daysRemaining === 0 ? 'text-orange-600' :
+                                                daysRemaining <= 3 ? 'text-yellow-600' : 'text-green-600'
+                                            }`} />
+                                        </div>
+                                        <div>
+                                            <p className="font-semibold text-gray-800">{tarea.title}</p>
+                                            <p className="text-sm text-gray-600">{tarea.subject_name} - {tarea.group_name}</p>
+                                            <div className="flex items-center mt-1 space-x-4">
+                                                <p className="text-xs text-gray-500">
+                                                    <Calendar className="w-3 h-3 inline mr-1" />
+                                                    Vence: {formatDate(tarea.due_date)}
+                                                </p>
+                                                <p className={`text-xs font-semibold ${colorClass}`}>
+                                                    <Clock className="w-3 h-3 inline mr-1" />
+                                                    {daysRemaining < 0 
+                                                        ? `Vencida hace ${Math.abs(daysRemaining)} días`
+                                                        : daysRemaining === 0 
+                                                        ? 'Vence hoy'
+                                                        : `${daysRemaining} días restantes`
+                                                    }
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-sm text-gray-600">
+                                            {tarea.submitted_count}/{tarea.total_students} entregas
+                                        </p>
+                                        <button 
+                                            onClick={() => handleVerGrupo(tarea.subject_id, tarea.group_id)}
+                                            className="text-blue-600 hover:text-blue-800 text-sm font-medium mt-1"
+                                        >
+                                            Ver detalles →
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 </div>
             </div>

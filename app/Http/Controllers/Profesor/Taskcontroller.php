@@ -114,12 +114,15 @@ class TaskController extends Controller
             'due_date' => 'required|date|after_or_equal:today',
             'close_date' => 'nullable|date|after:due_date',
             'allow_late_submission' => 'nullable|boolean',
-            'max_score' => 'required|integer|min:1|max:1000',
+            // ✅ CORREGIDO: Ahora permite decimales entre 0.1 y 5.0
+            'max_score' => 'required|numeric|min:0.1|max:5.0',
             'attachments' => 'nullable|array',
             'attachments.*' => 'file|max:10240', // 10MB
         ], [
             'close_date.after' => 'La fecha de cierre debe ser posterior a la fecha de entrega',
             'due_date.after_or_equal' => 'La fecha de entrega debe ser hoy o en el futuro',
+            'max_score.max' => 'La calificación máxima no puede ser mayor a 5.0',
+            'max_score.min' => 'La calificación máxima debe ser al menos 0.1',
         ]);
 
         $this->assertOwnership((int) $validated['subject_id'], (int) $validated['group_id']);
@@ -225,13 +228,16 @@ class TaskController extends Controller
             'due_date' => 'sometimes|date|after_or_equal:today',
             'close_date' => 'nullable|date|after:due_date',
             'allow_late_submission' => 'nullable|boolean',
-            'max_score' => 'sometimes|integer|min:1|max:1000',
+            // ✅ CORREGIDO: Ahora permite decimales entre 0.1 y 5.0
+            'max_score' => 'sometimes|numeric|min:0.1|max:5.0',
             'is_active' => 'nullable|boolean',
             'attachments' => 'nullable|array',
             'attachments.*' => 'file|max:10240',
         ], [
             'close_date.after' => 'La fecha de cierre debe ser posterior a la fecha de entrega',
             'due_date.after_or_equal' => 'La fecha de entrega debe ser hoy o en el futuro',
+            'max_score.max' => 'La calificación máxima no puede ser mayor a 5.0',
+            'max_score.min' => 'La calificación máxima debe ser al menos 0.1',
         ]);
 
         try {
@@ -243,6 +249,7 @@ class TaskController extends Controller
             if (isset($validated['due_date'])) {
                 $updates['due_date'] = Carbon::parse($validated['due_date'])->setTimezone('America/Bogota');
             }
+
             if (isset($validated['close_date'])) {
                 // Si close_date está vacío, establecer a null
                 $updates['close_date'] = !empty($validated['close_date'])
@@ -394,7 +401,6 @@ class TaskController extends Controller
     public function deleteAttachment(TaskAttachment $attachment)
     {
         $task = $attachment->task;
-
         $this->assertOwnership((int) $task->subject_id, (int) $task->group_id);
 
         if ($task->teacher_id !== auth()->id()) {

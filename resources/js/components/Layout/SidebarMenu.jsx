@@ -50,7 +50,7 @@ export default function SidebarMenu({ role }) {
       { icon: MessageSquare, label: "Chat", path: "/profesor/chat" },
       { icon: BookOpen, label: "Mis clases", path: "/profesor/clases" },
       { icon: Calendar, label: "Horario", path: "/profesor/horario" },
-      { icon: ClipboardList, label: "Registro de notas", path: "/profesor/notas" },
+      { icon: ClipboardList, label: "Registro de notas", path: "/profesor/registrarNotas" },
       { icon: UserCheck, label: "Asistencias", path: "/profesor/asistencias" },
     ],
     estudiante: [

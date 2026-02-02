@@ -286,8 +286,8 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
                 type="button"
                 onClick={() => handleChange('work_type', type.value)}
                 className={`p-5 rounded-2xl border-2 transition-all text-left relative overflow-hidden ${formData.work_type === type.value
-                    ? `bg-gradient-to-br ${type.color} shadow-lg scale-105`
-                    : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
+                  ? `bg-gradient-to-br ${type.color} shadow-lg scale-105`
+                  : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
                   }`}
               >
                 <div className="text-3xl mb-3">{type.icon}</div>
@@ -384,8 +384,9 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
           </label>
           <input
             type="number"
-            min="1"
-            max="1000"
+            step="0.1"
+            min="0.1"
+            max="5"
             value={formData.max_score}
             onChange={(e) => handleChange('max_score', parseInt(e.target.value))}
             className={`w-full px-5 py-4 rounded-xl border-2 ${errors.max_score ? 'border-red-300 bg-red-50' : 'border-gray-200'
