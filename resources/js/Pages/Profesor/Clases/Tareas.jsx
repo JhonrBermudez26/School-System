@@ -42,6 +42,37 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
   useEffect(() => {
     if (classInfo.subject_id && classInfo.group_id) {
       loadTasks();
+
+      // ===== ESCUCHAR EVENTO DE ECHO =====
+      console.log(`📡 Escuchando tareas en grupo: ${classInfo.group_id}`);
+      const channel = window.Echo?.channel(`group.${classInfo.group_id}`);
+      
+      if (channel) {
+        channel.listen('.task.created', (data) => {
+          console.log("✅ Nueva tarea recibida por Echo:", data);
+          // Recargar la lista de tareas
+          loadTasks();
+        });
+      }
+
+      // ===== ESCUCHAR CUSTOM EVENT =====
+      const handleNuevaTarea = (event) => {
+        console.log("✅ Nueva tarea recibida por CustomEvent:", event.detail);
+        // Verificar si la tarea es de este grupo
+        if (event.detail.groupId === classInfo.group_id) {
+          loadTasks();
+        }
+      };
+
+      window.addEventListener('nueva-tarea', handleNuevaTarea);
+
+      return () => {
+        if (channel) {
+          console.log("🔌 Desconectando canal de tareas");
+          channel.stopListening('.task.created');
+        }
+        window.removeEventListener('nueva-tarea', handleNuevaTarea);
+      };
     }
   }, [classInfo.subject_id, classInfo.group_id]);
 
@@ -58,7 +89,6 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
 
     try {
       const response = await deleteWithCsrf(`/profesor/clases/tasks/${taskId}`);
-
       if (response.ok) {
         loadTasks();
       } else {
@@ -76,7 +106,6 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
       const response = await fetchWithCsrf(`/profesor/clases/tasks/${task.id}`, {
         method: 'GET',
       });
-
       if (response.ok) {
         const data = await response.json();
         setSelectedTask(data.task);
@@ -217,6 +246,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
                       {task.description}
                     </p>
                   </div>
+
                   {/* Acciones */}
                   <div className="flex gap-2">
                     <button

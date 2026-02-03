@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\TaskSubmission;
+use App\Events\TaskCreated;
+use App\Events\TaskUpdated;
+use App\Events\TaskDeleted;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -114,7 +117,6 @@ class TaskController extends Controller
             'due_date' => 'required|date|after_or_equal:today',
             'close_date' => 'nullable|date|after:due_date',
             'allow_late_submission' => 'nullable|boolean',
-            // ✅ CORREGIDO: Ahora permite decimales entre 0.1 y 5.0
             'max_score' => 'required|numeric|min:0.1|max:5.0',
             'attachments' => 'nullable|array',
             'attachments.*' => 'file|max:10240', // 10MB
@@ -150,7 +152,7 @@ class TaskController extends Controller
                 'max_score' => $validated['max_score'],
             ]);
 
-            // Creación automática de entregas "PENDIENTE" para cada estudiante
+            // Creación automática de entregas para estudiantes
             $students = DB::table('group_user as gu')
                 ->join('model_has_roles as mhr', function ($join) {
                     $join->on('gu.user_id', '=', 'mhr.model_id')
@@ -191,6 +193,9 @@ class TaskController extends Controller
 
             DB::commit();
 
+            // ✅ DISPARAR EVENTO DE BROADCAST
+            broadcast(new TaskCreated($task))->toOthers();
+
             return response()->json([
                 'message' => 'Tarea creada exitosamente',
                 'task' => $task->load('attachments'),
@@ -228,16 +233,10 @@ class TaskController extends Controller
             'due_date' => 'sometimes|date|after_or_equal:today',
             'close_date' => 'nullable|date|after:due_date',
             'allow_late_submission' => 'nullable|boolean',
-            // ✅ CORREGIDO: Ahora permite decimales entre 0.1 y 5.0
             'max_score' => 'sometimes|numeric|min:0.1|max:5.0',
             'is_active' => 'nullable|boolean',
             'attachments' => 'nullable|array',
             'attachments.*' => 'file|max:10240',
-        ], [
-            'close_date.after' => 'La fecha de cierre debe ser posterior a la fecha de entrega',
-            'due_date.after_or_equal' => 'La fecha de entrega debe ser hoy o en el futuro',
-            'max_score.max' => 'La calificación máxima no puede ser mayor a 5.0',
-            'max_score.min' => 'La calificación máxima debe ser al menos 0.1',
         ]);
 
         try {
@@ -245,13 +244,11 @@ class TaskController extends Controller
 
             $updates = $validated;
 
-            // Forzar zona horaria si vienen las fechas
             if (isset($validated['due_date'])) {
                 $updates['due_date'] = Carbon::parse($validated['due_date'])->setTimezone('America/Bogota');
             }
 
             if (isset($validated['close_date'])) {
-                // Si close_date está vacío, establecer a null
                 $updates['close_date'] = !empty($validated['close_date'])
                     ? Carbon::parse($validated['close_date'])->setTimezone('America/Bogota')
                     : null;
@@ -259,7 +256,7 @@ class TaskController extends Controller
 
             $task->update($updates);
 
-            // Guardar nuevos archivos adjuntos
+            // Guardar nuevos archivos
             if ($request->hasFile('attachments')) {
                 foreach ($request->file('attachments') as $file) {
                     $path = $file->store('tasks/' . $task->id, 'public');
@@ -276,6 +273,9 @@ class TaskController extends Controller
 
             DB::commit();
 
+            // ✅ DISPARAR EVENTO DE ACTUALIZACIÓN
+            broadcast(new TaskUpdated($task))->toOthers();
+
             return response()->json([
                 'message' => 'Tarea actualizada exitosamente',
                 'task' => $task->load('attachments'),
@@ -284,7 +284,6 @@ class TaskController extends Controller
             DB::rollBack();
             \Log::error('Error actualizando tarea:', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
@@ -308,6 +307,11 @@ class TaskController extends Controller
         try {
             DB::beginTransaction();
 
+            // Guardar info antes de eliminar
+            $taskId = $task->id;
+            $groupId = $task->group_id;
+            $title = $task->title;
+
             // Eliminar archivos del storage
             foreach ($task->attachments as $attachment) {
                 if ($attachment->file_path && Storage::disk('public')->exists($attachment->file_path)) {
@@ -328,6 +332,9 @@ class TaskController extends Controller
 
             DB::commit();
 
+            // ✅ DISPARAR EVENTO DE ELIMINACIÓN
+            broadcast(new TaskDeleted($taskId, $groupId, $title))->toOthers();
+
             return response()->json([
                 'message' => 'Tarea eliminada exitosamente'
             ]);
@@ -335,7 +342,6 @@ class TaskController extends Controller
             DB::rollBack();
             \Log::error('Error eliminando tarea:', [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
             ]);
 
             return response()->json([
@@ -382,7 +388,6 @@ class TaskController extends Controller
             ->where('status', 'graded')
             ->count();
 
-        // Agregar stats directamente al modelo task
         $task->stats = [
             'total' => $totalStudents,
             'submitted' => $submitted,

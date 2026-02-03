@@ -26,7 +26,7 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
     due_date: editingTask?.due_date ? new Date(editingTask.due_date).toISOString().slice(0, 16) : '',
     close_date: editingTask?.close_date ? new Date(editingTask.close_date).toISOString().slice(0, 16) : '',
     allow_late_submission: editingTask?.allow_late_submission ?? true,
-    max_score: editingTask?.max_score || 100,
+    max_score: editingTask?.max_score || 5,
   });
 
   const [attachments, setAttachments] = useState([]);

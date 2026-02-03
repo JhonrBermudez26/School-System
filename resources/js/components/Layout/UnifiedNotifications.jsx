@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { router, usePage } from '@inertiajs/react';
-import { X, MessageSquare, Bell, FileText } from 'lucide-react';
+import { X, MessageSquare, Bell, FileText, ClipboardList } from 'lucide-react';
 
 export default function UnifiedNotifications() {
   const { auth } = usePage().props;
@@ -27,9 +27,65 @@ export default function UnifiedNotifications() {
     }
   };
 
+  // ===== TASK NOTIFICATIONS (canal público por grupo) =====
+  useEffect(() => {
+    if (!user?.id) return;
+
+    console.log('📡 Iniciando escucha de notificaciones de tareas');
+
+    // Obtener todos los grupos del usuario
+    const userGroups = user?.groups || [];
+    const channels = [];
+
+    userGroups.forEach(group => {
+      console.log(`🔌 Conectando al canal: group.${group.id}`);
+      const groupChannel = window.Echo?.channel(`group.${group.id}`);
+
+      if (groupChannel) {
+        channels.push(groupChannel);
+
+        groupChannel.listen('.task.created', (data) => {
+          console.log('🔔 Nueva tarea creada:', data);
+
+          const notifId = `task-${Date.now()}`;
+          setNotifications(prev => [...prev, {
+            id: notifId,
+            type: 'task-new',
+            title: 'Nueva Tarea Asignada',
+            message: `${data.teacher_name} publicó: ${data.title} en ${data.subject_name}`,
+            timestamp: new Date(),
+            taskId: data.task_id,
+            subjectId: data.subject_id,
+            groupId: data.group_id,
+          }]);
+
+          autoRemove(notifId);
+          playNotificationSound();
+
+          // Emitir evento personalizado para actualizar la lista de tareas
+          window.dispatchEvent(new CustomEvent('nueva-tarea', {
+            detail: {
+              taskId: data.task_id,
+              groupId: data.group_id,
+              subjectId: data.subject_id
+            }
+          }));
+        });
+      }
+    });
+
+    return () => {
+      console.log('🔌 Desconectando escucha de notificaciones de tareas');
+      channels.forEach(channel => {
+        if (channel) channel.stopListening('.task.created');
+      });
+    };
+  }, [user?.id]);
+
   // ===== CHAT NOTIFICATIONS (canal privado por usuario) =====
   useEffect(() => {
     if (!user?.id) return;
+
     console.log('📡 Iniciando escucha de notificaciones de chat para usuario:', user.id);
 
     const userChannel = window.Echo?.private(`user.${user.id}`);
@@ -63,14 +119,10 @@ export default function UnifiedNotifications() {
   }, [user?.id]);
 
   // ===== PUBLICATION NOTIFICATIONS (vía CustomEvents) =====
-  // Los componentes Publicaciones (profesor/estudiante) ya escuchan Echo en sus canales
-  // clase.* y emiten CustomEvents cuando reciben eventos. Este bloque los captura desde
-  // aquí, así las notificaciones aparecen sin importar en qué panel estés dentro de esa clase.
   useEffect(() => {
     const handleNewPost = (event) => {
       const { publicacion } = event.detail;
       const notifId = `pub-new-custom-${Date.now()}`;
-
       setNotifications(prev => [
         ...prev,
         {
@@ -82,12 +134,12 @@ export default function UnifiedNotifications() {
         }
       ]);
       autoRemove(notifId);
+      playNotificationSound();
     };
 
     const handleUpdatedPost = (event) => {
       const { publicacion } = event.detail;
       const notifId = `pub-updated-custom-${Date.now()}`;
-
       setNotifications(prev => [
         ...prev,
         {
@@ -104,7 +156,6 @@ export default function UnifiedNotifications() {
     const handleDeletedPost = (event) => {
       const { title } = event.detail;
       const notifId = `pub-deleted-custom-${Date.now()}`;
-
       setNotifications(prev => [
         ...prev,
         {
@@ -134,6 +185,10 @@ export default function UnifiedNotifications() {
       router.visit(route('profesor.chat.show', { conversation: notification.conversationId }));
       closeNotification(notification.id);
     }
+    // Podrías agregar navegación para tareas si lo deseas
+    // if (notification.type === 'task-new' && notification.taskId) {
+    //   router.visit(route('estudiante.clases.show', { ... }));
+    // }
   };
 
   const closeNotification = (id) => {
@@ -146,6 +201,13 @@ export default function UnifiedNotifications() {
       return (
         <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center shadow-lg">
           <MessageSquare className="h-5 w-5 text-white" />
+        </div>
+      );
+    }
+    if (notification.type === 'task-new') {
+      return (
+        <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+          <ClipboardList className="h-5 w-5 text-white" />
         </div>
       );
     }
@@ -168,6 +230,7 @@ export default function UnifiedNotifications() {
   // Obtener color de borde según tipo
   const getBorderColor = (type) => {
     if (type === 'chat') return 'border-l-blue-500';
+    if (type === 'task-new') return 'border-l-indigo-600';
     if (type === 'publication-new') return 'border-l-green-500';
     if (type === 'publication-updated') return 'border-l-yellow-500';
     if (type === 'publication-deleted') return 'border-l-red-500';
@@ -181,9 +244,8 @@ export default function UnifiedNotifications() {
       {notifications.map(notification => (
         <div
           key={notification.id}
-          className={`pointer-events-auto bg-white rounded-xl shadow-2xl border-l-4 ${getBorderColor(notification.type)} p-4 min-w-[320px] max-w-[400px] transition-all transform hover:scale-[1.02] animate-slide-in ${
-            notification.type === 'chat' ? 'cursor-pointer hover:shadow-xl' : ''
-          }`}
+          className={`pointer-events-auto bg-white rounded-xl shadow-2xl border-l-4 ${getBorderColor(notification.type)} p-4 min-w-[320px] max-w-[400px] transition-all transform hover:scale-[1.02] animate-slide-in ${notification.type === 'chat' ? 'cursor-pointer hover:shadow-xl' : ''
+            }`}
           onClick={() => handleNotificationClick(notification)}
         >
           <div className="flex items-start gap-3">
@@ -199,6 +261,8 @@ export default function UnifiedNotifications() {
                 <div className="flex items-center gap-2">
                   {notification.type === 'chat' ? (
                     <MessageSquare className="h-4 w-4 text-blue-600" />
+                  ) : notification.type === 'task-new' ? (
+                    <ClipboardList className="h-4 w-4 text-indigo-600" />
                   ) : (
                     <Bell className="h-4 w-4 text-indigo-600" />
                   )}
@@ -228,9 +292,10 @@ export default function UnifiedNotifications() {
               </p>
 
               {/* Timestamp */}
-              <p className={`text-xs font-medium ${
-                notification.type === 'chat' ? 'text-blue-600' : 'text-indigo-600'
-              }`}>
+              <p className={`text-xs font-medium ${notification.type === 'chat' ? 'text-blue-600' :
+                  notification.type === 'task-new' ? 'text-indigo-600' :
+                    'text-indigo-600'
+                }`}>
                 Hace un momento
               </p>
             </div>

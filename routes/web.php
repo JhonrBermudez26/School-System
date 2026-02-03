@@ -259,25 +259,36 @@ Route::middleware(['auth'])->group(function () {
         });
     });
 
-    //ESTUDIANTE
     Route::middleware('role:estudiante')->prefix('estudiante')->group(function () {
-
         Route::get('/dashboard', [EstudianteDashboardController::class, 'index'])->name('estudiante.dashboard');
-    
-   // Clases
-    Route::get('/clases', [EstudianteClasesController::class, 'index'])->name('estudiante.clases.index');
-    Route::get('/clases/{subject_id}/{group_id}', [EstudianteClasesController::class, 'show'])->name('estudiante.clases.show');
-             
-     // Publicaciones
-     Route::post('/posts', [EstudiantePostController::class, 'store'])->name('estudiante.posts.store');
-    Route::put('/posts/{post}', [EstudiantePostController::class, 'update'])->name('estudiante.posts.update');
-    Route::delete('/posts/{post}', [EstudiantePostController::class, 'destroy'])->name('estudiante.posts.destroy');
-             
-     // Tareas
-     Route::get('/tasks/{id}', [EstudianteTaskController::class, 'show'])->name('estudiante.tasks.show');
-     Route::post('/tasks/submit', [EstudianteTaskController::class, 'submit'])->name('estudiante.tasks.submit');
-    
 
+        // Clases
+        Route::get('/clases', [EstudianteClasesController::class, 'index'])->name('estudiante.clases.index');
+        Route::get('/clases/{subject_id}/{group_id}', [EstudianteClasesController::class, 'show'])->name('estudiante.clases.show');
+                
+        // Publicaciones
+        Route::post('/posts', [EstudiantePostController::class, 'store'])->name('estudiante.posts.store');
+        Route::put('/posts/{post}', [EstudiantePostController::class, 'update'])->name('estudiante.posts.update');
+        Route::delete('/posts/{post}', [EstudiantePostController::class, 'destroy'])->name('estudiante.posts.destroy');
+                
+        // Tareas - Rutas existentes
+        Route::prefix('clases')->name('clases.')->group(function () {
+            Route::get('/tasks', [EstudianteTaskController::class, 'index'])->name('tasks.index');
+            Route::get('/tasks/{task}', [EstudianteTaskController::class, 'show'])->name('tasks.show');
+        });
+        
+        Route::prefix('tasks')->name('tasks.')->group(function () {
+            Route::post('/submit', [EstudianteTaskController::class, 'submit'])->name('submit');
+            Route::delete('/submissions/{submission}', [EstudianteTaskController::class, 'deleteSubmission'])->name('submissions.delete');
+            
+            // ===== NUEVAS RUTAS =====
+            Route::get('/{task}/available-classmates', [EstudianteTaskController::class, 'getAvailableClassmates'])
+                ->name('available-classmates');
+            Route::delete('/files/{file}', [EstudianteTaskController::class, 'deleteFile'])
+                ->name('files.delete');
+            Route::delete('/members/{member}', [EstudianteTaskController::class, 'removeMember'])
+                ->name('members.remove');
+        });
     });
 
     //GET EDITAR
