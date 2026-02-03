@@ -1,5 +1,5 @@
 <?php
-namespace App\Http\Controllers\Profesor;
+namespace App\Http\Controllers\Estudiante;
 
 use App\Http\Controllers\Controller;
 use App\Models\Post;
@@ -13,61 +13,49 @@ use App\Events\NewPublicacion;
 use App\Events\PublicacionActualizada;
 use App\Events\PublicacionEliminada;
 
-class PostController extends Controller
+class EstudiantePostController extends Controller
 {
-    private function assertPostOwnership(Post $post): void
-    {
-        abort_unless($post->user_id === Auth::id(), 403, 'No eres el autor de esta publicación');
-    }
-
-    private function assertOwnership(int $subjectId, int $groupId): void
+    /**
+     * Verificar que el estudiante pertenece al grupo
+     */
+    private function assertGroupMembership(int $groupId): void
     {
         $userId = Auth::id();
-        $exists = DB::table('subject_group')
+        $belongs = DB::table('group_user')
+            ->where('group_id', $groupId)
             ->where('user_id', $userId)
-            ->where('subject_id', $subjectId)
-            ->where('group_id', $groupId)
             ->exists();
-        abort_unless($exists, 403);
+        abort_unless($belongs, 403, 'No tienes acceso a este grupo');
     }
 
-    public function index(Request $request)
+    /**
+     * Verificar que el usuario es el autor de la publicación
+     */
+    private function assertOwnership(Post $post): void
     {
-        $request->validate([
-            'subject_id' => 'required|integer',
-            'group_id' => 'required|integer',
-        ]);
-
-        $subjectId = (int) $request->query('subject_id');
-        $groupId = (int) $request->query('group_id');
-        $this->assertOwnership($subjectId, $groupId);
-
-        $posts = Post::with('attachments')
-            ->where('subject_id', $subjectId)
-            ->where('group_id', $groupId)
-            ->orderByDesc('created_at')
-            ->get();
-
-        return response()->json($posts);
+        abort_unless($post->user_id === Auth::id(), 403, 'No tienes permiso para editar esta publicación');
     }
 
+    /**
+     * Crear una publicación
+     */
     public function store(Request $request)
     {
         $data = $request->validate([
             'subject_id' => 'required|integer',
             'group_id' => 'required|integer',
-            'type' => 'nullable|in:post,tarea',
+            'type' => 'nullable|in:post',
             'title' => 'required|string|max:255',
             'content' => 'nullable|string',
-            'due_at' => 'nullable|date',
             'files' => 'sometimes|array',
-            'files.*' => 'file|max:20480', // hasta 20MB por archivo
+            'files.*' => 'file|max:20480', // 20MB max
             'links' => 'sometimes|array',
             'links.*' => 'string',
         ]);
 
-        $this->assertOwnership((int) $data['subject_id'], (int) $data['group_id']);
+        $this->assertGroupMembership((int) $data['group_id']);
 
+        // Crear la publicación
         $post = Post::create([
             'subject_id' => $data['subject_id'],
             'group_id' => $data['group_id'],
@@ -75,7 +63,6 @@ class PostController extends Controller
             'type' => $data['type'] ?? 'post',
             'title' => $data['title'],
             'content' => $data['content'] ?? null,
-            'due_at' => $data['due_at'] ?? null,
         ]);
 
         // Adjuntar archivos
@@ -106,33 +93,33 @@ class PostController extends Controller
             }
         }
 
-        // ✅ Recargar la publicación con todas sus relaciones
+        // ✅ Recargar con relaciones
         $post->load(['attachments', 'user']);
 
-        // ✅ Agregar campos calculados
+        // ✅ Preparar datos completos
         $postData = $post->toArray();
         $postData['author_name'] = $post->user->name . ' ' . ($post->user->last_name ?? '');
-        $postData['author_role'] = 'profesor';
+        $postData['author_role'] = 'estudiante';
         $postData['author_photo'] = $post->user->photo ? "/storage/{$post->user->photo}" : null;
         $postData['is_owner'] = true;
 
-        // ✅ Emitir el evento
+        // ✅ Emitir evento (se enviará a TODOS los usuarios del canal)
         broadcast(new NewPublicacion($postData, $data['subject_id'], $data['group_id']))->toOthers();
 
-        return Redirect::back()->with('success', 'Publicación creada');
+        return Redirect::back()->with('success', 'Publicación creada exitosamente');
     }
 
+    /**
+     * Actualizar una publicación
+     */
     public function update(Request $request, Post $post)
     {
-        // Verificar pertenencia de la clase a este profesor
-        $this->assertPostOwnership($post);
-        $this->assertOwnership((int) $post->subject_id, (int) $post->group_id);
+        $this->assertOwnership($post);
+        $this->assertGroupMembership((int) $post->group_id);
 
         $data = $request->validate([
             'title' => 'sometimes|required|string|max:255',
             'content' => 'nullable|string',
-            'type' => 'sometimes|in:post,tarea',
-            'due_at' => 'nullable|date',
             'files' => 'sometimes|array',
             'files.*' => 'file|max:20480',
             'links' => 'sometimes|array',
@@ -143,11 +130,10 @@ class PostController extends Controller
             'links_to_delete.*' => 'integer',
         ]);
 
+        // Actualizar datos básicos
         $post->update([
             'title' => $data['title'] ?? $post->title,
             'content' => $data['content'] ?? $post->content,
-            'type' => $data['type'] ?? $post->type,
-            'due_at' => $data['due_at'] ?? $post->due_at,
         ]);
 
         // Eliminar archivos marcados
@@ -205,32 +191,35 @@ class PostController extends Controller
 
         $postData = $post->toArray();
         $postData['author_name'] = $post->user->name . ' ' . ($post->user->last_name ?? '');
-        $postData['author_role'] = 'profesor';
+        $postData['author_role'] = 'estudiante';
         $postData['author_photo'] = $post->user->photo ? "/storage/{$post->user->photo}" : null;
         $postData['is_owner'] = (int)$post->user_id === Auth::id();
 
         // ✅ Emitir evento de actualización
         broadcast(new PublicacionActualizada($postData, $post->subject_id, $post->group_id))->toOthers();
 
-        return Redirect::back()->with('success', 'Publicación actualizada');
+        return Redirect::back()->with('success', 'Publicación actualizada exitosamente');
     }
 
+    /**
+     * Eliminar una publicación
+     */
     public function destroy(Post $post)
     {
-        $this->assertPostOwnership($post);
-        $this->assertOwnership((int) $post->subject_id, (int) $post->group_id);
+        $this->assertOwnership($post);
+        $this->assertGroupMembership((int) $post->group_id);
 
         $subjectId = $post->subject_id;
         $groupId = $post->group_id;
         $postId = $post->id;
-        
-        // Eliminar archivos físicos antes de eliminar el post
+
+        // Eliminar archivos físicos
         foreach ($post->attachments as $attachment) {
             if ($attachment->type !== 'link' && $attachment->path) {
                 Storage::disk('public')->delete($attachment->path);
             }
         }
-        
+
         // Eliminar attachments y post
         $post->attachments()->delete();
         $post->delete();
@@ -238,6 +227,6 @@ class PostController extends Controller
         // ✅ Emitir evento de eliminación
         broadcast(new PublicacionEliminada($postId, $subjectId, $groupId))->toOthers();
 
-        return Redirect::back()->with('success', 'Publicación eliminada');
+        return Redirect::back()->with('success', 'Publicación eliminada exitosamente');
     }
 }

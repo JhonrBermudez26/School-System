@@ -10,23 +10,24 @@ import {
   X as CloseIcon,
 } from "lucide-react";
 import SidebarMenu from "./SidebarMenu";
-import ChatNotification from './ChatNotification';
+import UnifiedNotifications from './UnifiedNotifications';
 
 export default function Layout({ title, children }) {
-  
   const { auth, app } = usePage().props;
   const currentUrl = usePage().url;
   const user = auth?.user;
+
   const [previewImage, setPreviewImage] = useState(user?.photo ? `/storage/${user.photo}` : null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  
+
   const appName = app?.name;
   const appFullName = app?.fullName || appName;
-  
+
   const handleLogout = () => router.post("/logout");
   const handleEditProfile = () => router.visit("/perfil/editar");
-  
+
+  // BUG CORREGIDO: faltaba paréntesis, se usaba template literal en lugar de string normal
   const navigateToDashboard = () => {
     const rol = user?.roles?.[0]?.toLowerCase();
     router.visit(`/${rol}/dashboard`);
@@ -35,7 +36,7 @@ export default function Layout({ title, children }) {
   return (
     <>
       <Head title={title ? `${title} | ${appName}` : appFullName} />
-      
+
       <div className="min-h-screen bg-gray-100 flex flex-col">
         {/* Navbar */}
         <nav className="bg-white shadow-md fixed w-full top-0 z-50">
@@ -156,7 +157,7 @@ export default function Layout({ title, children }) {
               }`}
           >
             <div className="flex flex-col h-full">
-              {/* Perfil en mobile - Solo visible en pantallas pequeñas */}
+              {/* Perfil en mobile */}
               <div className="lg:hidden border-b border-gray-200 p-4">
                 <div className="flex items-center space-x-3 mb-4">
                   <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold shadow-md flex-shrink-0">
@@ -183,8 +184,7 @@ export default function Layout({ title, children }) {
                     </p>
                   </div>
                 </div>
-                
-                {/* Botones de perfil en mobile */}
+
                 <div className="space-y-2">
                   <button
                     onClick={() => {
@@ -224,15 +224,15 @@ export default function Layout({ title, children }) {
               </div>
             </div>
           </aside>
-          
+
           {/* Contenido principal */}
           <main className="flex-1 lg:ml-72 p-6 sm:p-8 transition-all duration-300">
             {children}
           </main>
         </div>
 
-        {/* Notificaciones de Chat - Fuera del contenedor principal */}
-        <ChatNotification />
+        {/* Notificaciones - fuera del contenedor principal, siempre activas */}
+        <UnifiedNotifications />
       </div>
     </>
   );

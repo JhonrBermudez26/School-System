@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Profesor;
 
 use App\Http\Controllers\Controller;
@@ -93,12 +92,42 @@ class ClassController extends Controller
             ->distinct()
             ->count('gu.user_id');
 
-        // Publicaciones
-        $publicaciones = Post::with('attachments')
+        // Publicaciones con información del autor
+        $publicaciones = Post::with(['attachments', 'user.roles'])
             ->where('subject_id', $subjectId)
             ->where('group_id', $groupId)
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->map(function ($post) {
+                // Obtener el rol del usuario
+                $userRole = $post->user->roles->first();
+                $roleName = $userRole ? $userRole->name : 'usuario';
+                
+                return [
+                    'id' => $post->id,
+                    'type' => $post->type,
+                    'title' => $post->title,
+                    'content' => $post->content,
+                    'created_at' => $post->created_at,
+                    'user_id' => $post->user_id,
+                    'author_name' => $post->user->name . ' ' . ($post->user->last_name ?? ''),
+                    'author_photo' => $post->user->photo
+                        ? asset('storage/' . $post->user->photo)
+                        : null,
+                    'author_role' => $roleName,
+                    'is_owner' => $post->user_id === auth()->id(),
+                    'attachments' => $post->attachments->map(function ($att) {
+                        return [
+                            'id' => $att->id,
+                            'type' => $att->type,
+                            'filename' => $att->filename,
+                            'path' => $att->path,
+                            'url' => $att->url,
+                            'created_at' => $att->created_at,
+                        ];
+                    }),
+                ];
+            });
 
         // Carpetas con conteo de archivos
         $folders = Folder::where('subject_id', $subjectId)
@@ -119,7 +148,7 @@ class ClassController extends Controller
             ->where('is_active', true)
             ->first();
 
-        // ✅ NUEVO: Tareas
+        // Tareas
         $tasks = Task::with('attachments')
             ->where('subject_id', $subjectId)
             ->where('group_id', $groupId)

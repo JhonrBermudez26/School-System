@@ -26,6 +26,14 @@ use App\Http\Controllers\Profesor\AsistenciasController;
 use App\Http\Controllers\Profesor\RegistrarNotasController;
 use App\Http\Controllers\Profesor\TaskController;
 
+
+use App\Http\Controllers\Estudiante\EstudianteDashboardController;
+use App\Http\Controllers\Estudiante\EstudianteClasesController;
+use App\Http\Controllers\Estudiante\Estudiantepostcontroller;
+use App\Http\Controllers\Estudiante\Estudiantetaskcontroller;
+
+
+
 // Página principal (pública)
 Route::get('/', function () {
     return Inertia::render('Welcome');
@@ -198,10 +206,10 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/clases/detalle', [ClassController::class, 'show'])->name('profesor.clases.show');
         
         // Publicaciones (CRUD)
-        Route::get('/clases/posts', [PostController::class, 'index'])->name('profesor.posts.index');
-        Route::post('/clases/posts', [PostController::class, 'store'])->name('profesor.posts.store');
-        Route::put('/clases/posts/{post}', [PostController::class, 'update'])->name('profesor.posts.update');
-        Route::delete('/clases/posts/{post}', [PostController::class, 'destroy'])->name('profesor.posts.destroy');
+        Route::get('/posts', [PostController::class, 'index'])->name('profesor.posts.index');
+    Route::post('/posts', [PostController::class, 'store'])->name('profesor.posts.store');
+    Route::put('/posts/{post}', [PostController::class, 'update'])->name('profesor.posts.update');
+    Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('profesor.posts.destroy');
         
         // Carpetas (CRUD)
         Route::post('/clases/folders', [FolderController::class, 'store'])->name('profesor.folders.store');
@@ -254,20 +262,22 @@ Route::middleware(['auth'])->group(function () {
     //ESTUDIANTE
     Route::middleware('role:estudiante')->prefix('estudiante')->group(function () {
 
-        // Dashboard
-        Route::get('/dashboard', function () {
-            return Inertia::render('Estudiante/Dashboard');
-        })->name('estudiante.dashboard');
+        Route::get('/dashboard', [EstudianteDashboardController::class, 'index'])->name('estudiante.dashboard');
+    
+   // Clases
+    Route::get('/clases', [EstudianteClasesController::class, 'index'])->name('estudiante.clases.index');
+    Route::get('/clases/{subject_id}/{group_id}', [EstudianteClasesController::class, 'show'])->name('estudiante.clases.show');
+             
+     // Publicaciones
+     Route::post('/posts', [EstudiantePostController::class, 'store'])->name('estudiante.posts.store');
+    Route::put('/posts/{post}', [EstudiantePostController::class, 'update'])->name('estudiante.posts.update');
+    Route::delete('/posts/{post}', [EstudiantePostController::class, 'destroy'])->name('estudiante.posts.destroy');
+             
+     // Tareas
+     Route::get('/tasks/{id}', [EstudianteTaskController::class, 'show'])->name('estudiante.tasks.show');
+     Route::post('/tasks/submit', [EstudianteTaskController::class, 'submit'])->name('estudiante.tasks.submit');
+    
 
-         // Notas
-        Route::get('/notas', function () {
-            return Inertia::render('Estudiante/Notas');
-        })->name('estudiante.notas');
-
-        // Materias
-        Route::get('/materias', function () {
-            return Inertia::render('Estudiante/Materias');
-        })->name('estudiante.materias');
     });
 
     //GET EDITAR
