@@ -22,15 +22,13 @@ Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     return (int) $user->id === (int) $id;
 });
 
-// ✅ Canal para clases (publicaciones) - camelCase
+// Canal para clases (publicaciones)
 Broadcast::channel('clase.{subjectId}.{groupId}', function ($user, $subjectId, $groupId) {
-    // Verificar que el usuario es estudiante del grupo
     $isStudent = DB::table('group_user')
         ->where('group_id', $groupId)
         ->where('user_id', $user->id)
         ->exists();
     
-    // O verificar que es el profesor de esa clase
     $isTeacher = DB::table('subject_group')
         ->where('subject_id', $subjectId)
         ->where('group_id', $groupId)
@@ -42,7 +40,6 @@ Broadcast::channel('clase.{subjectId}.{groupId}', function ($user, $subjectId, $
 
 // ✅ Canal público para tareas por grupo
 Broadcast::channel('group.{groupId}', function ($user, $groupId) {
-    // Verificar que el usuario pertenece al grupo (estudiante o profesor)
     $isStudent = DB::table('group_user')
         ->where('group_id', $groupId)
         ->where('user_id', $user->id)

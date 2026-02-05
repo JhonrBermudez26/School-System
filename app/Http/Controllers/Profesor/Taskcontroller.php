@@ -1,14 +1,15 @@
 <?php
-
 namespace App\Http\Controllers\Profesor;
 
 use App\Http\Controllers\Controller;
 use App\Models\Task;
 use App\Models\TaskAttachment;
 use App\Models\TaskSubmission;
+use App\Models\TaskSubmissionMember;
 use App\Events\TaskCreated;
 use App\Events\TaskUpdated;
 use App\Events\TaskDeleted;
+use App\Events\SubmissionGraded;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -28,7 +29,7 @@ class TaskController extends Controller
             ->where('subject_id', $subjectId)
             ->where('group_id', $groupId)
             ->exists();
-
+        
         abort_unless($exists, 403, 'No tienes acceso a esta clase');
     }
 
@@ -45,10 +46,8 @@ class TaskController extends Controller
         $subjectId = (int) $request->query('subject_id');
         $groupId = (int) $request->query('group_id');
 
-        // Verificar acceso
         $this->assertOwnership($subjectId, $groupId);
 
-        // Obtener total de estudiantes del grupo
         $totalStudents = DB::table('group_user as gu')
             ->join('model_has_roles as mhr', function ($join) {
                 $join->on('gu.user_id', '=', 'mhr.model_id')
@@ -70,7 +69,7 @@ class TaskController extends Controller
                 $submitted = $task->submissions()
                     ->where('status', '!=', 'pending')
                     ->count();
-
+                
                 $graded = $task->submissions()
                     ->where('status', 'graded')
                     ->count();
@@ -119,7 +118,7 @@ class TaskController extends Controller
             'allow_late_submission' => 'nullable|boolean',
             'max_score' => 'required|numeric|min:0.1|max:5.0',
             'attachments' => 'nullable|array',
-            'attachments.*' => 'file|max:10240', // 10MB
+            'attachments.*' => 'file|max:10240',
         ], [
             'close_date.after' => 'La fecha de cierre debe ser posterior a la fecha de entrega',
             'due_date.after_or_equal' => 'La fecha de entrega debe ser hoy o en el futuro',
@@ -193,7 +192,6 @@ class TaskController extends Controller
 
             DB::commit();
 
-            // ✅ DISPARAR EVENTO DE BROADCAST
             broadcast(new TaskCreated($task))->toOthers();
 
             return response()->json([
@@ -206,7 +204,7 @@ class TaskController extends Controller
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
-
+            
             return response()->json([
                 'message' => 'Error al crear la tarea',
                 'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
@@ -243,11 +241,11 @@ class TaskController extends Controller
             DB::beginTransaction();
 
             $updates = $validated;
-
+            
             if (isset($validated['due_date'])) {
                 $updates['due_date'] = Carbon::parse($validated['due_date'])->setTimezone('America/Bogota');
             }
-
+            
             if (isset($validated['close_date'])) {
                 $updates['close_date'] = !empty($validated['close_date'])
                     ? Carbon::parse($validated['close_date'])->setTimezone('America/Bogota')
@@ -273,7 +271,6 @@ class TaskController extends Controller
 
             DB::commit();
 
-            // ✅ DISPARAR EVENTO DE ACTUALIZACIÓN
             broadcast(new TaskUpdated($task))->toOthers();
 
             return response()->json([
@@ -285,7 +282,7 @@ class TaskController extends Controller
             \Log::error('Error actualizando tarea:', [
                 'error' => $e->getMessage(),
             ]);
-
+            
             return response()->json([
                 'message' => 'Error al actualizar la tarea',
                 'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
@@ -307,7 +304,6 @@ class TaskController extends Controller
         try {
             DB::beginTransaction();
 
-            // Guardar info antes de eliminar
             $taskId = $task->id;
             $groupId = $task->group_id;
             $title = $task->title;
@@ -332,7 +328,6 @@ class TaskController extends Controller
 
             DB::commit();
 
-            // ✅ DISPARAR EVENTO DE ELIMINACIÓN
             broadcast(new TaskDeleted($taskId, $groupId, $title))->toOthers();
 
             return response()->json([
@@ -343,7 +338,7 @@ class TaskController extends Controller
             \Log::error('Error eliminando tarea:', [
                 'error' => $e->getMessage(),
             ]);
-
+            
             return response()->json([
                 'message' => 'Error al eliminar la tarea',
                 'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'
@@ -352,52 +347,197 @@ class TaskController extends Controller
     }
 
     /**
-     * Obtener detalles de una tarea con entregas
+     * ✅ CORRECCIÓN PRINCIPAL: Ver detalle de una tarea
+     * Solo muestra UNA submission por grupo (la del creador)
      */
-    public function show(Task $task)
+    public function show($id)
     {
-        $this->assertOwnership((int) $task->subject_id, (int) $task->group_id);
+        $task = Task::with('attachments')->findOrFail($id);
+        
+        if ($task->teacher_id !== Auth::id()) {
+            abort(403, 'No autorizado para ver esta tarea');
+        }
+        
+        // ✅ Filtrar submissions según el tipo de trabajo
+        if ($task->work_type === 'individual') {
+            // En individuales, traer todas las submissions
+            $submissions = TaskSubmission::with(['student', 'files'])
+                ->where('task_id', $id)
+                ->get();
+        } else {
+            // ✅ En parejas/grupos, SOLO traer las submissions de los CREADORES
+            // Es decir, aquellas donde el student_id NO está en task_submission_members
+            $submissions = TaskSubmission::with(['student', 'files', 'members.student'])
+                ->where('task_id', $id)
+                ->whereNotExists(function($query) {
+                    $query->select(DB::raw(1))
+                        ->from('task_submission_members')
+                        ->whereColumn('task_submission_members.submission_id', 'task_submissions.id')
+                        ->whereColumn('task_submission_members.student_id', 'task_submissions.student_id');
+                })
+                ->get();
+        }
+        
+        // Mapear submissions con is_creator
+        $submissions = $submissions->map(function ($s) use ($task) {
+            return [
+                'id'               => $s->id,
+                'student'          => $s->student,
+                'comment'          => $s->comment,
+                'status'           => $s->status,
+                'score'            => $s->score,
+                'teacher_feedback' => $s->teacher_feedback,
+                'submitted_at'     => $s->submitted_at,
+                'graded_at'        => $s->graded_at,
+                'is_late'          => $s->is_late,
+                'files'            => $s->files,
+                'members'          => $s->members ?? [],
+                'is_creator'       => true, // Siempre true porque ya filtramos
+            ];
+        });
+        
+        $stats = [
+            'total'     => $task->getTotalStudentsCount(),
+            'submitted' => TaskSubmission::where('task_id', $task->id)
+                ->whereIn('status', ['submitted', 'graded'])
+                ->count(),
+            'graded'    => TaskSubmission::where('task_id', $task->id)
+                ->where('status', 'graded')
+                ->count(),
+            'pending'   => TaskSubmission::where('task_id', $task->id)
+                ->where('status', 'pending')
+                ->count(),
+        ];
+        
+        return response()->json([
+            'task' => [
+                'id'                    => $task->id,
+                'title'                 => $task->title,
+                'description'           => $task->description,
+                'work_type'             => $task->work_type,
+                'max_group_members'     => $task->max_group_members,
+                'due_date'              => $task->due_date,
+                'close_date'            => $task->close_date,
+                'allow_late_submission' => $task->allow_late_submission,
+                'max_score'             => $task->max_score,
+                'is_active'             => $task->is_active,
+                'is_past_due'           => $task->isPastDue(),
+                'is_closed'             => $task->isClosed(),
+                'attachments'           => $task->attachments,
+                'submissions'           => $submissions,
+                'stats'                 => $stats,
+            ]
+        ]);
+    }
+
+    /**
+     * Calificar una entrega
+     */
+    public function gradeSubmission(Request $request, $submissionId)
+    {
+        $validated = $request->validate([
+            'score'            => 'required|numeric|min:0',
+            'teacher_feedback' => 'nullable|string|max:2000',
+            'individual_scores' => 'nullable|array',
+            'individual_scores.*.student_id' => 'required|exists:users,id',
+            'individual_scores.*.score'      => 'required|numeric|min:0',
+            'individual_scores.*.feedback'   => 'nullable|string|max:1000',
+        ]);
+
+        $submission = TaskSubmission::with(['task', 'student', 'members.student'])->findOrFail($submissionId);
+        $task = $submission->task;
+
+        $this->assertOwnership($task->subject_id, $task->group_id);
 
         if ($task->teacher_id !== auth()->id()) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
 
-        $task->load([
-            'attachments',
-            'submissions.student',
-            'submissions.files',
-            'groupSubmissions.members'
-        ]);
+        if ($submission->status === 'pending') {
+            return response()->json(['message' => 'No puedes calificar una entrega que no ha sido enviada'], 422);
+        }
 
-        $totalStudents = DB::table('group_user as gu')
-            ->join('model_has_roles as mhr', function ($join) {
-                $join->on('gu.user_id', '=', 'mhr.model_id')
-                    ->where('mhr.model_type', '=', 'App\\Models\\User');
-            })
-            ->join('roles as r', 'mhr.role_id', '=', 'r.id')
-            ->where('gu.group_id', $task->group_id)
-            ->where('r.name', 'estudiante')
-            ->distinct()
-            ->count('gu.user_id');
+        if ($validated['score'] > $task->max_score) {
+            return response()->json([
+                'message' => "La calificación no puede exceder {$task->max_score} puntos"
+            ], 422);
+        }
 
-        $submitted = $task->submissions()
-            ->where('status', '!=', 'pending')
-            ->count();
+        DB::beginTransaction();
 
-        $graded = $task->submissions()
-            ->where('status', 'graded')
-            ->count();
+        try {
+            $useIndividual = !empty($validated['individual_scores']) && $task->work_type !== 'individual';
 
-        $task->stats = [
-            'total' => $totalStudents,
-            'submitted' => $submitted,
-            'graded' => $graded,
-            'pending' => $totalStudents - $submitted,
-        ];
+            if ($useIndividual) {
+                // Modo individual (calificaciones diferenciadas)
+                $scoresSum = 0;
+                $count = 0;
 
-        return response()->json([
-            'task' => $task,
-        ]);
+                foreach ($validated['individual_scores'] as $ind) {
+                    $studentSub = TaskSubmission::where('task_id', $task->id)
+                        ->where('student_id', $ind['student_id'])
+                        ->first();
+
+                    if ($studentSub) {
+                        $studentSub->score = $ind['score'];
+                        $studentSub->teacher_feedback = $ind['feedback'] ?? $validated['teacher_feedback'] ?? null;
+                        $studentSub->status = 'graded';
+                        $studentSub->graded_at = now();
+                        $studentSub->save();
+
+                        $scoresSum += (float) $ind['score'];
+                        $count++;
+                    }
+                }
+
+                if ($count > 0) {
+                    $submission->score = round($scoresSum / $count, 2);
+                } else {
+                    $submission->score = $validated['score'];
+                }
+            } else {
+                // Modo grupal (misma nota para todos)
+                $submission->score = $validated['score'];
+                $submission->teacher_feedback = $validated['teacher_feedback'] ?? null;
+
+                // Propagar a todos los miembros
+                foreach ($submission->members as $member) {
+                    $memberSub = TaskSubmission::firstOrCreate(
+                        ['task_id' => $task->id, 'student_id' => $member->student_id],
+                        ['status' => 'pending', 'is_late' => false]
+                    );
+
+                    $memberSub->update([
+                        'score'            => $validated['score'],
+                        'teacher_feedback' => $validated['teacher_feedback'] ?? null,
+                        'status'           => 'graded',
+                        'graded_at'        => now(),
+                        'submitted_at'     => $submission->submitted_at,
+                        'is_late'          => $submission->is_late,
+                        'comment'          => $task->work_type === 'pairs'
+                            ? "Trabajo en pareja con {$submission->student->name}"
+                            : "Trabajo en grupo con {$submission->student->name}",
+                    ]);
+                }
+            }
+
+            $submission->status = 'graded';
+            $submission->graded_at = now();
+            $submission->save();
+
+            DB::commit();
+
+            broadcast(new SubmissionGraded($submission))->toOthers();
+
+            return response()->json([
+                'message'    => 'Entrega calificada exitosamente',
+                'submission' => $submission->fresh(['student', 'members.student']),
+            ]);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('Error calificando entrega', ['error' => $e->getMessage()]);
+            return response()->json(['message' => 'Error al calificar la entrega'], 500);
+        }
     }
 
     /**
@@ -427,7 +567,7 @@ class TaskController extends Controller
                 'error' => $e->getMessage(),
                 'attachment_id' => $attachment->id
             ]);
-
+            
             return response()->json([
                 'message' => 'Error al eliminar el archivo',
                 'error' => config('app.debug') ? $e->getMessage() : 'Error interno del servidor'

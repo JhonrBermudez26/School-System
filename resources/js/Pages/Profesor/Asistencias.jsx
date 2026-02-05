@@ -234,7 +234,7 @@ export default function Asistencias() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 lg:gap-6">
                     <div>
-                        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent">
+                        <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                             Registro de Asistencias
                         </h1>
                         <p className="text-sm sm:text-base text-gray-600 mt-1">
@@ -328,7 +328,7 @@ export default function Asistencias() {
                                 <button
                                     onClick={() => loadData()}
                                     disabled={!selectedSubject || !selectedGroup}
-                                    className="w-full px-4 sm:px-6 py-2 text-sm sm:text-base bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-lg hover:from-blue-700 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow hover:shadow-lg"
+                                    className="w-full px-4 sm:px-6 py-2 text-sm sm:text-base bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow hover:shadow-lg"
                                 >
                                     Cargar
                                 </button>
@@ -353,7 +353,7 @@ export default function Asistencias() {
                             <button
                                 onClick={() => handleViewChange('history')}
                                 className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 flex items-center justify-center gap-1 sm:gap-2 ${
-                                    currentView === 'history' ? 'bg-white shadow-md text-teal-700' : 'text-gray-600 hover:text-gray-800'
+                                    currentView === 'history' ? 'bg-white shadow-md text-indigo-700' : 'text-gray-600 hover:text-gray-800'
                                 }`}
                             >
                                 <History className="h-3 w-3 sm:h-4 sm:w-4" />
@@ -426,7 +426,7 @@ export default function Asistencias() {
                                             disabled={dateInfo.is_future}
                                             className={`group relative rounded-lg sm:rounded-xl shadow-md transition-all duration-300 cursor-pointer hover:shadow-lg hover:-translate-y-1 p-3 sm:p-4 text-left ${
                                                 selectedDate === dateInfo.date
-                                                    ? 'ring-2 ring-blue-500 bg-gradient-to-br from-blue-50 to-teal-50 border border-blue-300 scale-105'
+                                                    ? 'ring-2 ring-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-300 scale-105'
                                                     : dateInfo.is_today
                                                     ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-400'
                                                     : dateInfo.is_future
@@ -562,7 +562,7 @@ export default function Asistencias() {
                         {/* Lista de Estudiantes - Vista Móvil Mejorada */}
                         {selectedDate && estudiantes.length > 0 && (
                             <div className="bg-white rounded-lg sm:rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                                <div className="bg-gradient-to-r from-blue-600 to-teal-600 p-3 sm:p-4 text-white">
+                                <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-3 sm:p-4 text-white">
                                     <h2 className="text-base sm:text-xl font-bold truncate">
                                         {selectedClass.subject_name} - {selectedClass.group_name}
                                     </h2>
@@ -697,7 +697,7 @@ export default function Asistencias() {
                                     <button
                                         onClick={saveAttendances}
                                         disabled={isSaving}
-                                        className="w-full px-4 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-lg hover:from-blue-700 hover:to-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 font-medium"
+                                        className="w-full px-4 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 font-medium"
                                     >
                                         <Save className="h-4 w-4 sm:h-5 sm:w-5" />
                                         {isSaving ? 'Guardando...' : 'Guardar Asistencias'}

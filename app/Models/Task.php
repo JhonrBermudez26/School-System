@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -12,7 +11,7 @@ class Task extends Model
     use HasFactory;
 
     protected $fillable = [
-       'subject_id',
+        'subject_id',
         'group_id',
         'teacher_id',
         'title',
@@ -27,65 +26,48 @@ class Task extends Model
     ];
 
     protected $casts = [
-        'due_date'              => 'datetime:Y-m-d H:i:s',   // ← importante: con hora
-        'close_date'            => 'datetime:Y-m-d H:i:s',   // ← importante: con hora
+        'due_date'              => 'datetime:Y-m-d H:i:s',
+        'close_date'            => 'datetime:Y-m-d H:i:s',
         'allow_late_submission' => 'boolean',
         'is_active'             => 'boolean',
     ];
-    /**
-     * Relación con la asignatura (subject)
-     */
+
+    // ========== RELACIONES ==========
+
     public function subject()
     {
         return $this->belongsTo(\App\Models\Subject::class, 'subject_id');
     }
 
-    /**
-     * Relación con el grupo
-     */
     public function group()
     {
         return $this->belongsTo(\App\Models\Group::class, 'group_id');
     }
 
-    /**
-     * Relación con el profesor
-     */
     public function teacher()
     {
         return $this->belongsTo(User::class, 'teacher_id');
     }
 
-    /**
-     * Archivos adjuntos de la tarea
-     */
     public function attachments()
     {
         return $this->hasMany(TaskAttachment::class);
     }
 
-    /**
-     * Entregas de estudiantes
-     */
     public function submissions()
     {
         return $this->hasMany(TaskSubmission::class);
     }
 
-    /**
-     * Entregas grupales
-     */
     public function groupSubmissions()
     {
         return $this->hasMany(TaskGroupSubmission::class);
     }
 
-    /**
-     * Verificar si ya pasó la fecha de entrega
-     */
+    // ========== MÉTODOS DE ESTADO ==========
+
     public function isPastDue()
     {
-        // Opcional: puedes forzar la comparación en la misma zona, pero con el guardado correcto ya debería funcionar
         return Carbon::now('America/Bogota')->isAfter($this->due_date);
     }
 
@@ -94,14 +76,15 @@ class Task extends Model
         return $this->close_date && Carbon::now('America/Bogota')->isAfter($this->close_date);
     }
 
+    // ========== MÉTODOS DE CONTEO ==========
+
     /**
-     * Obtener estadísticas de entregas
-     * Ahora usa la tabla group_user correctamente
+     * ✅ AGREGAR ESTE MÉTODO
+     * Obtener el total de estudiantes en el grupo de esta tarea
      */
-    public function getSubmissionStats()
+    public function getTotalStudentsCount()
     {
-        // Contar total de estudiantes en el grupo
-        $total = DB::table('group_user as gu')
+        return DB::table('group_user as gu')
             ->join('model_has_roles as mhr', function ($join) {
                 $join->on('gu.user_id', '=', 'mhr.model_id')
                     ->where('mhr.model_type', '=', 'App\\Models\\User');
@@ -111,7 +94,14 @@ class Task extends Model
             ->where('r.name', 'estudiante')
             ->distinct()
             ->count('gu.user_id');
+    }
 
+    /**
+     * Obtener estadísticas de entregas
+     */
+    public function getSubmissionStats()
+    {
+        $total = $this->getTotalStudentsCount();
         $submitted = $this->submissions()->where('status', '!=', 'pending')->count();
         $graded = $this->submissions()->where('status', 'graded')->count();
         $pending = $total - $submitted;
@@ -124,34 +114,24 @@ class Task extends Model
         ];
     }
 
-    /**
-     * Scope para filtrar por profesor
-     */
+    // ========== SCOPES ==========
+
     public function scopeByTeacher($query, $teacherId)
     {
         return $query->where('teacher_id', $teacherId);
     }
 
-    /**
-     * Scope para filtrar por clase (subject + group)
-     */
     public function scopeByClass($query, $subjectId, $groupId)
     {
         return $query->where('subject_id', $subjectId)
                      ->where('group_id', $groupId);
     }
 
-    /**
-     * Scope para tareas activas
-     */
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
     }
 
-    /**
-     * Scope para tareas no cerradas
-     */
     public function scopeNotClosed($query)
     {
         return $query->where(function ($q) {

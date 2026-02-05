@@ -33,7 +33,7 @@ export default function Horario() {
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
                     <div>
-                        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-teal-600 bg-clip-text text-transparent">
+                        <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                             Mi Horario de Clases
                         </h1>
                         <p className="text-gray-600 mt-1">
@@ -61,8 +61,8 @@ export default function Horario() {
 
                         <div className="bg-white rounded-xl shadow-md p-5 border border-gray-100">
                             <div className="flex items-center gap-3">
-                                <div className="bg-teal-100 p-3 rounded-lg">
-                                    <GraduationCap className="h-6 w-6 text-teal-600" />
+                                <div className="bg-indigo-100 p-3 rounded-lg">
+                                    <GraduationCap className="h-6 w-6 text-indigo-600" />
                                 </div>
                                 <div>
                                     <p className="text-sm text-gray-600">Grupos Diferentes</p>
@@ -92,7 +92,7 @@ export default function Horario() {
                 {/* Banner del horario */}
                 {hasSchedule ? (
                     <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
-                        <div className="bg-gradient-to-r from-blue-600 to-teal-600 p-5 text-white">
+                        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 p-5 text-white">
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                 <div>
                                     <h2 className="text-xl font-bold flex items-center gap-2">

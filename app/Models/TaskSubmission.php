@@ -26,9 +26,12 @@ class TaskSubmission extends Model
         'is_late' => 'boolean',
         'submitted_at' => 'datetime',
         'graded_at' => 'datetime',
+        'score' => 'decimal:2',
     ];
 
-    // ========== RELACIONES EXISTENTES ==========
+    protected $appends = ['is_creator'];
+
+    // ========== RELACIONES ==========
     
     public function task()
     {
@@ -50,80 +53,59 @@ class TaskSubmission extends Model
         return $this->belongsTo(TaskGroupSubmission::class);
     }
 
-    // ========== NUEVAS RELACIONES PARA PAREJAS/GRUPOS ==========
-
-    /**
-     * Miembros adicionales del grupo de trabajo (para parejas/grupos)
-     * Esta es una alternativa más simple a usar task_group_submissions
-     */
     public function members()
     {
         return $this->hasMany(TaskSubmissionMember::class, 'submission_id');
     }
 
-    /**
-     * Obtener todos los miembros con información del estudiante
-     */
     public function allMembers()
     {
         return $this->members()->with('student');
     }
 
-    /**
-     * Obtener miembros aceptados
-     */
     public function acceptedMembers()
     {
         return $this->members()->where('status', 'accepted')->with('student');
     }
 
-    // ========== MÉTODOS HELPER ==========
+    // ========== ATRIBUTOS COMPUTADOS ==========
+    
+    public function getIsCreatorAttribute()
+    {
+        if (auth()->check()) {
+            return $this->student_id === auth()->id();
+        }
+        
+        return true;
+    }
 
-    /**
-     * Verificar si un estudiante es miembro de esta entrega
-     */
+    // ========== MÉTODOS HELPER ==========
+    
     public function hasMember($studentId)
     {
         return $this->members()->where('student_id', $studentId)->exists();
     }
 
-    /**
-     * Verificar si un estudiante es el creador de esta entrega
-     */
     public function isCreator($studentId)
     {
         return $this->student_id == $studentId;
     }
 
-    /**
-     * Verificar si un estudiante puede editar esta entrega
-     * Solo el creador puede editar si no está calificada
-     */
     public function canEdit($studentId)
     {
         return $this->student_id == $studentId && $this->status !== 'graded';
     }
 
-    /**
-     * Verificar si un estudiante puede ver esta entrega
-     * El creador y los miembros pueden ver
-     */
     public function canView($studentId)
     {
         return $this->student_id == $studentId || $this->hasMember($studentId);
     }
 
-    /**
-     * Obtener el total de miembros (incluyendo el creador)
-     */
     public function getTotalMembers()
     {
-        return $this->members()->where('status', 'accepted')->count() + 1; // +1 por el creador
+        return $this->members()->where('status', 'accepted')->count() + 1;
     }
 
-    /**
-     * Verificar si se puede agregar más miembros
-     */
     public function canAddMoreMembers()
     {
         $task = $this->task;
@@ -134,5 +116,27 @@ class TaskSubmission extends Model
         
         $maxMembers = $task->work_type === 'pairs' ? 2 : $task->max_group_members;
         return $this->getTotalMembers() < $maxMembers;
+    }
+
+    // ========== SCOPES ==========
+    
+    public function scopeForCurrentStudent($query)
+    {
+        return $query->where('student_id', auth()->id());
+    }
+
+    public function scopeSubmitted($query)
+    {
+        return $query->where('status', '!=', 'pending');
+    }
+
+    public function scopeGraded($query)
+    {
+        return $query->where('status', 'graded');
+    }
+
+    public function scopeLate($query)
+    {
+        return $query->where('is_late', true);
     }
 }

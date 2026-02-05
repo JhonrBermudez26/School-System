@@ -18,7 +18,7 @@ class TaskUpdated implements ShouldBroadcast
 
     public function __construct(Task $task)
     {
-        $this->task = $task;
+        $this->task = $task->load('teacher', 'subject');
         $this->groupId = $task->group_id;
     }
 
@@ -39,7 +39,10 @@ class TaskUpdated implements ShouldBroadcast
             'title' => $this->task->title,
             'group_id' => $this->groupId,
             'subject_id' => $this->task->subject_id,
+            'teacher_name' => $this->task->teacher->name ?? 'Profesor',
+            'subject_name' => $this->task->subject->name ?? 'Asignatura',
             'message' => 'Tarea actualizada: ' . $this->task->title,
+            'timestamp' => now()->toIso8601String(),
         ];
     }
 }

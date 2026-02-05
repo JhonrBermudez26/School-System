@@ -47,7 +47,7 @@ export default function SidebarMenu({ role }) {
       { icon: Settings, label: "Configuración", path: "/secretaria/configuracion" },
     ],
     profesor: [
-      { icon: GraduationCap, label: "Dashboard", path: "/profesor/dashboard" },
+      { icon: GraduationCap, label: "Inicio", path: "/profesor/dashboard" },
       { icon: MessageSquare, label: "Chat", path: "/profesor/chat" },
       { icon: BookOpen, label: "Mis clases", path: "/profesor/clases" },
       { icon: Calendar, label: "Horario", path: "/profesor/horario" },
