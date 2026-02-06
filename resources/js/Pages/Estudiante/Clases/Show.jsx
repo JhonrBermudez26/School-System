@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
 import Layout from '@/Components/Layout/Layout';
 import { MessageSquare, Folder, Video, BookOpen, User, ClipboardList } from 'lucide-react';
@@ -9,14 +9,82 @@ import Tareas from './Tareas';
 
 export default function Show() {
   const { props } = usePage();
-  const { 
-    classInfo, 
-    publicaciones = [], 
+  const {
+    classInfo,
+    publicaciones = [],
     tasks = [],
-    folders = [], 
-    files = [], 
-    meeting = null
+    folders = [],
+    files = [],
+    meeting: initialMeeting = null
   } = props;
+
+  // Estado local para la reunión (se actualiza en tiempo real)
+  const [localMeeting, setLocalMeeting] = useState(initialMeeting);
+
+  // Sincronizar con el prop inicial cuando cambie (por si hay reload)
+  useEffect(() => {
+    console.log('[Show Estudiante] Prop meeting inicial:', initialMeeting);
+    setLocalMeeting(initialMeeting);
+  }, [initialMeeting]);
+
+  // ✅ ESCUCHA EN TIEMPO REAL DE EVENTOS DE REUNIÓN
+  useEffect(() => {
+    if (!window.Echo || !classInfo?.group_id) {
+      console.warn('[Show Estudiante] Echo o group_id no disponible');
+      return;
+    }
+
+    const channelName = `group.${classInfo.group_id}`;
+    console.log('[Show Estudiante] 🔌 Suscribiéndose al canal:', channelName);
+
+    const channel = window.Echo.channel(channelName);
+
+    // ✅ Escuchar cuando se inicia una reunión
+    channel.listen('.meeting.started', (event) => {
+      console.log('[Show Estudiante] 🎉 meeting.started recibido:', event);
+      
+      if (event.meeting) {
+        setLocalMeeting(event.meeting);
+        
+        // Mostrar notificación nativa del navegador
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('Nueva reunión iniciada', {
+            body: `Tu profesor ha iniciado una videollamada en ${classInfo.subject_name}`,
+            icon: '/logo.png'
+          });
+        }
+      }
+    });
+
+    // ✅ Escuchar cuando se finaliza una reunión
+    channel.listen('.meeting.ended', (event) => {
+      console.log('[Show Estudiante] 📴 meeting.ended recibido:', event);
+      setLocalMeeting(null);
+      
+      // Mostrar notificación
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification('Reunión finalizada', {
+          body: 'La videollamada ha terminado',
+          icon: '/logo.png'
+        });
+      }
+    });
+
+    // Cleanup al desmontar
+    return () => {
+      console.log('[Show Estudiante] 🔌 Desuscribiéndose del canal:', channelName);
+      channel.stopListening('.meeting.started');
+      channel.stopListening('.meeting.ended');
+      window.Echo.leave(channelName);
+    };
+  }, [classInfo?.group_id, classInfo?.subject_name]);
+
+  // Solicitar permiso de notificaciones al montar
+  useEffect(() => {
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+  }, []);
 
   const tabs = [
     { key: 'publicaciones', label: 'Publicaciones', icon: MessageSquare, component: Publicaciones },
@@ -51,8 +119,14 @@ export default function Show() {
                     <div className="h-16 w-16 xs:h-20 xs:w-20 sm:h-24 sm:w-24 md:h-28 md:w-28 bg-white rounded-xl sm:rounded-2xl md:rounded-3xl shadow-2xl flex items-center justify-center border-3 sm:border-4 border-white">
                       <BookOpen className="h-8 w-8 xs:h-10 xs:w-10 sm:h-12 sm:w-12 md:h-14 md:w-14 text-blue-600" />
                     </div>
+                    {/* Indicador de reunión activa */}
+                    {localMeeting && (
+                      <div className="absolute -top-1 -right-1 w-6 h-6 sm:w-8 sm:h-8 bg-green-500 rounded-full border-3 sm:border-4 border-white flex items-center justify-center animate-pulse">
+                        <Video className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+                      </div>
+                    )}
                   </div>
-
+                  
                   {/* Detalles de la clase */}
                   <div className="flex-1 w-full sm:w-auto">
                     {/* Badge del código */}
@@ -60,6 +134,12 @@ export default function Show() {
                       <span className="inline-flex items-center gap-1 sm:gap-1.5 bg-white/20 backdrop-blur-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-white text-[11px] xs:text-xs sm:text-sm font-semibold">
                         {classInfo.subject_code || 'CURSO'}
                       </span>
+                      {localMeeting && (
+                        <span className="inline-flex items-center gap-1 sm:gap-1.5 bg-green-500 backdrop-blur-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-white text-[11px] xs:text-xs sm:text-sm font-semibold animate-pulse">
+                          <Video className="h-3 w-3" />
+                          Reunión en vivo
+                        </span>
+                      )}
                     </div>
                     
                     {/* Título */}
@@ -90,12 +170,14 @@ export default function Show() {
                     {tabs.map(tab => {
                       const Icon = tab.icon;
                       const isActive = active === tab.key;
+                      const hasActiveCall = tab.key === 'reunion' && localMeeting;
+                      
                       return (
                         <button
                           key={tab.key}
                           onClick={() => setActive(tab.key)}
                           className={`
-                            flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl 
+                            relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl 
                             font-semibold transition-all duration-300 whitespace-nowrap text-sm
                             ${isActive 
                               ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg scale-105' 
@@ -105,6 +187,9 @@ export default function Show() {
                         >
                           <Icon className="h-4 w-4" />
                           <span>{tab.label}</span>
+                          {hasActiveCall && (
+                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white animate-pulse"></span>
+                          )}
                         </button>
                       );
                     })}
@@ -117,13 +202,15 @@ export default function Show() {
                 {tabs.map(tab => {
                   const Icon = tab.icon;
                   const isActive = active === tab.key;
+                  const hasActiveCall = tab.key === 'reunion' && localMeeting;
+                  
                   return (
                     <button
                       key={tab.key}
                       onClick={() => setActive(tab.key)}
                       className={`
-                        md:flex-1 flex items-center justify-center gap-2 px-4 md:px-6 py-3 md:py-3.5 
-                        rounded-xl font-semibold transition-all duration-300 relative overflow-hidden
+                        relative md:flex-1 flex items-center justify-center gap-2 px-4 md:px-6 py-3 md:py-3.5 
+                        rounded-xl font-semibold transition-all duration-300 overflow-hidden
                         ${isActive 
                           ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-xl scale-105' 
                           : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:scale-102'
@@ -135,6 +222,11 @@ export default function Show() {
                       
                       <Icon className="h-4 w-4 md:h-5 md:w-5 relative z-10 flex-shrink-0" />
                       <span className="relative z-10 text-sm md:text-base">{tab.label}</span>
+                      
+                      {/* Indicador de reunión activa */}
+                      {hasActiveCall && (
+                        <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-green-500 rounded-full animate-pulse"></span>
+                      )}
                       
                       {/* Indicador activo */}
                       {isActive && (
@@ -152,21 +244,15 @@ export default function Show() {
             {active === 'publicaciones' && <Publicaciones publicaciones={publicaciones} classInfo={classInfo} />}
             {active === 'tareas' && <Tareas tasks={tasks} classInfo={classInfo} />}
             {active === 'archivos' && <Archivos folders={folders} files={files} />}
-            {active === 'reunion' && <Reunion meeting={meeting} classInfo={classInfo} />}
+            {active === 'reunion' && (
+              <Reunion 
+                meeting={localMeeting} 
+                classInfo={classInfo} 
+              />
+            )}
           </div>
         </div>
       </div>
-
-      {/* Estilos adicionales */}
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </Layout>
   );
 }

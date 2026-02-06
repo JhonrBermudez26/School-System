@@ -1,117 +1,162 @@
-import { useState, useEffect, useRef } from 'react';
-import { 
-  Video, VideoOff, Copy, Check, Monitor, Calendar, 
+// Estudiante Reunion.jsx
+import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  Video, VideoOff, Copy, Check, Monitor, Calendar,
   Clock, ExternalLink, Loader2, Users
 } from 'lucide-react';
 
 export default function Reunion({ meeting = null, classInfo }) {
   const [copied, setCopied] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const jitsiContainer = useRef(null);
+  const [isLoading, setIsLoading] = useState(true);
   const jitsiApi = useRef(null);
-  
+  const initializationAttempted = useRef(false);
   const meetingUrl = meeting?.url || '';
 
+  // Limpieza si meeting se vuelve null
   useEffect(() => {
-    if (meeting && jitsiContainer.current && !jitsiApi.current) {
-      loadJitsiScript();
-    }
-    return () => {
-      if (jitsiApi.current) {
+    if (!meeting && jitsiApi.current) {
+      console.log('[Jitsi] [ESTUDIANTE] Meeting eliminado, limpiando API');
+      try {
         jitsiApi.current.dispose();
-        jitsiApi.current = null;
+      } catch (e) {
+        console.error('[Jitsi] [ESTUDIANTE] Error al dispose:', e);
       }
-    };
+      jitsiApi.current = null;
+      initializationAttempted.current = false;
+      setIsLoading(true);
+    }
   }, [meeting]);
 
-  const loadJitsiScript = () => {
-    if (window.JitsiMeetExternalAPI) {
-      initJitsi();
+  const containerRef = useCallback((node) => {
+    console.log('[Jitsi] [ESTUDIANTE] Callback ref ejecutado, node:', node ? 'existe' : 'null');
+
+    if (node === null) {
+      console.log('[Jitsi] [ESTUDIANTE] Desmontando contenedor');
+      if (jitsiApi.current) {
+        try {
+          jitsiApi.current.dispose();
+        } catch (e) { }
+        jitsiApi.current = null;
+      }
+      initializationAttempted.current = false;
       return;
     }
-    setIsLoading(true);
-    const script = document.createElement('script');
-    script.src = 'https://meet.jit.si/external_api.js';
-    script.async = true;
-    script.onload = () => {
-      setIsLoading(false);
-      initJitsi();
-    };
-    script.onerror = () => {
-      setIsLoading(false);
-      alert('Error cargando Jitsi. Verifica tu conexión.');
-    };
-    document.body.appendChild(script);
-  };
 
-  const initJitsi = () => {
-    if (window.JitsiMeetExternalAPI && jitsiContainer.current && meeting) {
-      const domain = 'meet.jit.si';
-      
-      // Obtener el nombre del usuario del contexto
-      const userName = classInfo.student_name || 'Estudiante';
-      
-      const options = {
-        roomName: meeting.room_name,
-        width: '100%',
-        height: 600,
-        parentNode: jitsiContainer.current,
-        
-        configOverwrite: {
-          startWithAudioMuted: true,
-          startWithVideoMuted: false,
-          enableWelcomePage: false,
-          prejoinPageEnabled: false,
-          disableDeepLinking: true,
-          defaultLanguage: 'es',
-          resolution: 720,
-          constraints: {
-            video: {
-              height: { ideal: 720, max: 720, min: 240 }
-            }
+    if (!meeting?.room_name) {
+      console.log('[Jitsi] [ESTUDIANTE] No hay meeting, esperando...');
+      return;
+    }
+
+    if (jitsiApi.current || initializationAttempted.current) {
+      console.log('[Jitsi] [ESTUDIANTE] Ya inicializado');
+      return;
+    }
+
+    console.log('[Jitsi] [ESTUDIANTE] Contenedor montado, inicializando...');
+
+    const initializeJitsi = () => {
+      console.log('[Jitsi] [ESTUDIANTE] Iniciando initializeJitsi...');
+      if (!window.JitsiMeetExternalAPI) {
+        console.error('[Jitsi] [ESTUDIANTE] ❌ JitsiMeetExternalAPI no disponible');
+        setIsLoading(false);
+        return;
+      }
+
+      initializationAttempted.current = true;
+
+      try {
+        const domain = 'meet.jit.si';
+        const options = {
+          roomName: meeting.room_name,
+          width: '100%',
+          height: '100%',
+          parentNode: node,
+          configOverwrite: {
+            startWithAudioMuted: true,
+            startWithVideoMuted: false,
+            enableWelcomePage: false,
+            prejoinPageEnabled: false,
+            disableDeepLinking: true,
+            defaultLanguage: 'es',
+            resolution: 720,
+            disableInviteFunctions: true,
+            doNotStoreRoom: true,
+            requireDisplayName: false,
           },
-          disableInviteFunctions: true,
-          doNotStoreRoom: true,
-        },
-        
-        interfaceConfigOverwrite: {
-          TOOLBAR_BUTTONS: [
-            'microphone', 
-            'camera', 
-            'desktop',
-            'fullscreen',
-            'hangup', 
-            'chat', 
-            'raisehand',
-            'videoquality',
-          ],
-          SHOW_JITSI_WATERMARK: false,
-          SHOW_BRAND_WATERMARK: false,
-          SHOW_POWERED_BY: false,
-          DEFAULT_LOGO_URL: '',
-          DEFAULT_WELCOME_PAGE_LOGO_URL: '',
-        },
-        
-        userInfo: {
-          displayName: userName,
-        }
+          interfaceConfigOverwrite: {
+            TOOLBAR_BUTTONS: [
+              'microphone', 'camera', 'desktop', 'fullscreen', 'hangup',
+              'chat', 'raisehand', 'videoquality'
+            ],
+            SHOW_JITSI_WATERMARK: false,
+            SHOW_BRAND_WATERMARK: false,
+            SHOW_POWERED_BY: false,
+          },
+          userInfo: {
+            displayName: classInfo?.student_name || 'Estudiante',
+          }
+        };
+
+        console.log('[Jitsi] [ESTUDIANTE] Creando JitsiMeetExternalAPI...');
+        jitsiApi.current = new window.JitsiMeetExternalAPI(domain, options);
+        console.log('[Jitsi] [ESTUDIANTE] ✅ API creada exitosamente');
+
+        jitsiApi.current.on('videoConferenceJoined', () => {
+          console.log('[Jitsi] [ESTUDIANTE] 🎉 Usuario se unió');
+          setIsLoading(false);
+        });
+
+        jitsiApi.current.on('connection.disconnect', (msg) => {
+          console.error('[Jitsi] [ESTUDIANTE] ⚠️ Desconexión:', msg);
+          setIsLoading(false);
+        });
+
+        // Fallback corto para pruebas
+        setTimeout(() => {
+          if (isLoading) {
+            console.log('[Jitsi] [ESTUDIANTE] ⏰ Fallback timeout');
+            setIsLoading(false);
+          }
+        }, 8000);
+
+      } catch (error) {
+        console.error('[Jitsi] [ESTUDIANTE] ❌ Error al crear API:', error);
+        setIsLoading(false);
+        initializationAttempted.current = false;
+      }
+    };
+
+    if (window.JitsiMeetExternalAPI) {
+      console.log('[Jitsi] [ESTUDIANTE] Script ya cargado');
+      setTimeout(initializeJitsi, 500);
+    } else {
+      console.log('[Jitsi] [ESTUDIANTE] Cargando script...');
+      const script = document.createElement('script');
+      script.src = 'https://meet.jit.si/external_api.js';
+      script.async = true;
+      script.id = 'jitsi-script-student';
+
+      script.onload = () => {
+        console.log('[Jitsi] [ESTUDIANTE] ✅ Script cargado');
+        setTimeout(initializeJitsi, 500);
       };
 
-      jitsiApi.current = new window.JitsiMeetExternalAPI(domain, options);
-      
-      jitsiApi.current.on('participantJoined', (participant) => {
-        console.log('Usuario conectado:', participant);
-      });
-      
-      jitsiApi.current.on('participantLeft', (participant) => {
-        console.log('Usuario desconectado:', participant);
-      });
-      
-      jitsiApi.current.on('videoConferenceLeft', () => {
-        console.log('Saliste de la reunión');
-      });
+      script.onerror = (err) => {
+        console.error('[Jitsi] [ESTUDIANTE] ❌ Error cargando script:', err);
+        setIsLoading(false);
+      };
+
+      document.body.appendChild(script);
     }
-  };
+
+    return () => {
+      const s = document.getElementById('jitsi-script-student');
+      if (s) {
+        document.body.removeChild(s);
+        console.log('[Jitsi] [ESTUDIANTE] Script removido');
+      }
+    };
+  }, [meeting, classInfo]);
 
   const copyLink = () => {
     navigator.clipboard.writeText(meetingUrl);
@@ -249,9 +294,15 @@ export default function Reunion({ meeting = null, classInfo }) {
             <p className="text-lg font-semibold text-gray-700 mb-2">Cargando reunión...</p>
             <p className="text-sm text-gray-500">Esto puede tardar unos segundos</p>
           </div>
-        ) : (
-          <div ref={jitsiContainer} className="w-full" />
-        )}
+        ) : null}
+        <div
+          ref={containerRef}
+          className="w-full"
+          style={{
+            height: '600px',
+            display: isLoading ? 'none' : 'block'
+          }}
+        />
       </div>
 
       {/* Consejos */}

@@ -232,7 +232,7 @@ export default function Layout({ title, children }) {
         </div>
 
         {/* Notificaciones - fuera del contenedor principal, siempre activas */}
-        <UnifiedNotifications />
+        {user &&<UnifiedNotifications />}
       </div>
     </>
   );

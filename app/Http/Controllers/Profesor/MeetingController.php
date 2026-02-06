@@ -1,9 +1,10 @@
 <?php
-
 namespace App\Http\Controllers\Profesor;
 
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
+use App\Events\MeetingStarted;
+use App\Events\MeetingEnded;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,7 @@ class MeetingController extends Controller
             ->where('subject_id', $subjectId)
             ->where('group_id', $groupId)
             ->exists();
-
+        
         abort_unless($exists, 403);
     }
 
@@ -62,6 +63,9 @@ class MeetingController extends Controller
             'is_active' => true,
         ]);
 
+        // Disparar evento
+        event(new MeetingStarted($meeting));
+
         return Redirect::back()->with('success', 'Reunión creada exitosamente');
     }
 
@@ -73,6 +77,9 @@ class MeetingController extends Controller
             'is_active' => false,
             'ended_at' => now()
         ]);
+
+        // Disparar evento
+        event(new MeetingEnded($meeting->id, $meeting->group_id, $meeting->subject_id));
 
         return Redirect::back()->with('success', 'Reunión finalizada exitosamente');
     }

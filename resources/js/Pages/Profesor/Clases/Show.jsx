@@ -1,5 +1,4 @@
-// Show.jsx - Versión completamente responsive
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
 import Layout from '@/Components/Layout/Layout';
 import { MessageSquare, Folder, Video, BookOpen, GraduationCap, Users, Calendar, ClipboardList } from 'lucide-react';
@@ -10,13 +9,13 @@ import Tareas from './Tareas';
 
 export default function Show() {
   const { props } = usePage();
-  const { 
-    classInfo, 
-    studentsCount, 
-    publicaciones = [], 
-    folders = [], 
-    files = [], 
-    meeting = null,
+  const {
+    classInfo,
+    studentsCount,
+    publicaciones = [],
+    folders = [],
+    files = [],
+    meeting: initialMeeting = null,
     tasks = []
   } = props;
 
@@ -28,6 +27,47 @@ export default function Show() {
   ];
 
   const [active, setActive] = useState('publicaciones');
+  const [meeting, setMeeting] = useState(initialMeeting);
+
+  // Sincronizar con prop inicial
+  useEffect(() => {
+    console.log('[Profesor Show] Prop meeting inicial:', initialMeeting);
+    setMeeting(initialMeeting);
+  }, [initialMeeting]);
+
+  // ✅ ESCUCHA EN TIEMPO REAL PARA EL PROFESOR (para sincronizar entre pestañas/dispositivos)
+  useEffect(() => {
+    if (!window.Echo || !classInfo?.group_id) {
+      console.warn('[Profesor Show] Echo o group_id no disponible');
+      return;
+    }
+
+    const channelName = `group.${classInfo.group_id}`;
+    console.log('[Profesor Show] 🔌 Suscribiéndose al canal:', channelName);
+
+    const channel = window.Echo.channel(channelName);
+
+    // Escuchar cuando se inicia una reunión (por si se hace desde otro dispositivo)
+    channel.listen('.meeting.started', (event) => {
+      console.log('[Profesor Show] meeting.started recibido:', event);
+      if (event.meeting) {
+        setMeeting(event.meeting);
+      }
+    });
+
+    // Escuchar cuando se finaliza una reunión
+    channel.listen('.meeting.ended', (event) => {
+      console.log('[Profesor Show] meeting.ended recibido:', event);
+      setMeeting(null);
+    });
+
+    return () => {
+      console.log('[Profesor Show] 🔌 Desuscribiéndose del canal:', channelName);
+      channel.stopListening('.meeting.started');
+      channel.stopListening('.meeting.ended');
+      window.Echo.leave(channelName);
+    };
+  }, [classInfo?.group_id]);
 
   return (
     <Layout title={`${classInfo.subject_name} - ${classInfo.group_name}`}>
@@ -56,6 +96,12 @@ export default function Show() {
                     <div className="absolute -bottom-1 -right-1 sm:-bottom-2 sm:-right-2 w-6 h-6 sm:w-8 sm:h-8 bg-green-500 rounded-full border-3 sm:border-4 border-white flex items-center justify-center">
                       <span className="text-white text-[10px] sm:text-xs font-bold">✓</span>
                     </div>
+                    {/* Indicador de reunión activa */}
+                    {meeting && (
+                      <div className="absolute -top-1 -left-1 w-6 h-6 sm:w-8 sm:h-8 bg-red-500 rounded-full border-3 sm:border-4 border-white flex items-center justify-center animate-pulse">
+                        <Video className="h-3 w-3 sm:h-4 sm:w-4 text-white" />
+                      </div>
+                    )}
                   </div>
 
                   {/* Detalles de la clase */}
@@ -70,6 +116,12 @@ export default function Show() {
                         <Users className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                         {studentsCount} {studentsCount === 1 ? 'estudiante' : 'estudiantes'}
                       </span>
+                      {meeting && (
+                        <span className="inline-flex items-center gap-1 sm:gap-1.5 bg-red-500 backdrop-blur-sm px-2 sm:px-3 py-1 sm:py-1.5 rounded-full text-white text-[11px] xs:text-xs sm:text-sm font-semibold animate-pulse">
+                          <Video className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                          Reunión activa
+                        </span>
+                      )}
                     </div>
                     
                     {/* Título - Tamaño de fuente adaptativo */}
@@ -89,91 +141,98 @@ export default function Show() {
 
             {/* Tabs modernos - Ahora en el área blanca */}
             <div className="px-4 sm:px-6 md:px-8 lg:px-10 py-4 sm:py-6">
-                
-                {/* Versión móvil pequeña: Scroll horizontal con padding mejorado */}
-                <div className="sm:hidden">
-                  <div className="overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-                    <div className="flex gap-2 min-w-max">
-                      {tabs.map(tab => {
-                        const Icon = tab.icon;
-                        const isActive = active === tab.key;
-                        return (
-                          <button
-                            key={tab.key}
-                            onClick={() => setActive(tab.key)}
-                            className={`
-                              flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl 
-                              font-semibold transition-all duration-300 whitespace-nowrap text-sm
-                              ${isActive 
-                                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg scale-105' 
-                                : 'bg-gray-100 text-gray-600 hover:bg-gray-200 active:scale-95'
-                              }
-                            `}
-                          >
-                            <Icon className="h-4 w-4" />
-                            <span>{tab.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
+              
+              {/* Versión móvil pequeña: Scroll horizontal con padding mejorado */}
+              <div className="sm:hidden">
+                <div className="overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+                  <div className="flex gap-2 min-w-max">
+                    {tabs.map(tab => {
+                      const Icon = tab.icon;
+                      const isActive = active === tab.key;
+                      const hasActiveMeeting = tab.key === 'reunion' && meeting;
+                      
+                      return (
+                        <button
+                          key={tab.key}
+                          onClick={() => setActive(tab.key)}
+                          className={`
+                            relative flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 rounded-lg sm:rounded-xl 
+                            font-semibold transition-all duration-300 whitespace-nowrap text-sm
+                            ${isActive
+                              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg scale-105'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200 active:scale-95'
+                            }
+                          `}
+                        >
+                          <Icon className="h-4 w-4" />
+                          <span>{tab.label}</span>
+                          {hasActiveMeeting && (
+                            <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
+              </div>
 
-                {/* Versión tablet y desktop: Grid o Flex según espacio */}
-                <div className="hidden sm:grid sm:grid-cols-2 md:flex md:flex-row gap-2 md:gap-3">
-                  {tabs.map(tab => {
-                    const Icon = tab.icon;
-                    const isActive = active === tab.key;
-                    return (
-                      <button
-                        key={tab.key}
-                        onClick={() => setActive(tab.key)}
-                        className={`
-                          md:flex-1 flex items-center justify-center gap-2 px-4 md:px-6 py-3 md:py-3.5 
-                          rounded-xl font-semibold transition-all duration-300 relative overflow-hidden
-                          ${isActive 
-                            ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-xl scale-105' 
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:scale-102'
-                          }
-                        `}
-                      >
-                        {/* Efecto de brillo */}
-                        <div className={`absolute inset-0 bg-white transition-opacity duration-300 ${isActive ? 'opacity-10' : 'opacity-0'}`}></div>
-                        
-                        <Icon className="h-4 w-4 md:h-5 md:w-5 relative z-10 flex-shrink-0" />
-                        <span className="relative z-10 text-sm md:text-base">{tab.label}</span>
-                        
-                        {/* Indicador activo */}
-                        {isActive && (
-                          <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/50 rounded-full"></div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
+              {/* Versión tablet y desktop: Grid o Flex según espacio */}
+              <div className="hidden sm:grid sm:grid-cols-2 md:flex md:flex-row gap-2 md:gap-3">
+                {tabs.map(tab => {
+                  const Icon = tab.icon;
+                  const isActive = active === tab.key;
+                  const hasActiveMeeting = tab.key === 'reunion' && meeting;
+                  
+                  return (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActive(tab.key)}
+                      className={`
+                        relative md:flex-1 flex items-center justify-center gap-2 px-4 md:px-6 py-3 md:py-3.5 
+                        rounded-xl font-semibold transition-all duration-300 overflow-hidden
+                        ${isActive
+                          ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-xl scale-105'
+                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:scale-102'
+                        }
+                      `}
+                    >
+                      {/* Efecto de brillo */}
+                      <div className={`absolute inset-0 bg-white transition-opacity duration-300 ${isActive ? 'opacity-10' : 'opacity-0'}`}></div>
+                      
+                      <Icon className="h-4 w-4 md:h-5 md:w-5 relative z-10 flex-shrink-0" />
+                      <span className="relative z-10 text-sm md:text-base">{tab.label}</span>
+                      
+                      {/* Indicador de reunión activa */}
+                      {hasActiveMeeting && (
+                        <span className="absolute top-2 right-2 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse"></span>
+                      )}
+                      
+                      {/* Indicador activo */}
+                      {isActive && (
+                        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/50 rounded-full"></div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </div>
+          </div>
 
           {/* Contenido dinámico con animación */}
           <div className="animate-fadeIn">
             {active === 'publicaciones' && <Publicaciones publicaciones={publicaciones} classInfo={classInfo} />}
             {active === 'tareas' && <Tareas tasks={tasks} classInfo={classInfo} />}
             {active === 'archivos' && <Archivos folders={folders} files={files} classInfo={classInfo} />}
-            {active === 'reunion' && <Reunion meeting={meeting} classInfo={classInfo} studentsCount={studentsCount} />}
+            {active === 'reunion' && (
+              <Reunion
+                meeting={meeting}
+                classInfo={classInfo}
+                studentsCount={studentsCount}
+              />
+            )}
           </div>
         </div>
       </div>
-
-      {/* Estilos adicionales para scroll horizontal sin barra visible */}
-      <style jsx>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none;
-          scrollbar-width: none;
-        }
-      `}</style>
     </Layout>
   );
 }
