@@ -1049,7 +1049,7 @@ export default function Chat() {
                   ref={scrollRef}
                   className="flex-1 overflow-y-auto px-4 py-6"
                   style={{
-                    backgroundImage: 'url(/images/whatsapp-bg.png), linear-gradient(to bottom, #e5ddd5, #f0ede8)',
+                    backgroundImage: 'linear-gradient(to bottom, #c2bfbbff, #f0ede8)',
                     backgroundSize: 'contain, cover',
                     backgroundPosition: 'center, center'
                   }}

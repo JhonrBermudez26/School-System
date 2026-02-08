@@ -11,7 +11,6 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!score && !useIndividualGrading) {
       setError('La calificación es requerida');
       return;
@@ -34,7 +33,7 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
 
       if (useIndividualGrading && task.work_type !== 'individual') {
         const indScores = [];
-        
+
         // Creador
         indScores.push({
           student_id: submission.student.id,
@@ -59,8 +58,11 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
         }
       }
 
+      // ✅ CAMBIO: Usar PUT en lugar de POST para actualizaciones
+      const method = submission.status === 'graded' ? 'PUT' : 'POST';
+
       const response = await fetch(`/profesor/clases/tasks/submissions/${submission.id}/grade`, {
-        method: 'POST',
+        method: method,
         headers: {
           'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
           'Content-Type': 'application/json',
@@ -129,7 +131,7 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
       <div className="w-full max-w-4xl bg-white rounded-3xl shadow-2xl max-h-[92vh] overflow-hidden flex flex-col">
-        
+
         {/* Header */}
         <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-blue-50/50 to-blue-50/50">
           <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -137,7 +139,9 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
               <Star className="h-6 w-6 text-white" fill="white" />
             </div>
             <div className="min-w-0">
-              <h2 className="text-2xl font-bold text-gray-800 truncate">Calificar Entrega</h2>
+              <h2 className="text-2xl font-bold text-gray-800 truncate">
+                {submission.status === 'graded' ? 'Editar Calificación' : 'Calificar Entrega'}
+              </h2>
               <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
                 <span className="truncate">{submission.student?.name}</span>
                 {submission.is_creator && (
@@ -158,7 +162,7 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
 
         {/* Contenido */}
         <div className="flex-1 overflow-y-auto p-8 space-y-6 bg-gray-50/30">
-          
+
           {/* Info Cards - Más ligeras */}
           <div className="grid grid-cols-3 gap-4">
             <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-blue-100/50 shadow-sm">
@@ -228,7 +232,7 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
                 </div>
                 <label className="text-lg font-semibold text-gray-800">Calificación Grupal</label>
               </div>
-              
+
               <div className="flex items-center gap-8">
                 <div className="relative">
                   <input
@@ -238,42 +242,39 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
                     max={task.max_score}
                     value={score}
                     onChange={(e) => setScore(e.target.value)}
-                    className={`w-36 text-center text-5xl font-bold border-2 rounded-2xl p-4 transition-all outline-none ${
-                      error 
-                        ? 'border-rose-300 bg-rose-50 text-rose-600' 
-                        : score 
-                          ? `${getScoreBgColor(score)} ${getScoreColor(score)} focus:ring-2 focus:ring-offset-2 ${
-                              getScorePercentage(score) >= 90 ? 'focus:ring-emerald-200' :
-                              getScorePercentage(score) >= 80 ? 'focus:ring-blue-200' :
-                              getScorePercentage(score) >= 60 ? 'focus:ring-amber-200' :
+                    className={`w-36 text-center text-5xl font-bold border-2 rounded-2xl p-4 transition-all outline-none ${error
+                      ? 'border-rose-300 bg-rose-50 text-rose-600'
+                      : score
+                        ? `${getScoreBgColor(score)} ${getScoreColor(score)} focus:ring-2 focus:ring-offset-2 ${getScorePercentage(score) >= 90 ? 'focus:ring-emerald-200' :
+                          getScorePercentage(score) >= 80 ? 'focus:ring-blue-200' :
+                            getScorePercentage(score) >= 60 ? 'focus:ring-amber-200' :
                               'focus:ring-rose-200'
-                            }`
-                          : 'border-gray-200 bg-gray-50 text-gray-300 focus:border-blue-300 focus:ring-2 focus:ring-blue-100'
-                    }`}
+                        }`
+                        : 'border-gray-200 bg-gray-50 text-gray-300 focus:border-blue-300 focus:ring-2 focus:ring-blue-100'
+                      }`}
                     placeholder="0.0"
                   />
                   {score && (
-                    <div className={`absolute -top-3 -right-3 w-12 h-12 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg ${
-                      getScorePercentage(score) >= 90 ? 'bg-gradient-to-br from-emerald-400 to-emerald-500' :
+                    <div className={`absolute -top-3 -right-3 w-12 h-12 rounded-full flex items-center justify-center text-white text-sm font-bold shadow-lg ${getScorePercentage(score) >= 90 ? 'bg-gradient-to-br from-emerald-400 to-emerald-500' :
                       getScorePercentage(score) >= 80 ? 'bg-gradient-to-br from-blue-400 to-blue-500' :
-                      getScorePercentage(score) >= 60 ? 'bg-gradient-to-br from-amber-400 to-amber-500' :
-                      'bg-gradient-to-br from-rose-400 to-rose-500'
-                    }`}>
+                        getScorePercentage(score) >= 60 ? 'bg-gradient-to-br from-amber-400 to-amber-500' :
+                          'bg-gradient-to-br from-rose-400 to-rose-500'
+                      }`}>
                       {getScorePercentage(score)}%
                     </div>
                   )}
                 </div>
-                
+
                 <div className="flex-1">
                   <div className="flex items-baseline gap-2 mb-3">
                     <span className="text-3xl font-light text-gray-300">/</span>
                     <span className="text-3xl font-semibold text-gray-600">{task.max_score}</span>
                     <span className="text-sm text-gray-400 font-medium">puntos</span>
                   </div>
-                  
+
                   {score && (
                     <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                      <div 
+                      <div
                         className={`h-full rounded-full transition-all duration-700 ${getProgressBarColor(score)}`}
                         style={{ width: `${getScorePercentage(score)}%` }}
                       ></div>
@@ -281,7 +282,7 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
                   )}
                 </div>
               </div>
-              
+
               {error && (
                 <div className="mt-5 flex items-start gap-3 p-4 bg-rose-50 border border-rose-200 rounded-xl">
                   <AlertCircle className="h-5 w-5 text-rose-500 flex-shrink-0 mt-0.5" />
@@ -318,7 +319,7 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
                       <p className="text-xs text-blue-600 font-medium">Creador del grupo</p>
                     </div>
                   </div>
-                  
+
                   {useIndividualGrading && (
                     <div className="flex items-center gap-2">
                       <input
@@ -328,11 +329,10 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
                         max={task.max_score}
                         value={individualScores[submission.student.id]?.score || score}
                         onChange={(e) => handleIndividualChange(submission.student.id, 'score', e.target.value)}
-                        className={`w-20 text-center text-lg font-semibold border-2 rounded-lg p-2 transition-all outline-none ${
-                          individualScores[submission.student.id]?.score 
-                            ? `${getScoreBgColor(individualScores[submission.student.id]?.score)} ${getScoreColor(individualScores[submission.student.id]?.score)}`
-                            : 'border-gray-200 bg-gray-50 text-gray-400'
-                        } focus:ring-2 focus:ring-blue-200`}
+                        className={`w-20 text-center text-lg font-semibold border-2 rounded-lg p-2 transition-all outline-none ${individualScores[submission.student.id]?.score
+                          ? `${getScoreBgColor(individualScores[submission.student.id]?.score)} ${getScoreColor(individualScores[submission.student.id]?.score)}`
+                          : 'border-gray-200 bg-gray-50 text-gray-400'
+                          } focus:ring-2 focus:ring-blue-200`}
                         placeholder="0.0"
                       />
                       <span className="text-sm font-medium text-gray-400">/ {task.max_score}</span>
@@ -343,8 +343,8 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
 
               {/* Miembros */}
               {submission.members?.map((member, index) => (
-                <div 
-                  key={member.student_id} 
+                <div
+                  key={member.student_id}
                   className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:border-gray-200 transition-all"
                 >
                   <div className="flex justify-between items-center gap-4">
@@ -357,7 +357,7 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
                         <p className="text-xs text-gray-500">Integrante</p>
                       </div>
                     </div>
-                    
+
                     {useIndividualGrading && (
                       <div className="flex items-center gap-2">
                         <input
@@ -367,11 +367,10 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
                           max={task.max_score}
                           value={individualScores[member.student_id]?.score || ''}
                           onChange={(e) => handleIndividualChange(member.student_id, 'score', e.target.value)}
-                          className={`w-20 text-center text-lg font-semibold border-2 rounded-lg p-2 transition-all outline-none ${
-                            individualScores[member.student_id]?.score 
-                              ? `${getScoreBgColor(individualScores[member.student_id]?.score)} ${getScoreColor(individualScores[member.student_id]?.score)}`
-                              : 'border-gray-200 bg-gray-50 text-gray-400'
-                          } focus:ring-2 focus:ring-blue-200`}
+                          className={`w-20 text-center text-lg font-semibold border-2 rounded-lg p-2 transition-all outline-none ${individualScores[member.student_id]?.score
+                            ? `${getScoreBgColor(individualScores[member.student_id]?.score)} ${getScoreColor(individualScores[member.student_id]?.score)}`
+                            : 'border-gray-200 bg-gray-50 text-gray-400'
+                            } focus:ring-2 focus:ring-blue-200`}
                           placeholder="0.0"
                         />
                         <span className="text-sm font-medium text-gray-400">/ {task.max_score}</span>
@@ -411,7 +410,7 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
             <CheckCircle className="h-4 w-4" />
             <span>Notificación automática a estudiantes</span>
           </p>
-          
+
           <div className="flex gap-3">
             <button
               onClick={onClose}
@@ -420,7 +419,7 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
             >
               Cancelar
             </button>
-            
+
             <button
               onClick={handleSubmit}
               disabled={loading}
@@ -434,7 +433,8 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  <span>Guardar Calificación</span>
+                  {/* ✅ Texto dinámico según si ya está calificado */}
+                  <span>{submission.status === 'graded' ? 'Actualizar Calificación' : 'Guardar Calificación'}</span>
                 </>
               )}
             </button>

@@ -251,6 +251,10 @@
         // Calificar una entrega
         Route::post('/tasks/submissions/{submission}/grade', [TaskController::class, 'gradeSubmission'])
             ->name('tasks.gradeSubmission');
+
+            //actualizar entrega
+        Route::put('/tasks/submissions/{submission}/grade', [TaskController::class, 'gradeSubmission'])
+        ->name('tasks.updateGrade');
     });
             
             //HORARIO

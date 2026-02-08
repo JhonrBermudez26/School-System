@@ -10,6 +10,9 @@ import {
   AlertCircle,
   Star,
   Award,
+  Edit,
+  Eye,
+  CheckCircle
 } from 'lucide-react';
 import GradeSubmissionModal from './GradeSubmissionModal';
 
@@ -123,7 +126,7 @@ export default function TaskDetail({ task: initialTask, onClose, onUpdate }) {
           <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-6 sm:px-8 py-6 flex items-center justify-between relative overflow-hidden">
             <div className="absolute inset-0 bg-white/10 transform -skew-y-3 origin-top-right"></div>
             <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32"></div>
-            
+
             <div className="relative flex items-center gap-4">
               <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
                 <FileText className="h-8 w-8 text-white" strokeWidth={2} />
@@ -135,7 +138,7 @@ export default function TaskDetail({ task: initialTask, onClose, onUpdate }) {
                 <p className="text-blue-100 text-sm mt-1">Detalles de la tarea</p>
               </div>
             </div>
-            
+
             <button
               onClick={onClose}
               className="relative p-3 text-white/80 hover:text-white hover:bg-white/10 rounded-xl transition-all"
@@ -423,33 +426,59 @@ export default function TaskDetail({ task: initialTask, onClose, onUpdate }) {
 
                 {/* Calificación */}
                 {submission.status === 'graded' && (
-                  <div className="p-4 bg-green-50 rounded-xl border border-green-200">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="font-bold text-green-800">
-                        {task.work_type === 'individual' ? 'Calificación' : 'Calificación grupal'}
-                      </span>
-                      <span className="text-2xl font-bold text-green-700">
-                        {submission.score} / {task.max_score}
-                      </span>
+                  <div className="p-5 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border-2 border-green-200">
+                    <div className="flex justify-between items-start gap-4 mb-3">
+                      <div className="flex-1">
+                        <span className="font-bold text-green-800 text-sm block mb-2">
+                          {task.work_type === 'individual' ? 'Calificación' : 'Calificación grupal'}
+                        </span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-4xl font-bold text-green-700">
+                            {submission.score}
+                          </span>
+                          <span className="text-lg text-green-600 font-semibold">
+                            / {task.max_score}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* ✅ BOTÓN PARA EDITAR CALIFICACIÓN */}
+                      <button
+                        onClick={() => {
+                          setGradingSubmission(submission);
+                          setShowGradeModal(true);
+                        }}
+                        className="group flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-blue-50 border-2 border-blue-200 hover:border-blue-400 rounded-xl transition-all shadow-sm hover:shadow-md"
+                        title="Editar calificación"
+                      >
+                        <Edit className="h-4 w-4 text-blue-600 group-hover:text-blue-700" />
+                        <span className="text-sm font-semibold text-blue-600 group-hover:text-blue-700">
+                          Editar
+                        </span>
+                      </button>
                     </div>
+
                     {submission.teacher_feedback && (
-                      <p className="text-sm text-green-800 mt-2">
-                        <strong>Retroalimentación:</strong> {submission.teacher_feedback}
-                      </p>
+                      <div className="p-3 bg-white/50 rounded-lg border border-green-200 mt-3">
+                        <p className="text-xs font-semibold text-green-800 mb-1">Retroalimentación:</p>
+                        <p className="text-sm text-green-900 leading-relaxed">
+                          {submission.teacher_feedback}
+                        </p>
+                      </div>
                     )}
                   </div>
                 )}
 
                 {/* ✅ Botón CALIFICAR - Solo aparece UNA VEZ por grupo */}
-                {submission.status === 'submitted' && submission.is_creator && (
+                {submission.status === 'submitted' && (
                   <button
                     onClick={() => {
                       setGradingSubmission(submission);
                       setShowGradeModal(true);
                     }}
-                    className="mt-4 w-full py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-2 shadow-md"
+                    className="mt-4 w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold hover:from-blue-700 hover:to-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg hover:shadow-xl hover:scale-[1.02] transform"
                   >
-                    <Star className="h-5 w-5" />
+                    <Star className="h-5 w-5" fill="currentColor" />
                     Calificar entrega
                   </button>
                 )}

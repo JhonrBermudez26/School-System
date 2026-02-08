@@ -433,112 +433,119 @@ class TaskController extends Controller
     /**
      * Calificar una entrega
      */
-    public function gradeSubmission(Request $request, $submissionId)
-    {
-        $validated = $request->validate([
-            'score'            => 'required|numeric|min:0',
-            'teacher_feedback' => 'nullable|string|max:2000',
-            'individual_scores' => 'nullable|array',
-            'individual_scores.*.student_id' => 'required|exists:users,id',
-            'individual_scores.*.score'      => 'required|numeric|min:0',
-            'individual_scores.*.feedback'   => 'nullable|string|max:1000',
-        ]);
+    /**
+ * Calificar o actualizar una entrega
+ */
+public function gradeSubmission(Request $request, $submissionId)
+{
+    $validated = $request->validate([
+        'score'            => 'required|numeric|min:0',
+        'teacher_feedback' => 'nullable|string|max:2000',
+        'individual_scores' => 'nullable|array',
+        'individual_scores.*.student_id' => 'required|exists:users,id',
+        'individual_scores.*.score'      => 'required|numeric|min:0',
+        'individual_scores.*.feedback'   => 'nullable|string|max:1000',
+    ]);
 
-        $submission = TaskSubmission::with(['task', 'student', 'members.student'])->findOrFail($submissionId);
-        $task = $submission->task;
+    $submission = TaskSubmission::with(['task', 'student', 'members.student'])->findOrFail($submissionId);
+    $task = $submission->task;
 
-        $this->assertOwnership($task->subject_id, $task->group_id);
+    $this->assertOwnership($task->subject_id, $task->group_id);
 
-        if ($task->teacher_id !== auth()->id()) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
+    if ($task->teacher_id !== auth()->id()) {
+        return response()->json(['message' => 'No autorizado'], 403);
+    }
 
-        if ($submission->status === 'pending') {
-            return response()->json(['message' => 'No puedes calificar una entrega que no ha sido enviada'], 422);
-        }
+    // ✅ PERMITIR EDICIÓN: Remover restricción de status pending
+    // Ya no validamos: if ($submission->status === 'pending')
 
-        if ($validated['score'] > $task->max_score) {
-            return response()->json([
-                'message' => "La calificación no puede exceder {$task->max_score} puntos"
-            ], 422);
-        }
+    if ($validated['score'] > $task->max_score) {
+        return response()->json([
+            'message' => "La calificación no puede exceder {$task->max_score} puntos"
+        ], 422);
+    }
 
-        DB::beginTransaction();
+    DB::beginTransaction();
+    try {
+        $useIndividual = !empty($validated['individual_scores']) && $task->work_type !== 'individual';
 
-        try {
-            $useIndividual = !empty($validated['individual_scores']) && $task->work_type !== 'individual';
+        if ($useIndividual) {
+            // Modo individual (calificaciones diferenciadas)
+            $scoresSum = 0;
+            $count = 0;
 
-            if ($useIndividual) {
-                // Modo individual (calificaciones diferenciadas)
-                $scoresSum = 0;
-                $count = 0;
+            foreach ($validated['individual_scores'] as $ind) {
+                $studentSub = TaskSubmission::where('task_id', $task->id)
+                    ->where('student_id', $ind['student_id'])
+                    ->first();
 
-                foreach ($validated['individual_scores'] as $ind) {
-                    $studentSub = TaskSubmission::where('task_id', $task->id)
-                        ->where('student_id', $ind['student_id'])
-                        ->first();
+                if ($studentSub) {
+                    $studentSub->score = $ind['score'];
+                    $studentSub->teacher_feedback = $ind['feedback'] ?? $validated['teacher_feedback'] ?? null;
+                    $studentSub->status = 'graded';
+                    $studentSub->graded_at = now();
+                    $studentSub->save();
 
-                    if ($studentSub) {
-                        $studentSub->score = $ind['score'];
-                        $studentSub->teacher_feedback = $ind['feedback'] ?? $validated['teacher_feedback'] ?? null;
-                        $studentSub->status = 'graded';
-                        $studentSub->graded_at = now();
-                        $studentSub->save();
-
-                        $scoresSum += (float) $ind['score'];
-                        $count++;
-                    }
-                }
-
-                if ($count > 0) {
-                    $submission->score = round($scoresSum / $count, 2);
-                } else {
-                    $submission->score = $validated['score'];
-                }
-            } else {
-                // Modo grupal (misma nota para todos)
-                $submission->score = $validated['score'];
-                $submission->teacher_feedback = $validated['teacher_feedback'] ?? null;
-
-                // Propagar a todos los miembros
-                foreach ($submission->members as $member) {
-                    $memberSub = TaskSubmission::firstOrCreate(
-                        ['task_id' => $task->id, 'student_id' => $member->student_id],
-                        ['status' => 'pending', 'is_late' => false]
-                    );
-
-                    $memberSub->update([
-                        'score'            => $validated['score'],
-                        'teacher_feedback' => $validated['teacher_feedback'] ?? null,
-                        'status'           => 'graded',
-                        'graded_at'        => now(),
-                        'submitted_at'     => $submission->submitted_at,
-                        'is_late'          => $submission->is_late,
-                        'comment'          => $task->work_type === 'pairs'
-                            ? "Trabajo en pareja con {$submission->student->name}"
-                            : "Trabajo en grupo con {$submission->student->name}",
-                    ]);
+                    $scoresSum += (float) $ind['score'];
+                    $count++;
                 }
             }
 
-            $submission->status = 'graded';
-            $submission->graded_at = now();
-            $submission->save();
+            if ($count > 0) {
+                $submission->score = round($scoresSum / $count, 2);
+            } else {
+                $submission->score = $validated['score'];
+            }
+        } else {
+            // Modo grupal (misma nota para todos)
+            $submission->score = $validated['score'];
+            $submission->teacher_feedback = $validated['teacher_feedback'] ?? null;
 
-            DB::commit();
+            // Propagar a todos los miembros
+            foreach ($submission->members as $member) {
+                $memberSub = TaskSubmission::firstOrCreate(
+                    ['task_id' => $task->id, 'student_id' => $member->student_id],
+                    ['status' => 'pending', 'is_late' => false]
+                );
 
-            broadcast(new SubmissionGraded($submission))->toOthers();
-
-            return response()->json([
-                'message'    => 'Entrega calificada exitosamente',
-                'submission' => $submission->fresh(['student', 'members.student']),
-            ]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            \Log::error('Error calificando entrega', ['error' => $e->getMessage()]);
-            return response()->json(['message' => 'Error al calificar la entrega'], 500);
+                $memberSub->update([
+                    'score'            => $validated['score'],
+                    'teacher_feedback' => $validated['teacher_feedback'] ?? null,
+                    'status'           => 'graded',
+                    'graded_at'        => now(),
+                    'submitted_at'     => $submission->submitted_at,
+                    'is_late'          => $submission->is_late,
+                    'comment'          => $task->work_type === 'pairs'
+                        ? "Trabajo en pareja con {$submission->student->name}"
+                        : "Trabajo en grupo con {$submission->student->name}",
+                ]);
+            }
         }
+
+        $submission->status = 'graded';
+        $submission->graded_at = now();
+        $submission->save();
+
+        DB::commit();
+
+        broadcast(new SubmissionGraded($submission))->toOthers();
+
+        // ✅ MENSAJE DINÁMICO
+        $message = $request->isMethod('put') 
+            ? 'Calificación actualizada exitosamente' 
+            : 'Entrega calificada exitosamente';
+
+        return response()->json([
+            'message'    => $message,
+            'submission' => $submission->fresh(['student', 'members.student']),
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        \Log::error('Error calificando entrega', ['error' => $e->getMessage()]);
+        return response()->json(['message' => 'Error al procesar la calificación'], 500);
     }
+}
 
     /**
      * Eliminar un archivo adjunto de la tarea
