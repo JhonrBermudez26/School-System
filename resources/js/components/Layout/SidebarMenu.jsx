@@ -13,7 +13,7 @@ import {
   ChartPie,
   Book,
   MessageSquare,
-  
+
 } from "lucide-react";
 
 export default function SidebarMenu({ role }) {
@@ -56,8 +56,10 @@ export default function SidebarMenu({ role }) {
     ],
     estudiante: [
       { icon: GraduationCap, label: "Inicio", path: "/estudiante/dashboard" },
+      { icon: MessageSquare, label: "Chat", path: "/estudiante/chat" },
       { icon: BookOpen, label: "Mis clases", path: "/estudiante/clases" },
       { icon: FileText, label: "Calificaciones", path: "/estudiante/notas" },
+
     ],
   };
 

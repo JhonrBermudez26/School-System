@@ -31,6 +31,7 @@
     use App\Http\Controllers\Estudiante\EstudianteClasesController;
     use App\Http\Controllers\Estudiante\Estudiantepostcontroller;
     use App\Http\Controllers\Estudiante\Estudiantetaskcontroller;
+    use App\Http\Controllers\Estudiante\EstudianteChatController;
 
     Route::get('/sanctum/csrf-cookie', function () {
         return response()->noContent();
@@ -275,6 +276,11 @@
                 Route::delete('/manual/{id}', [RegistrarNotasController::class, 'deleteManualGrade'])->name('manual.delete');
             });
         });
+
+
+
+
+
 //ESTUDIANTE
         Route::middleware('role:estudiante')->prefix('estudiante')->group(function () {
             Route::get('/dashboard', [EstudianteDashboardController::class, 'index'])->name('estudiante.dashboard');
@@ -317,6 +323,47 @@
         Route::delete('/submissions/{submission}', [EstudianteTaskController::class, 'deleteSubmission'])
             ->name('submissions.delete');
     });
+
+
+    // CHAT
+    Route::get('/chat', [EstudianteChatController::class, 'index'])
+        ->name('estudiante.chat');
+        
+    Route::get('/chat/conversations/json', [EstudianteChatController::class, 'conversationsJson'])
+        ->name('estudiante.chat.conversations.json');
+    
+    Route::get('/chat/search', [EstudianteChatController::class, 'searchUsers'])
+        ->name('estudiante.chat.search');
+    
+    Route::post('/chat/create', [EstudianteChatController::class, 'createConversation'])
+        ->name('estudiante.chat.create');
+    
+    Route::get('/chat/{id}', [EstudianteChatController::class, 'getConversation'])
+        ->name('estudiante.chat.show');
+    
+    Route::post('/chat/{id}/message', [EstudianteChatController::class, 'sendMessage'])
+        ->name('estudiante.chat.message');
+    
+    Route::post('/chat/{id}/read', [EstudianteChatController::class, 'markAsRead'])
+        ->name('estudiante.chat.read');
+    
+    Route::delete('/chat/message/{id}', [EstudianteChatController::class, 'deleteMessage'])
+        ->name('estudiante.chat.delete-message');
+    
+    Route::post('/chat/{id}/leave', [EstudianteChatController::class, 'leaveGroup'])
+        ->name('estudiante.chat.leave');
+    
+    Route::post('/chat/{id}/add-participant', [EstudianteChatController::class, 'addParticipant'])
+        ->name('estudiante.chat.addParticipant');
+    
+    Route::put('/chat/{id}/update-group', [EstudianteChatController::class, 'updateGroup'])
+        ->name('estudiante.chat.update-group');
+        
+    Route::put('/chat/message/{id}/edit', [EstudianteChatController::class, 'editMessage'])
+        ->name('estudiante.chat.edit-message');
+        
+    Route::delete('/chat/conversation/{id}', [EstudianteChatController::class, 'deleteConversation'])
+        ->name('estudiante.chat.delete-conversation');
         });
 
         //GET EDITAR
