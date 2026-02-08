@@ -26,7 +26,7 @@ class TaskSubmission extends Model
         'is_late' => 'boolean',
         'submitted_at' => 'datetime',
         'graded_at' => 'datetime',
-        'score' => 'decimal:2',
+        'score' => 'decimal:1',
     ];
 
     protected $appends = ['is_creator'];

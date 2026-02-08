@@ -43,6 +43,7 @@ class TaskCreated implements ShouldBroadcast
             'due_date' => $this->task->due_date,
             'max_score' => $this->task->max_score,
             'work_type' => $this->task->work_type,
+            'teacher_id' => $this->task->teacher_id,
             'teacher_name' => $this->task->teacher->name ?? 'Profesor',
             'subject_name' => $this->task->subject->name ?? 'Asignatura',
             'message' => 'Nueva tarea creada: ' . $this->task->title,

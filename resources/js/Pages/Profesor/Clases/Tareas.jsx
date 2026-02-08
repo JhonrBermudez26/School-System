@@ -58,17 +58,14 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
         channel
           .listen('.task.created', (data) => {
             console.log("✅ Nueva tarea recibida por Echo:", data);
-            showNotification(`📚 Tarea creada: ${data.title}`, 'success');
             loadTasks();
           })
           .listen('.task.updated', (data) => {
             console.log("🔄 Tarea actualizada:", data);
-            showNotification(`📝 Tarea actualizada: ${data.title}`, 'info');
             loadTasks();
           })
           .listen('.task.deleted', (data) => {
             console.log("🗑️ Tarea eliminada:", data);
-            showNotification(`🗑️ ${data.message}`, 'warning');
             loadTasks();
           })
           .listen('.submission.created', (data) => {
@@ -100,7 +97,6 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
     setShowForm(false);
     setEditingTask(null);
     loadTasks();
-    showNotification('✅ Tarea guardada exitosamente', 'success');
   };
 
   const handleDeleteTask = async (taskId) => {
@@ -112,7 +108,6 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
       const response = await deleteWithCsrf(`/profesor/clases/tasks/${taskId}`);
 
       if (response.ok) {
-        showNotification('🗑️ Tarea eliminada exitosamente', 'success');
         loadTasks();
       } else {
         const data = await response.json();
@@ -172,31 +167,11 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
   };
 
   // ===== COMPONENTE DE NOTIFICACIÓN =====
-  const NotificationBanner = () => {
-    if (!notification) return null;
 
-    const bgColors = {
-      success: 'bg-green-500',
-      info: 'bg-blue-500',
-      warning: 'bg-orange-500',
-      error: 'bg-red-500'
-    };
-
-    return (
-      <div className={`fixed top-4 right-4 z-50 ${bgColors[notification.type]} text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 animate-slide-in`}>
-        <Bell className="h-5 w-5" />
-        <span className="font-semibold">{notification.message}</span>
-        <button onClick={() => setNotification(null)} className="ml-4 hover:bg-white/20 rounded-lg p-1">
-          <X className="h-4 w-4" />
-        </button>
-      </div>
-    );
-  };
 
   if (showForm) {
     return (
       <>
-        <NotificationBanner />
         <TaskForm
           classInfo={classInfo}
           onClose={() => {
@@ -213,7 +188,6 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
   if (showDetail && selectedTask) {
     return (
       <>
-        <NotificationBanner />
         <TaskDetail
           task={selectedTask}
           onClose={() => {
@@ -228,7 +202,6 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
 
   return (
     <>
-      <NotificationBanner />
       <div className="space-y-6">
         {/* Header */}
         <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8 border border-gray-100">

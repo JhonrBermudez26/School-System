@@ -39,6 +39,7 @@ class TaskUpdated implements ShouldBroadcast
             'title' => $this->task->title,
             'group_id' => $this->groupId,
             'subject_id' => $this->task->subject_id,
+            'teacher_id' => $this->task->teacher_id,
             'teacher_name' => $this->task->teacher->name ?? 'Profesor',
             'subject_name' => $this->task->subject->name ?? 'Asignatura',
             'message' => 'Tarea actualizada: ' . $this->task->title,

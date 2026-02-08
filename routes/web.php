@@ -32,7 +32,9 @@
     use App\Http\Controllers\Estudiante\Estudiantepostcontroller;
     use App\Http\Controllers\Estudiante\Estudiantetaskcontroller;
 
-
+    Route::get('/sanctum/csrf-cookie', function () {
+        return response()->noContent();
+    });
 
     // Página principal (pública)
     Route::get('/', function () {

@@ -1,7 +1,6 @@
 import { Head, router, usePage } from "@inertiajs/react";
 import { useState } from "react";
 import {
-  Users,
   LogOut,
   GraduationCap,
   ChevronDown,
@@ -10,13 +9,13 @@ import {
   X as CloseIcon,
 } from "lucide-react";
 import SidebarMenu from "./SidebarMenu";
-import UnifiedNotifications from './UnifiedNotifications';
+import { NotificationProvider } from '../Notificationprovider';
+import UnifiedNotifications from '../UnifiedNotifications';
 
 export default function Layout({ title, children }) {
   const { auth, app } = usePage().props;
   const currentUrl = usePage().url;
   const user = auth?.user;
-
   const [previewImage, setPreviewImage] = useState(user?.photo ? `/storage/${user.photo}` : null);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -27,16 +26,14 @@ export default function Layout({ title, children }) {
   const handleLogout = () => router.post("/logout");
   const handleEditProfile = () => router.visit("/perfil/editar");
 
-  // BUG CORREGIDO: faltaba paréntesis, se usaba template literal en lugar de string normal
   const navigateToDashboard = () => {
     const rol = user?.roles?.[0]?.toLowerCase();
     router.visit(`/${rol}/dashboard`);
   };
 
   return (
-    <>
+    <NotificationProvider user={user}>
       <Head title={title ? `${title} | ${appName}` : appFullName} />
-
       <div className="min-h-screen bg-gray-100 flex flex-col">
         {/* Navbar */}
         <nav className="bg-white shadow-md fixed w-full top-0 z-50">
@@ -184,7 +181,6 @@ export default function Layout({ title, children }) {
                     </p>
                   </div>
                 </div>
-
                 <div className="space-y-2">
                   <button
                     onClick={() => {
@@ -231,9 +227,9 @@ export default function Layout({ title, children }) {
           </main>
         </div>
 
-        {/* Notificaciones - fuera del contenedor principal, siempre activas */}
-        {user &&<UnifiedNotifications />}
+        {/* ✅ Notificaciones globales montadas aquí */}
+        {user && <UnifiedNotifications />}
       </div>
-    </>
+    </NotificationProvider>
   );
 }

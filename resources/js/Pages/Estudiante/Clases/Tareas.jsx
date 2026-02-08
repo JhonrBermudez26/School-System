@@ -380,28 +380,6 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
     document.body.removeChild(link);
   };
 
-  // ===== COMPONENTE DE NOTIFICACIÓN =====
-  const NotificationBanner = () => {
-    if (!notification) return null;
-    
-    const bgColors = {
-      success: 'bg-green-500',
-      info: 'bg-blue-500',
-      warning: 'bg-orange-500',
-      error: 'bg-red-500'
-    };
-
-    return (
-      <div className={`fixed top-4 right-4 left-4 sm:left-auto z-50 ${bgColors[notification.type]} text-white px-4 sm:px-6 py-3 sm:py-4 rounded-xl sm:rounded-2xl shadow-2xl flex items-center gap-3 animate-slide-in max-w-md sm:max-w-none mx-auto sm:mx-0`}>
-        <Bell className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
-        <span className="font-semibold text-sm sm:text-base flex-1 min-w-0 truncate">{notification.message}</span>
-        <button onClick={() => setNotification(null)} className="hover:bg-white/20 rounded-lg p-1 flex-shrink-0">
-          <X className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-        </button>
-      </div>
-    );
-  };
-
   // ===== COMPONENTE SELECTOR DE MIEMBROS =====
   const MemberSelector = () => (
     <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl sm:rounded-2xl p-4 sm:p-6 border-2 border-purple-200">
@@ -463,7 +441,6 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
   if (tasks.length === 0) {
     return (
       <>
-        <NotificationBanner />
         <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-8 sm:p-12 lg:p-16 text-center border border-gray-100">
           <div className="w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 bg-gradient-to-br from-blue-100 to-indigo-200 rounded-full flex items-center justify-center mx-auto mb-4 sm:mb-6">
             <ClipboardList className="h-8 w-8 sm:h-10 sm:w-10 lg:h-12 lg:w-12 text-blue-600" strokeWidth={1.5} />
@@ -489,7 +466,6 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
 
     return (
       <>
-        <NotificationBanner />
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4">
           <div className="w-full max-w-4xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-h-[98vh] sm:max-h-[92vh] overflow-hidden flex flex-col border border-gray-200">
             {/* Header */}
@@ -744,7 +720,6 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
   if (showSubmit && selectedTask) {
     return (
       <>
-        <NotificationBanner />
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-2 sm:p-4">
           <div className="w-full max-w-3xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl max-h-[98vh] sm:max-h-[92vh] overflow-hidden flex flex-col border border-gray-200">
             <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 border-b bg-gradient-to-r from-blue-50 to-indigo-50 flex items-center justify-between">
@@ -918,7 +893,6 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
   // ===== RENDER: LISTA PRINCIPAL =====
   return (
     <>
-      <NotificationBanner />
       <div className="space-y-4 sm:space-y-5">
         {/* Header */}
         <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xl p-4 sm:p-6 lg:p-8 border border-gray-100">
