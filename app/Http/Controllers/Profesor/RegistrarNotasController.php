@@ -143,7 +143,7 @@ class RegistrarNotasController extends Controller
                 ];
 
                 $totalScore = 0;
-                $totalMaxScore = 0;
+                $gradeCount = 0;
 
                 // Calificaciones de tareas
                 foreach ($tasks as $task) {
@@ -156,7 +156,7 @@ class RegistrarNotasController extends Controller
                         // ✅ Convertir a float
                         $score = (float) $submission->score;
                         $totalScore += $score;
-                        $totalMaxScore += $task['max_score'];
+                        $gradeCount++;
                     }
 
                     $studentGrades['grades']['task_' . $task['id']] = [
@@ -179,7 +179,7 @@ class RegistrarNotasController extends Controller
 
                     if ($score !== null) {
                         $totalScore += $score;
-                        $totalMaxScore += $manualGrade['max_score'];
+                        $gradeCount++;
                     }
 
                     $studentGrades['grades']['manual_' . $manualGrade['id']] = [
@@ -190,9 +190,9 @@ class RegistrarNotasController extends Controller
                 }
 
                 // Calcular promedio
-                if ($totalMaxScore > 0) {
+                if ($gradeCount > 0) {
                     // Promedio ponderado normalizado a escala 0-5
-                    $studentGrades['average'] = round(($totalScore / $totalMaxScore) * 5, 2);
+                    $studentGrades['average'] = round(($totalScore / $gradeCount), 2);
                 }
 
                 $gradeMatrix[] = $studentGrades;
