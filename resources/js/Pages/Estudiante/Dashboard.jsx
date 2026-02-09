@@ -82,7 +82,7 @@ export default function Dashboard() {
                         Bienvenido, {studentInfo.name || 'Estudiante'}
                     </h1>
                     <p className="text-gray-600 mt-2">
-                        {studentInfo.grade || 'Sin grupo asignado'} - Periodo {studentInfo.period || 'N/A'}
+                        {studentInfo.grade || 'Sin grupo asignado'} - {studentInfo.period || 'N/A'}
                     </p>
                 </div>
 

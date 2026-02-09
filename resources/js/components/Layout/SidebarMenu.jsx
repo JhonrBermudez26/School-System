@@ -58,8 +58,9 @@ export default function SidebarMenu({ role }) {
       { icon: GraduationCap, label: "Inicio", path: "/estudiante/dashboard" },
       { icon: MessageSquare, label: "Chat", path: "/estudiante/chat" },
       { icon: BookOpen, label: "Mis clases", path: "/estudiante/clases" },
-      { icon: FileText, label: "Calificaciones", path: "/estudiante/notas" },
-
+      { icon: Calendar, label: "Horario", path: "/estudiante/horario" },
+      { icon: ClipboardList, label: "Mis notas", path: "/estudiante/notas" },
+      { icon: UserCheck, label: "Mis asistencias", path: "/estudiante/asistencias" },
     ],
   };
 

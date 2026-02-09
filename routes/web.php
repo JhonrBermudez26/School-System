@@ -32,6 +32,12 @@
     use App\Http\Controllers\Estudiante\Estudiantepostcontroller;
     use App\Http\Controllers\Estudiante\Estudiantetaskcontroller;
     use App\Http\Controllers\Estudiante\EstudianteChatController;
+    use App\Http\Controllers\Estudiante\ScheduleEstudentController;
+    use App\Http\Controllers\Estudiante\AsistenciasEstudentController;
+    use App\Http\Controllers\Estudiante\MisNotasController;
+
+
+
 
     Route::get('/sanctum/csrf-cookie', function () {
         return response()->noContent();
@@ -368,6 +374,16 @@
         
     Route::delete('/chat/conversation/{id}', [EstudianteChatController::class, 'deleteConversation'])
         ->name('estudiante.chat.delete-conversation');
+
+         //HORARIO
+        Route::get('/horario', [ScheduleEstudentController::class, 'index'])->name('estudiante.horario');
+
+             // ASISTENCIAS
+        Route::get('/asistencias', [AsistenciasEstudentController::class, 'index'])
+                ->name('profesor.asistencias');
+
+            // Mis NOTAS
+        Route::get('/notas', [MisNotasController::class, 'index'])->name('estudiante.notas');
         });
 
         //GET EDITAR

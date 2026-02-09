@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Profesor;
 
 use App\Http\Controllers\Controller;
@@ -22,7 +21,7 @@ class AsistenciasController extends Controller
         
         // Obtener el período académico activo
         $currentPeriod = AcademicPeriod::getPeriodoActivo();
-
+        
         if (!$currentPeriod) {
             return Inertia::render('Profesor/Asistencias', [
                 'error' => 'No hay un período académico activo. Contacta a la secretaría.',
@@ -35,7 +34,7 @@ class AsistenciasController extends Controller
                 'filters' => [],
             ]);
         }
-
+        
         // Obtener horario del profesor con días y franjas
         $horario = DB::table('timetable_slots as ts')
             ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
@@ -57,7 +56,7 @@ class AsistenciasController extends Controller
             ->orderBy('s.name')
             ->orderBy('g.nombre')
             ->get();
-
+        
         // Agrupar por materia-grupo (asignaciones únicas)
         $asignaciones = $horario->groupBy(function($item) {
             return $item->subject_id . '-' . $item->group_id;
@@ -79,16 +78,16 @@ class AsistenciasController extends Controller
                 })->values()
             ];
         })->values();
-
+        
         $subjectId = $request->integer('subject_id');
         $groupId = $request->integer('group_id');
         $view = $request->input('view', 'register');
-
+        
         $estudiantes = collect();
         $selectedClass = null;
         $classDates = collect();
         $attendanceHistory = collect();
-
+        
         if ($subjectId && $groupId) {
             $hasAssignment = DB::table('timetable_slots as ts')
                 ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
@@ -96,15 +95,15 @@ class AsistenciasController extends Controller
                 ->where('ts.subject_id', $subjectId)
                 ->where('tt.group_id', $groupId)
                 ->exists();
-
+            
             if (!$hasAssignment) {
                 return back()->with('error', '❌ No tienes permiso para ver este grupo');
             }
-
+            
             $selectedClass = $asignaciones->first(function ($item) use ($subjectId, $groupId) {
                 return $item['subject_id'] == $subjectId && $item['group_id'] == $groupId;
             });
-
+            
             if ($view === 'register') {
                 // Generar TODAS las fechas de clase dentro del período
                 $classDates = $this->generateClassDates(
@@ -119,11 +118,11 @@ class AsistenciasController extends Controller
                     $estudiantes = $this->getStudentsWithAttendance($groupId, $subjectId, $selectedDate);
                 }
             } else {
-                // Historial: solo mostrar asistencias del período actual
-                $attendanceHistory = $this->getAttendanceHistory($subjectId, $groupId, $currentPeriod);
+                // Historial: solo mostrar asistencias del período actual Y que sean días de clase válidos
+                $attendanceHistory = $this->getAttendanceHistory($subjectId, $groupId, $user->id, $currentPeriod);
             }
         }
-
+        
         return Inertia::render('Profesor/Asistencias', [
             'asignaciones' => $asignaciones,
             'estudiantes' => $estudiantes,
@@ -148,7 +147,7 @@ class AsistenciasController extends Controller
             ],
         ]);
     }
-
+    
     /**
      * Generar TODAS las fechas de clase según horario y período académico
      */
@@ -163,7 +162,12 @@ class AsistenciasController extends Controller
             ->where('tt.group_id', $groupId)
             ->select('ts.day', 'tsl.start_time', 'tsl.end_time')
             ->get();
-
+        
+        // Si no hay horarios configurados, no generar fechas
+        if ($schedules->isEmpty()) {
+            return collect();
+        }
+        
         // Mapeo de días en español a números ISO (1=Lunes, 7=Domingo)
         $dayMap = [
             'Lunes' => 1,
@@ -176,7 +180,17 @@ class AsistenciasController extends Controller
             'Sabado' => 6,
             'Domingo' => 7,
         ];
-
+        
+        // Obtener SOLO los días que tienen clase
+        $classDaysISO = $schedules->map(function($schedule) use ($dayMap) {
+            return $dayMap[$schedule->day] ?? null;
+        })->filter()->unique()->values()->all();
+        
+        // Si no hay días válidos, retornar vacío
+        if (empty($classDaysISO)) {
+            return collect();
+        }
+        
         // Agrupar horarios por día
         $schedulesByDay = $schedules->groupBy('day')->map(function ($daySchedules) {
             return $daySchedules->map(function ($schedule) {
@@ -186,7 +200,7 @@ class AsistenciasController extends Controller
                 ];
             })->values();
         });
-
+        
         // Obtener fechas del período
         $periodStart = Carbon::parse($currentPeriod->start_date);
         $periodEnd = Carbon::parse($currentPeriod->end_date);
@@ -194,27 +208,32 @@ class AsistenciasController extends Controller
         // No mostrar fechas futuras más allá de hoy
         $today = Carbon::today();
         $effectiveEnd = $periodEnd->gt($today) ? $today : $periodEnd;
-
+        
         $classDates = collect();
-
-        // Iterar por cada día del período
+        
+        // ✅ CORRECCIÓN CRÍTICA: Iterar SOLO por fechas que caen en días de clase
         for ($date = $periodStart->copy(); $date->lte($effectiveEnd); $date->addDay()) {
             $dayOfWeek = $date->dayOfWeekIso; // 1=Lunes, 7=Domingo
+            
+            // ✅ SALTAR SI NO ES UN DÍA DE CLASE
+            if (!in_array($dayOfWeek, $classDaysISO)) {
+                continue;
+            }
             
             // Buscar el nombre del día en español
             $spanishDay = array_search($dayOfWeek, $dayMap);
             
             if (!$spanishDay || !isset($schedulesByDay[$spanishDay])) {
-                continue; // No hay clase este día
+                continue; // No debería pasar, pero por seguridad
             }
-
+            
             // Verificar si ya existe asistencia registrada para esta fecha
             $hasAttendance = DB::table('attendances')
                 ->where('subject_id', $subjectId)
                 ->where('group_id', $groupId)
                 ->where('date', $date->format('Y-m-d'))
                 ->exists();
-
+            
             // Contar estudiantes que asistieron
             $attendanceStats = null;
             if ($hasAttendance) {
@@ -230,7 +249,7 @@ class AsistenciasController extends Controller
                         DB::raw('SUM(CASE WHEN status = "excused" THEN 1 ELSE 0 END) as excused')
                     )
                     ->first();
-
+                
                 $attendanceStats = [
                     'total' => $stats->total,
                     'present' => $stats->present,
@@ -239,10 +258,10 @@ class AsistenciasController extends Controller
                     'excused' => $stats->excused,
                 ];
             }
-
+            
             // Obtener los horarios de este día
             $daySchedules = $schedulesByDay[$spanishDay];
-
+            
             $classDates->push([
                 'date' => $date->format('Y-m-d'),
                 'day_name' => $date->locale('es')->isoFormat('dddd'),
@@ -257,11 +276,11 @@ class AsistenciasController extends Controller
                 'week_number' => $date->weekOfYear,
             ]);
         }
-
+        
         // Ordenar por fecha descendente (más reciente primero)
         return $classDates->sortByDesc('date')->values();
     }
-
+    
     /**
      * Validar si una fecha está dentro del período y es día de clase
      */
@@ -273,14 +292,13 @@ class AsistenciasController extends Controller
         if (!$currentPeriod->contieneFecha($carbonDate)) {
             return false;
         }
-
+        
         // No permitir fechas futuras
         if ($carbonDate->isFuture()) {
             return false;
         }
-
+        
         $dayOfWeek = $carbonDate->dayOfWeekIso;
-
         $dayMap = [
             1 => 'Lunes',
             2 => 'Martes',
@@ -290,10 +308,10 @@ class AsistenciasController extends Controller
             6 => 'Sábado',
             7 => 'Domingo',
         ];
-
+        
         $dayName = $dayMap[$dayOfWeek] ?? null;
         if (!$dayName) return false;
-
+        
         // Verificar si hay una clase ese día
         return DB::table('timetable_slots as ts')
             ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
@@ -303,7 +321,7 @@ class AsistenciasController extends Controller
             ->where('ts.day', $dayName)
             ->exists();
     }
-
+    
     /**
      * Obtener estudiantes con su asistencia del día
      */
@@ -338,16 +356,53 @@ class AsistenciasController extends Controller
             ->orderBy('users.name')
             ->get();
     }
-
+    
     /**
-     * Obtener historial de asistencias del período actual
+     * ✅ CORREGIDO: Obtener historial de asistencias SOLO de días de clase válidos
      */
-    private function getAttendanceHistory($subjectId, $groupId, $currentPeriod)
+    private function getAttendanceHistory($subjectId, $groupId, $teacherId, $currentPeriod)
     {
+        // Obtener los días de la semana donde hay clases
+        $schedules = DB::table('timetable_slots as ts')
+            ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
+            ->where('ts.user_id', $teacherId)
+            ->where('ts.subject_id', $subjectId)
+            ->where('tt.group_id', $groupId)
+            ->pluck('ts.day');
+        
+        if ($schedules->isEmpty()) {
+            return collect();
+        }
+        
+        // Mapeo de días
+        $dayMap = [
+            'Lunes' => 1,
+            'Martes' => 2,
+            'Miercoles' => 3,
+            'Miércoles' => 3,
+            'Jueves' => 4,
+            'Viernes' => 5,
+            'Sábado' => 6,
+            'Sabado' => 6,
+            'Domingo' => 7,
+        ];
+        
+        // Obtener días ISO válidos
+        $validDaysISO = $schedules->map(fn($day) => $dayMap[$day] ?? null)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+        
+        if (empty($validDaysISO)) {
+            return collect();
+        }
+        
         $periodStart = Carbon::parse($currentPeriod->start_date);
         $periodEnd = Carbon::parse($currentPeriod->end_date);
-
-        return DB::table('attendances as a')
+        
+        // Obtener TODAS las asistencias registradas en el periodo
+        $attendances = DB::table('attendances as a')
             ->join('users as u', 'a.user_id', '=', 'u.id')
             ->where('a.subject_id', $subjectId)
             ->where('a.group_id', $groupId)
@@ -365,8 +420,16 @@ class AsistenciasController extends Controller
             )
             ->orderBy('a.date', 'desc')
             ->orderBy('u.last_name')
-            ->get()
-            ->groupBy('date')
+            ->get();
+        
+        // ✅ FILTRAR SOLO FECHAS QUE CAEN EN DÍAS DE CLASE
+        $filteredAttendances = $attendances->filter(function($record) use ($validDaysISO) {
+            $date = Carbon::parse($record->date);
+            return in_array($date->dayOfWeekIso, $validDaysISO);
+        });
+        
+        // Agrupar por fecha
+        return $filteredAttendances->groupBy('date')
             ->map(function ($dateGroup, $date) {
                 $stats = [
                     'present' => $dateGroup->where('status', 'present')->count(),
@@ -375,7 +438,7 @@ class AsistenciasController extends Controller
                     'excused' => $dateGroup->where('status', 'excused')->count(),
                     'total' => $dateGroup->count(),
                 ];
-
+                
                 return [
                     'date' => $date,
                     'formatted_date' => Carbon::parse($date)->locale('es')->isoFormat('dddd, D [de] MMMM, YYYY'),
@@ -385,7 +448,7 @@ class AsistenciasController extends Controller
             })
             ->values();
     }
-
+    
     /**
      * Guardar asistencia masiva
      */
@@ -400,28 +463,28 @@ class AsistenciasController extends Controller
             'attendances.*.status' => 'required|in:present,absent,late,excused',
             'attendances.*.notes' => 'nullable|string|max:500',
         ]);
-
+        
         $userId = Auth::id();
-
+        
         // Obtener el período académico activo
         $currentPeriod = AcademicPeriod::getPeriodoActivo();
-
+        
         if (!$currentPeriod) {
             return back()->with('error', '❌ No hay un período académico activo');
         }
-
+        
         // Validar que la fecha esté dentro del período
         $date = Carbon::parse($validated['date']);
         
         if (!$currentPeriod->contieneFecha($date)) {
             return back()->with('error', '❌ La fecha debe estar dentro del período académico: ' . $currentPeriod->name);
         }
-
+        
         // Validar que sea un día de clase según el horario
         if (!$this->isValidClassDate($validated['date'], $validated['subject_id'], $validated['group_id'], $userId, $currentPeriod)) {
             return back()->with('error', '❌ No puedes registrar asistencia en esta fecha. No tienes clase programada ese día.');
         }
-
+        
         // Verificar permiso del profesor
         $hasAssignment = DB::table('timetable_slots as ts')
             ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
@@ -429,11 +492,11 @@ class AsistenciasController extends Controller
             ->where('ts.subject_id', $validated['subject_id'])
             ->where('tt.group_id', $validated['group_id'])
             ->exists();
-
+        
         if (!$hasAssignment) {
             return back()->with('error', '❌ No tienes permiso para registrar asistencia en este grupo');
         }
-
+        
         DB::beginTransaction();
         try {
             foreach ($validated['attendances'] as $attendance) {
@@ -451,7 +514,7 @@ class AsistenciasController extends Controller
                     ]
                 );
             }
-
+            
             DB::commit();
             return back()->with('success', '✅ Asistencias registradas correctamente');
         } catch (\Exception $e) {
@@ -459,7 +522,7 @@ class AsistenciasController extends Controller
             return back()->with('error', '❌ Error al registrar asistencias: ' . $e->getMessage());
         }
     }
-
+    
     /**
      * Eliminar un registro de asistencia
      */
@@ -471,7 +534,7 @@ class AsistenciasController extends Controller
             if ($attendance->teacher_id !== Auth::id()) {
                 return back()->with('error', '❌ No tienes permiso para eliminar este registro');
             }
-
+            
             $attendance->delete();
             return back()->with('success', '✅ Registro eliminado correctamente');
         } catch (\Exception $e) {
