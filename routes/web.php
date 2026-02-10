@@ -131,19 +131,17 @@
             Route::post('/horarios/generar', [ScheduleController::class, 'generate'])->name('horarios.generate');
 
             // Periodos
-            Route::get('/periodos', [PeriodController::class, 'index'])
-                ->name('secretaria.periodos');
-            Route::post('/periodos', [PeriodController::class, 'store'])
-                ->name('secretaria.periodos.crear');
-            // Alias temporal para compatibilidad con frontend actual
-            Route::post('/periodos/crear', [PeriodController::class, 'store']);
-            Route::put('/periodos/{id}', [PeriodController::class, 'update'])
-                ->name('secretaria.periodos.actualizar');
-            Route::delete('/periodos/{id}', [PeriodController::class, 'destroy'])
-                ->name('secretaria.periodos.eliminar');
-            Route::patch('/periodos/{id}/toggle', [PeriodController::class, 'toggle'])
-                ->name('secretaria.periodos.toggle');
-            Route::post('/periodos/verify-password', [PeriodController::class, 'verifyPassword'])
+    Route::get('/periodos', [PeriodController::class, 'index'])
+        ->name('secretaria.periodos');
+    Route::post('/periodos', [PeriodController::class, 'store'])
+        ->name('secretaria.periodos.crear');
+    Route::put('/periodos/{id}', [PeriodController::class, 'update'])
+        ->name('secretaria.periodos.actualizar');
+    Route::delete('/periodos/{id}', [PeriodController::class, 'destroy'])
+        ->name('secretaria.periodos.eliminar');
+    Route::patch('/periodos/{id}/toggle', [PeriodController::class, 'toggle'])
+        ->name('secretaria.periodos.toggle');
+    Route::post('/periodos/verify-password', [PeriodController::class, 'verifyPassword'])
         ->name('secretaria.periodos.verify');
 
             // Boletines

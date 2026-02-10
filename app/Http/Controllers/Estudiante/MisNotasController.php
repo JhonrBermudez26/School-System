@@ -5,214 +5,289 @@ namespace App\Http\Controllers\Estudiante;
 use App\Http\Controllers\Controller;
 use App\Models\Task;
 use App\Models\TaskSubmission;
+use App\Models\AcademicPeriod;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class MisNotasController extends Controller
 {
     /**
-     * Mostrar las notas del estudiante autenticado
+     * ✅ Mostrar notas con filtro por periodo
      */
-    public function index()
-    {
-        $student = Auth::user();
-        
-        // Obtener todos los grupos del estudiante
-        $groups = DB::table('group_user')
-            ->where('user_id', $student->id)
-            ->pluck('group_id');
-        
-        if ($groups->isEmpty()) {
-            return Inertia::render('Estudiante/Notas', [
-                'materias' => [],
-                'promedioGeneral' => 0,
-                'estadisticas' => [
-                    'total_materias' => 0,
-                    'total_evaluaciones' => 0,
-                    'evaluaciones_calificadas' => 0,
-                    'evaluaciones_pendientes' => 0,
-                ],
-            ]);
-        }
-        
-        // Obtener todas las asignaciones del estudiante (materias por grupo)
-        $asignaciones = DB::table('subject_group as sg')
-            ->join('subjects as s', 'sg.subject_id', '=', 's.id')
-            ->join('groups as g', 'sg.group_id', '=', 'g.id')
-            ->whereIn('sg.group_id', $groups)
-            ->select(
-                'sg.subject_id',
-                's.name as subject_name',
-                's.code as subject_code',
-                'sg.group_id',
-                'g.nombre as group_name'
+    public function index(Request $request)
+{
+    $student = Auth::user();
+
+    $groups = DB::table('group_user')
+        ->where('user_id', $student->id)
+        ->pluck('group_id');
+
+    if ($groups->isEmpty()) {
+        return $this->emptyResponse();
+    }
+
+    // Periodo seleccionado
+    $periodoId = $request->query('period_id');
+    $periodoActual = $periodoId
+        ? AcademicPeriod::find($periodoId)
+        : AcademicPeriod::getPeriodoActual();
+
+    // Todos los periodos
+    $periodos = AcademicPeriod::ordenado()->get()->map(fn ($p) => [
+        'id' => $p->id,
+        'nombre' => $p->name,
+        'inicio' => $p->start_date->format('Y-m-d'),
+        'fin' => $p->end_date->format('Y-m-d'),
+        'estado' => $p->getEstadoAttribute(),
+        'es_actual' => $p->isDentroFecha(),
+        'porcentaje' => $p->grade_weight,
+    ]);
+
+    // Asignaciones
+    $asignaciones = DB::table('subject_group as sg')
+        ->join('subjects as s', 'sg.subject_id', '=', 's.id')
+        ->join('groups as g', 'sg.group_id', '=', 'g.id')
+        ->whereIn('sg.group_id', $groups)
+        ->select(
+            'sg.subject_id',
+            's.name as subject_name',
+            's.code as subject_code',
+            'sg.group_id',
+            'g.nombre as group_name'
+        )
+        ->orderBy('s.name')
+        ->get();
+
+    $materias = [];
+    $totalEvaluacionesCalificadas = 0;
+    $totalEvaluacionesPendientes = 0;
+
+    // 👉 aquí guardamos los promedios de asignaturas del periodo
+    $promediosPeriodo = [];
+
+    foreach ($asignaciones as $asignacion) {
+
+        $subjectId = $asignacion->subject_id;
+        $groupId   = $asignacion->group_id;
+
+        /** =========================
+         *  TAREAS
+         *  ========================= */
+        $tasksQuery = TaskSubmission::with('task')
+            ->whereHas('task', fn ($q) =>
+                $q->where('subject_id', $subjectId)
+                  ->where('group_id', $groupId)
             )
-            ->orderBy('s.name')
-            ->get();
-        
-        $materias = [];
-        $totalEvaluacionesCalificadas = 0;
-        $totalEvaluacionesPendientes = 0;
-        $sumaPromedios = 0;
-        $countMaterias = 0;
-        
-        foreach ($asignaciones as $asignacion) {
-            $subjectId = $asignacion->subject_id;
-            $groupId = $asignacion->group_id;
-            
-            // ===== NOTAS DE TAREAS =====
-            $tasksNotas = TaskSubmission::with('task')
-                ->whereHas('task', function ($query) use ($subjectId, $groupId) {
-                    $query->where('subject_id', $subjectId)
-                          ->where('group_id', $groupId);
-                })
-                ->where('student_id', $student->id)
-                ->get()
-                ->map(function ($submission) {
-                    return [
-                        'id' => $submission->id,
-                        'nombre' => $submission->task->title,
-                        'valor' => $submission->score ? (float) $submission->score : null,
-                        'max_score' => (float) $submission->task->max_score,
-                        'porcentaje' => 100, // Las tareas no tienen porcentaje definido
-                        'fecha' => $submission->graded_at ?? $submission->task->due_date,
-                        'tipo' => 'Tarea',
-                        'estado' => $submission->status,
-                        'feedback' => $submission->teacher_feedback,
-                    ];
-                });
-            
-            // ===== NOTAS MANUALES =====
-            $manualNotas = DB::table('manual_grade_scores as mgs')
-                ->join('manual_grades as mg', 'mgs.manual_grade_id', '=', 'mg.id')
-                ->where('mg.subject_id', $subjectId)
-                ->where('mg.group_id', $groupId)
-                ->where('mgs.student_id', $student->id)
-                ->select(
-                    'mgs.id',
-                    'mg.title as nombre',
-                    'mgs.score as valor',
-                    'mg.max_score',
-                    'mg.weight as porcentaje',
-                    'mg.grade_date as fecha',
-                    'mgs.feedback'
-                )
-                ->get()
-                ->map(function ($grade) {
-                    return [
-                        'id' => $grade->id,
-                        'nombre' => $grade->nombre,
-                        'valor' => $grade->valor ? (float) $grade->valor : null,
-                        'max_score' => (float) $grade->max_score,
-                        'porcentaje' => (float) ($grade->porcentaje ?? 100),
-                        'fecha' => $grade->fecha,
-                        'tipo' => 'Evaluación Manual',
-                        'estado' => $grade->valor !== null ? 'graded' : 'pending',
-                        'feedback' => $grade->feedback,
-                    ];
-                });
-            
-            // Combinar todas las notas
-            $todasNotas = $tasksNotas->concat($manualNotas)->sortByDesc('fecha')->values()->all();
-            
-            // Calcular promedio de la materia
-            $notasCalificadas = collect($todasNotas)->filter(fn($n) => $n['valor'] !== null);
-            $promedio = 0;
-            
-            if ($notasCalificadas->count() > 0) {
-                // Promedio simple (todas las evaluaciones pesan igual)
-                $promedio = round($notasCalificadas->avg('valor'), 2);
-                $sumaPromedios += $promedio;
-                $countMaterias++;
-            }
-            
-            // Estadísticas de esta materia
-            $calificadas = $notasCalificadas->count();
-            $pendientes = collect($todasNotas)->filter(fn($n) => $n['valor'] === null)->count();
-            
-            $totalEvaluacionesCalificadas += $calificadas;
-            $totalEvaluacionesPendientes += $pendientes;
-            
-            $materias[] = [
-                'id' => $subjectId . '_' . $groupId,
-                'subject_id' => $subjectId,
-                'group_id' => $groupId,
-                'name' => $asignacion->subject_name,
-                'code' => $asignacion->subject_code,
-                'group_name' => $asignacion->group_name,
-                'notas' => $todasNotas,
-                'promedio' => $promedio,
-                'stats' => [
-                    'total' => count($todasNotas),
-                    'calificadas' => $calificadas,
-                    'pendientes' => $pendientes,
-                ],
-            ];
+            ->where('student_id', $student->id);
+
+        if ($periodoId) {
+            $tasksQuery->whereHas('task', fn ($q) =>
+                $q->where('academic_period_id', $periodoId)
+            );
         }
-        
-        // Calcular promedio general (todas las materias con todas sus notas)
-        $promedioGeneral = $countMaterias > 0 ? round($sumaPromedios / $countMaterias, 2) : 0;
-        
-        // Obtener periodo académico actual (grades_enabled = true)
-        $periodoActual = DB::table('academic_periods')
-            ->where('grades_enabled', true)
-            ->first();
-        
-        // Calcular promedio del periodo actual (solo notas del periodo habilitado)
-        $promedioDelPeriodo = 0;
-        if ($periodoActual) {
-            // Filtrar materias que tienen evaluaciones en el periodo actual
-            $materiasDelPeriodo = collect($materias)->map(function($materia) use ($periodoActual) {
-                // Obtener solo las notas dentro del rango del periodo
-                $notasDelPeriodo = collect($materia['notas'])->filter(function($nota) use ($periodoActual) {
-                    if (!$nota['fecha']) return false;
-                    $fechaNota = \Carbon\Carbon::parse($nota['fecha']);
-                    $inicioP = \Carbon\Carbon::parse($periodoActual->start_date);
-                    $finP = \Carbon\Carbon::parse($periodoActual->end_date);
-                    return $fechaNota->between($inicioP, $finP) && $nota['valor'] !== null;
-                });
-                
-                // Calcular promedio solo con notas del periodo
-                $promedioPeriodo = 0;
-                if ($notasDelPeriodo->count() > 0) {
-                    $promedioPeriodo = round($notasDelPeriodo->avg('valor'), 2);
-                }
-                
-                return [
-                    'promedio_periodo' => $promedioPeriodo,
-                    'tiene_notas' => $notasDelPeriodo->count() > 0
-                ];
-            })->filter(fn($m) => $m['tiene_notas'] && $m['promedio_periodo'] > 0);
-            
-            if ($materiasDelPeriodo->count() > 0) {
-                $promedioDelPeriodo = round($materiasDelPeriodo->avg('promedio_periodo'), 2);
+
+        $tasksNotas = $tasksQuery->get()->map(fn ($s) => [
+            'id' => $s->id,
+            'nombre' => $s->task->title,
+            'valor' => $s->score ? (float) $s->score : null,
+            'max_score' => (float) $s->task->max_score,
+            'porcentaje' => 100,
+            'fecha' => $s->graded_at ?? $s->task->due_date,
+            'tipo' => 'Tarea',
+            'estado' => $s->status,
+            'feedback' => $s->teacher_feedback,
+            'academic_period_id' => $s->task->academic_period_id,
+        ]);
+
+        /** =========================
+         *  NOTAS MANUALES
+         *  ========================= */
+        $manualQuery = DB::table('manual_grade_scores as mgs')
+            ->join('manual_grades as mg', 'mgs.manual_grade_id', '=', 'mg.id')
+            ->where('mg.subject_id', $subjectId)
+            ->where('mg.group_id', $groupId)
+            ->where('mgs.student_id', $student->id);
+
+        if ($periodoId) {
+            $manualQuery->where('mg.academic_period_id', $periodoId);
+        }
+
+        $manualNotas = $manualQuery->select(
+            'mgs.id',
+            'mg.title as nombre',
+            'mgs.score as valor',
+            'mg.max_score',
+            'mg.weight as porcentaje',
+            'mg.grade_date as fecha',
+            'mgs.feedback',
+            'mg.academic_period_id'
+        )->get()->map(fn ($g) => [
+            'id' => $g->id,
+            'nombre' => $g->nombre,
+            'valor' => $g->valor ? (float) $g->valor : null,
+            'max_score' => (float) $g->max_score,
+            'porcentaje' => (float) ($g->porcentaje ?? 100),
+            'fecha' => $g->fecha,
+            'tipo' => 'Evaluación Manual',
+            'estado' => $g->valor !== null ? 'graded' : 'pending',
+            'feedback' => $g->feedback,
+            'academic_period_id' => $g->academic_period_id,
+        ]);
+
+        /** =========================
+         *  UNIFICAR NOTAS
+         *  ========================= */
+        $todasNotas = $tasksNotas->concat($manualNotas)
+            ->sortByDesc('fecha')
+            ->values()
+            ->all();
+
+        $notasPorPeriodo = $this->calcularNotasPorPeriodo($todasNotas);
+
+        /** =========================
+         *  PROMEDIO DE LA MATERIA
+         *  ========================= */
+        $promedio = 0;
+
+        if ($periodoId) {
+            $dataPeriodo = collect($notasPorPeriodo)
+                ->firstWhere('periodo_id', $periodoId);
+
+            $promedio = $dataPeriodo['promedio'] ?? 0;
+        } else {
+            $periodosConNota = collect($notasPorPeriodo)
+                ->filter(fn ($p) => $p['promedio'] > 0);
+
+            if ($periodosConNota->count() > 0) {
+                $promedio = round($periodosConNota->avg('promedio'), 2);
             }
         }
-        
-        // Calcular asignaturas aprobadas y reprobadas
-        // Consideramos aprobada una materia con promedio >= 3.0
-        $materiasAprobadas = collect($materias)->filter(fn($m) => $m['promedio'] >= 3.0)->count();
-        $materiasReprobadas = collect($materias)->filter(fn($m) => $m['promedio'] > 0 && $m['promedio'] < 3.0)->count();
-        $materiasSinCalificar = collect($materias)->filter(fn($m) => $m['promedio'] == 0)->count();
-        
+
+        if ($promedio > 0) {
+            $promediosPeriodo[] = $promedio;
+        }
+
+        $calificadas = collect($todasNotas)->whereNotNull('valor')->count();
+        $pendientes  = collect($todasNotas)->whereNull('valor')->count();
+
+        $totalEvaluacionesCalificadas += $calificadas;
+        $totalEvaluacionesPendientes += $pendientes;
+
+        $materias[] = [
+            'id' => $subjectId . '_' . $groupId,
+            'subject_id' => $subjectId,
+            'group_id' => $groupId,
+            'name' => $asignacion->subject_name,
+            'code' => $asignacion->subject_code,
+            'group_name' => $asignacion->group_name,
+            'notas' => $todasNotas,
+            'notas_por_periodo' => $notasPorPeriodo,
+            'promedio' => $promedio,
+            'stats' => [
+                'total' => count($todasNotas),
+                'calificadas' => $calificadas,
+                'pendientes' => $pendientes,
+            ],
+        ];
+    }
+
+    /** =========================
+     *  PROMEDIO GENERAL
+     *  ========================= */
+    $promedioGeneral = 0;
+
+    if (count($promediosPeriodo) > 0) {
+        $promedioGeneral = round(
+            array_sum($promediosPeriodo) / count($promediosPeriodo),
+            2
+        );
+    }
+
+    return Inertia::render('Estudiante/Notas', [
+        'materias' => $materias,
+        'promedioGeneral' => $promedioGeneral,
+        'periodos' => $periodos,
+        'periodoActual' => $periodoActual ? [
+            'id' => $periodoActual->id,
+            'nombre' => $periodoActual->name,
+            'inicio' => $periodoActual->start_date->format('Y-m-d'),
+            'fin' => $periodoActual->end_date->format('Y-m-d'),
+            'porcentaje' => $periodoActual->grade_weight,
+            'habilitado' => $periodoActual->grades_enabled,
+        ] : null,
+        'estadisticas' => [
+            'total_asignaturas' => count($materias),
+            'asignaturas_aprobadas' => collect($materias)->where('promedio', '>=', 3)->count(),
+            'asignaturas_reprobadas' => collect($materias)->whereBetween('promedio', [0.01, 2.99])->count(),
+            'asignaturas_sin_calificar' => collect($materias)->where('promedio', 0)->count(),
+            'total_evaluaciones' => $totalEvaluacionesCalificadas + $totalEvaluacionesPendientes,
+            'evaluaciones_calificadas' => $totalEvaluacionesCalificadas,
+            'evaluaciones_pendientes' => $totalEvaluacionesPendientes,
+        ],
+    ]);
+}
+   
+    private function calcularNotasPorPeriodo($todasNotas)
+{
+    $periodos = AcademicPeriod::ordenado()->get();
+    $resultado = [];
+
+    foreach ($periodos as $periodo) {
+
+        $notasPeriodo = collect($todasNotas)
+            ->filter(fn ($n) => $n['academic_period_id'] == $periodo->id)
+            ->filter(fn ($n) => $n['valor'] !== null && $n['max_score'] > 0);
+
+        $sumaPonderada = 0;
+        $pesoTotal = 0;
+
+        foreach ($notasPeriodo as $nota) {
+
+            // Normalizar a escala 0–5
+            $notaNormalizada = ($nota['valor'] / $nota['max_score']) * 5;
+
+            $peso = $nota['porcentaje'] ?? 100;
+
+            $sumaPonderada += $notaNormalizada * ($peso / 100);
+            $pesoTotal += $peso;
+        }
+
+        $promedio = $pesoTotal > 0
+            ? round($sumaPonderada / ($pesoTotal / 100), 2)
+            : 0;
+
+        $resultado[] = [
+            'periodo_id' => $periodo->id,
+            'periodo_nombre' => $periodo->name,
+            'peso' => $periodo->grade_weight ?? 0,
+            'promedio' => $promedio,
+            'cantidad_notas' => $notasPeriodo->count(),
+            'cantidad_calificadas' => $notasPeriodo->count(),
+            'estado' => $periodo->getEstadoAttribute(),
+        ];
+    }
+
+    return $resultado;
+}
+
+    
+    private function emptyResponse()
+    {
         return Inertia::render('Estudiante/Notas', [
-            'materias' => $materias,
-            'promedioGeneral' => $promedioGeneral,
-            'promedioDelPeriodo' => $promedioDelPeriodo,
-            'periodoActual' => $periodoActual ? [
-                'nombre' => $periodoActual->name,
-                'inicio' => $periodoActual->start_date,
-                'fin' => $periodoActual->end_date,
-            ] : null,
+            'materias' => [],
+            'promedioGeneral' => 0,
+            'periodos' => [],
+            'periodoActual' => null,
             'estadisticas' => [
-                'total_asignaturas' => count($materias),
-                'asignaturas_aprobadas' => $materiasAprobadas,
-                'asignaturas_reprobadas' => $materiasReprobadas,
-                'asignaturas_sin_calificar' => $materiasSinCalificar,
-                'total_evaluaciones' => $totalEvaluacionesCalificadas + $totalEvaluacionesPendientes,
-                'evaluaciones_calificadas' => $totalEvaluacionesCalificadas,
-                'evaluaciones_pendientes' => $totalEvaluacionesPendientes,
+                'total_asignaturas' => 0,
+                'asignaturas_aprobadas' => 0,
+                'asignaturas_reprobadas' => 0,
+                'asignaturas_sin_calificar' => 0,
+                'total_evaluaciones' => 0,
+                'evaluaciones_calificadas' => 0,
+                'evaluaciones_pendientes' => 0,
             ],
         ]);
     }

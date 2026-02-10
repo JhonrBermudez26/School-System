@@ -13,6 +13,7 @@ class Task extends Model
     protected $fillable = [
         'subject_id',
         'group_id',
+        'academic_period_id', // ✅ NUEVO
         'teacher_id',
         'title',
         'description',
@@ -33,6 +34,11 @@ class Task extends Model
     ];
 
     // ========== RELACIONES ==========
+    
+    public function academicPeriod()
+    {
+        return $this->belongsTo(AcademicPeriod::class);
+    }
 
     public function subject()
     {
@@ -65,7 +71,7 @@ class Task extends Model
     }
 
     // ========== MÉTODOS DE ESTADO ==========
-
+    
     public function isPastDue()
     {
         return Carbon::now('America/Bogota')->isAfter($this->due_date);
@@ -77,11 +83,7 @@ class Task extends Model
     }
 
     // ========== MÉTODOS DE CONTEO ==========
-
-    /**
-     * ✅ AGREGAR ESTE MÉTODO
-     * Obtener el total de estudiantes en el grupo de esta tarea
-     */
+    
     public function getTotalStudentsCount()
     {
         return DB::table('group_user as gu')
@@ -96,9 +98,6 @@ class Task extends Model
             ->count('gu.user_id');
     }
 
-    /**
-     * Obtener estadísticas de entregas
-     */
     public function getSubmissionStats()
     {
         $total = $this->getTotalStudentsCount();
@@ -115,7 +114,7 @@ class Task extends Model
     }
 
     // ========== SCOPES ==========
-
+    
     public function scopeByTeacher($query, $teacherId)
     {
         return $query->where('teacher_id', $teacherId);
@@ -138,5 +137,23 @@ class Task extends Model
             $q->whereNull('close_date')
               ->orWhere('close_date', '>', now());
         });
+    }
+
+    // ✅ NUEVO: Filtrar por periodo académico
+    public function scopeByPeriod($query, $periodId)
+    {
+        return $query->where('academic_period_id', $periodId);
+    }
+
+    // ✅ NUEVO: Obtener tareas del periodo actual
+    public function scopeCurrentPeriod($query)
+    {
+        $currentPeriod = AcademicPeriod::getPeriodoActual();
+        
+        if (!$currentPeriod) {
+            return $query->whereNull('academic_period_id');
+        }
+
+        return $query->where('academic_period_id', $currentPeriod->id);
     }
 }

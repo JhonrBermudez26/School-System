@@ -17,7 +17,7 @@ class EstudianteDashboardController extends Controller
     {
         $user = Auth::user();
 
-        // Obtener el grupo actual del estudiante
+        // Grupo actual
         $currentGroup = $user->groups()->first();
 
         if (!$currentGroup) {
@@ -39,19 +39,18 @@ class EstudianteDashboardController extends Controller
             ]);
         }
 
-        // ✅ OBTENER PERIODO ACADÉMICO ACTUAL
-        $periodoActual = AcademicPeriod::where('start_date', '<=', now())
-            ->where('end_date', '>=', now())
-            ->where('is_active', true)
-            ->first();
+        // ✅ Periodo académico activo (MISMA FUENTE QUE NOTAS)
+        $periodoActual = AcademicPeriod::getPeriodoActivo();
 
-        $periodName = $periodoActual ? $periodoActual->name : 'Sin periodo activo';
+        $periodName = $periodoActual
+            ? $periodoActual->name
+            : 'Sin periodo activo';
 
-        // Obtener información del grupo
+        // Grupo / grado
         $group = DB::table('groups')->where('id', $currentGroup->id)->first();
 
         $gradeName = 'Sin grado';
-        if ($group && property_exists($group, 'grade_id') && $group->grade_id) {
+        if ($group && $group->grade_id) {
             $grade = DB::table('grades')->where('id', $group->grade_id)->first();
             if ($grade) {
                 $gradeName = $grade->nombre ?? $grade->name ?? 'Sin grado';
@@ -60,20 +59,37 @@ class EstudianteDashboardController extends Controller
 
         $groupName = $group->nombre ?? $group->name ?? 'Sin nombre';
 
-        // ✅ CALCULAR ESTADÍSTICAS
-        $promedio = $this->calculateAverage($user->id, $currentGroup->id);
+        // ✅ ESTADÍSTICAS
+        $promedio = $this->calculateAverage(
+            $user->id,
+            $currentGroup->id,
+            $periodoActual
+        );
+
         $tareasPendientes = $this->countPendingTasks($user->id, $currentGroup->id);
         $asistencia = $this->calculateAttendance($user->id, $currentGroup->id);
-        
+
         $materiasInscritas = DB::table('subject_group')
             ->where('group_id', $currentGroup->id)
             ->distinct()
             ->count('subject_id');
 
-        // ✅ DATOS DETALLADOS
-        $materias = $this->getSubjectsWithGrades($user->id, $currentGroup->id);
-        $tareasPendientesDetalle = $this->getPendingTasksDetail($user->id, $currentGroup->id);
-        $proximasEvaluaciones = $this->getUpcomingEvaluations($user->id, $currentGroup->id);
+        // Detalle
+        $materias = $this->getSubjectsWithGrades(
+            $user->id,
+            $currentGroup->id,
+            $periodoActual
+        );
+
+        $tareasPendientesDetalle = $this->getPendingTasksDetail(
+            $user->id,
+            $currentGroup->id
+        );
+
+        $proximasEvaluaciones = $this->getUpcomingEvaluations(
+            $user->id,
+            $currentGroup->id
+        );
 
         return Inertia::render('Estudiante/Dashboard', [
             'stats' => [
@@ -93,57 +109,60 @@ class EstudianteDashboardController extends Controller
         ]);
     }
 
-    /**
-     * ✅ CALCULAR PROMEDIO GENERAL - IGUAL QUE EL PROFESOR
-     * Suma todas las notas (tareas + manuales) y divide por cantidad
+     /**
+     * ✅ PROMEDIO GENERAL DEL PERIODO (modelo académico correcto)
      */
-    private function calculateAverage($userId, $groupId)
+    private function calculateAverage($userId, $groupId, $periodo)
     {
-        // Obtener todas las asignaturas del grupo
+        if (!$periodo) {
+            return 0;
+        }
+
         $subjectIds = DB::table('subject_group')
             ->where('group_id', $groupId)
             ->pluck('subject_id');
 
-        if ($subjectIds->isEmpty()) {
-            return 0;
-        }
-
-        $totalScore = 0;
-        $gradeCount = 0;
+        $promedios = [];
 
         foreach ($subjectIds as $subjectId) {
-            // 1️⃣ Calificaciones de TAREAS calificadas
+
+            // Tareas del periodo
             $taskScores = DB::table('task_submissions as ts')
                 ->join('tasks as t', 'ts.task_id', '=', 't.id')
                 ->where('ts.student_id', $userId)
                 ->where('t.subject_id', $subjectId)
                 ->where('t.group_id', $groupId)
+                ->whereBetween('t.created_at', [
+                    $periodo->start_date,
+                    $periodo->end_date
+                ])
                 ->where('ts.status', 'graded')
                 ->whereNotNull('ts.score')
                 ->pluck('ts.score');
 
-            foreach ($taskScores as $score) {
-                $totalScore += (float) $score;
-                $gradeCount++;
-            }
-
-            // 2️⃣ Calificaciones MANUALES
+            // Notas manuales del periodo
             $manualScores = DB::table('manual_grade_scores as mgs')
                 ->join('manual_grades as mg', 'mgs.manual_grade_id', '=', 'mg.id')
                 ->where('mgs.student_id', $userId)
                 ->where('mg.subject_id', $subjectId)
                 ->where('mg.group_id', $groupId)
+                ->whereBetween('mg.created_at', [
+                    $periodo->start_date,
+                    $periodo->end_date
+                ])
                 ->whereNotNull('mgs.score')
                 ->pluck('mgs.score');
 
-            foreach ($manualScores as $score) {
-                $totalScore += (float) $score;
-                $gradeCount++;
+            $scores = $taskScores->merge($manualScores);
+
+            if ($scores->count() > 0) {
+                $promedios[] = round($scores->avg(), 2);
             }
         }
 
-        // ✅ Promedio simple: suma total / cantidad de notas
-        return $gradeCount > 0 ? round($totalScore / $gradeCount, 1) : 0;
+        return count($promedios) > 0
+            ? round(array_sum($promedios) / count($promedios), 2)
+            : 0;
     }
 
     /**
@@ -246,30 +265,42 @@ class EstudianteDashboardController extends Controller
         }
     }
 
-    /**
-     * Calcular asistencia
+     /**
+     * Asistencia global
      */
-    private function calculateAttendance($userId, $groupId)
-    {
-        try {
-            $total = DB::table('attendances')
-                ->where('student_id', $userId)
-                ->count();
+  private function calculateAttendance($userId, $groupId)
+{
+    $periodo = AcademicPeriod::getPeriodoActivo();
 
-            if ($total === 0) {
-                return 0;
-            }
-
-            $present = DB::table('attendances')
-                ->where('student_id', $userId)
-                ->where('status', 'present')
-                ->count();
-
-            return round(($present / $total) * 100);
-        } catch (\Exception $e) {
-            return 0;
-        }
+    if (!$periodo) {
+        return 0;
     }
+
+    $total = DB::table('attendances')
+        ->where('user_id', $userId)
+        ->where('group_id', $groupId)
+        ->whereBetween('date', [
+            $periodo->start_date,
+            $periodo->end_date
+        ])
+        ->count();
+
+    if ($total === 0) {
+        return 0;
+    }
+
+    $present = DB::table('attendances')
+        ->where('user_id', $userId)
+        ->where('group_id', $groupId)
+        ->whereBetween('date', [
+            $periodo->start_date,
+            $periodo->end_date
+        ])
+        ->whereIn('status', ['present', 'late', 'excused'])
+        ->count();
+
+    return round(($present / $total) * 100, 1);
+}
 
     /**
      * Tareas pendientes con detalle

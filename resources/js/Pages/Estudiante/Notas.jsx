@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { useState, useMemo } from 'react';
 import { 
     BookOpen, 
@@ -12,18 +12,37 @@ import {
     ChevronDown,
     ChevronUp,
     BarChart3,
-    Target
+    Target,
+    Filter
 } from 'lucide-react';
 import Layout from '@/Components/Layout/Layout';
 
 export default function Notas({ 
     materias = [], 
     promedioGeneral = 0, 
-    promedioDelPeriodo = 0,
+    periodos = [],
     periodoActual = null,
     estadisticas = {} 
 }) {
     const [expandedMateria, setExpandedMateria] = useState(null);
+    const [selectedPeriodId, setSelectedPeriodId] = useState(periodoActual?.id || '');
+
+    // Manejar cambio de periodo
+    const handlePeriodChange = (periodId) => {
+        setSelectedPeriodId(periodId);
+        
+        if (periodId) {
+            router.get(route('estudiante.notas'), { period_id: periodId }, {
+                preserveState: true,
+                preserveScroll: true,
+            });
+        } else {
+            router.get(route('estudiante.notas'), {}, {
+                preserveState: true,
+                preserveScroll: true,
+            });
+        }
+    };
 
     // Función para determinar el color según la nota
     const getGradeColor = (grade) => {
@@ -86,29 +105,73 @@ export default function Notas({
             <Head title="Mis Calificaciones" />
             
             <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
-                {/* Header */}
+                {/* Header con Selector de Periodo */}
                 <div className="mb-6 sm:mb-8">
-                    <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
-                        Mis Calificaciones
-                    </h1>
-                    <p className="text-sm sm:text-base text-gray-600 mt-2">
-                        {periodoActual 
-                            ? `Periodo activo: ${periodoActual.nombre}` 
-                            : 'Consulta tu rendimiento académico'}
-                    </p>
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+                        <div>
+                            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
+                                Mis Calificaciones
+                            </h1>
+                            <p className="text-sm sm:text-base text-gray-600 mt-2">
+                                Consulta tu rendimiento académico por periodo
+                            </p>
+                        </div>
+                        
+                        {/* Selector de Periodo */}
+                        <div className="relative w-full sm:w-auto">
+                            <label className="block text-xs font-medium text-gray-700 mb-2">
+                                Periodo Académico
+                            </label>
+                            <div className="relative">
+                                <select
+                                    value={selectedPeriodId}
+                                    onChange={(e) => handlePeriodChange(e.target.value)}
+                                    className="w-full sm:w-64 px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
+                                >
+                                    <option value="">Todos los periodos</option>
+                                    {periodos.map((periodo) => (
+                                        <option key={periodo.id} value={periodo.id}>
+                                            {periodo.nombre} {periodo.es_actual && '(Actual)'}
+                                        </option>
+                                    ))}
+                                </select>
+                                <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    {/* Info del Periodo Seleccionado */}
+                    {periodoActual && (
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
+                            <Calendar className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                                <p className="font-semibold text-blue-900">
+                                    {periodoActual.nombre}
+                                </p>
+                                <p className="text-sm text-blue-700 mt-1">
+                                    {formatDate(periodoActual.inicio)} — {formatDate(periodoActual.fin)}
+                                    {periodoActual.porcentaje && (
+                                        <span className="ml-2">
+                                            • Peso: {periodoActual.porcentaje}%
+                                        </span>
+                                    )}
+                                </p>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                {/* Estadísticas Principales - Diseño Simple y Elegante */}
+                {/* Estadísticas Principales */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
                     {/* Promedio Global */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8">
                         <div className="flex items-start justify-between mb-6">
                             <div>
                                 <p className="text-sm font-medium text-gray-600 mb-1">
-                                    Promedio Global
+                                    Promedio {selectedPeriodId ? 'del Periodo' : 'Global'}
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                    Todo el año académico
+                                    {selectedPeriodId ? periodoActual?.nombre : 'Todo el año académico'}
                                 </p>
                             </div>
                             <div className="bg-blue-50 p-2.5 rounded-lg">
@@ -128,91 +191,80 @@ export default function Notas({
                         </div>
                     </div>
 
-                    {/* Promedio del Periodo */}
+                    {/* Estadísticas de Asignaturas */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 sm:p-8">
-                        <div className="flex items-start justify-between mb-6">
+                        <div className="flex items-center justify-between mb-6">
                             <div>
                                 <p className="text-sm font-medium text-gray-600 mb-1">
-                                    Promedio del Periodo
+                                    Resumen de Asignaturas
                                 </p>
                                 <p className="text-xs text-gray-500">
-                                    {periodoActual ? periodoActual.nombre : 'Sin periodo activo'}
+                                    Total: {estadisticas.total_asignaturas}
                                 </p>
                             </div>
                             <div className="bg-purple-50 p-2.5 rounded-lg">
                                 <Target className="w-5 h-5 text-purple-600" />
                             </div>
                         </div>
-                        <div className="flex items-baseline gap-2">
-                            <p className={`text-5xl sm:text-6xl font-bold ${
-                                promedioDelPeriodo > 0 ? getGradeColor(promedioDelPeriodo) : 'text-gray-300'
-                            }`}>
-                                {promedioDelPeriodo > 0 ? promedioDelPeriodo.toFixed(1) : '—'}
-                            </p>
-                            <p className="text-lg text-gray-400 font-medium">/5.0</p>
-                        </div>
-                        {periodoActual && (
-                            <div className="mt-4 pt-4 border-t border-gray-100">
-                                <p className="text-xs text-gray-600 flex items-center gap-1.5">
-                                    <Calendar className="w-3.5 h-3.5" />
-                                    {formatDate(periodoActual.inicio)} — {formatDate(periodoActual.fin)}
-                                </p>
+                        
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">Aprobadas</span>
+                                <span className="text-lg font-bold text-green-600">
+                                    {estadisticas.asignaturas_aprobadas}
+                                </span>
                             </div>
-                        )}
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">Reprobadas</span>
+                                <span className="text-lg font-bold text-red-600">
+                                    {estadisticas.asignaturas_reprobadas}
+                                </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm text-gray-600">Sin calificar</span>
+                                <span className="text-lg font-bold text-gray-400">
+                                    {estadisticas.asignaturas_sin_calificar}
+                                </span>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                {/* Estadísticas de Asignaturas - Grid Compacto */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-                    {/* Total Asignaturas */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                {/* Estadísticas de Evaluaciones - Grid Compacto */}
+                <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-6 sm:mb-8">
+                    <div className="bg-white rounded-lg shadow-sm border border-blue-200 p-4">
                         <div className="flex items-center gap-3 mb-2">
-                            <div className="bg-gray-100 p-2 rounded-lg">
-                                <BookOpen className="w-4 h-4 text-gray-600" />
+                            <div className="bg-blue-100 p-2 rounded-lg">
+                                <FileText className="w-4 h-4 text-blue-600" />
                             </div>
                             <p className="text-xs font-medium text-gray-600">Total</p>
                         </div>
-                        <p className="text-2xl font-bold text-gray-900">
-                            {estadisticas.total_asignaturas || 0}
+                        <p className="text-2xl font-bold text-blue-600">
+                            {estadisticas.total_evaluaciones || 0}
                         </p>
                     </div>
 
-                    {/* Asignaturas Aprobadas */}
                     <div className="bg-white rounded-lg shadow-sm border border-green-200 p-4">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="bg-green-50 p-2 rounded-lg">
                                 <CheckCircle className="w-4 h-4 text-green-600" />
                             </div>
-                            <p className="text-xs font-medium text-gray-600">Aprobadas</p>
+                            <p className="text-xs font-medium text-gray-600">Calificadas</p>
                         </div>
                         <p className="text-2xl font-bold text-green-600">
-                            {estadisticas.asignaturas_aprobadas || 0}
+                            {estadisticas.evaluaciones_calificadas || 0}
                         </p>
                     </div>
 
-                    {/* Asignaturas Reprobadas */}
-                    <div className="bg-white rounded-lg shadow-sm border border-red-200 p-4">
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="bg-red-50 p-2 rounded-lg">
-                                <AlertCircle className="w-4 h-4 text-red-600" />
-                            </div>
-                            <p className="text-xs font-medium text-gray-600">Reprobadas</p>
-                        </div>
-                        <p className="text-2xl font-bold text-red-600">
-                            {estadisticas.asignaturas_reprobadas || 0}
-                        </p>
-                    </div>
-
-                    {/* Sin Calificar */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <div className="bg-white rounded-lg shadow-sm border border-amber-200 p-4 col-span-2 lg:col-span-1">
                         <div className="flex items-center gap-3 mb-2">
                             <div className="bg-amber-50 p-2 rounded-lg">
                                 <Clock className="w-4 h-4 text-amber-600" />
                             </div>
-                            <p className="text-xs font-medium text-gray-600">Sin notas</p>
+                            <p className="text-xs font-medium text-gray-600">Pendientes</p>
                         </div>
                         <p className="text-2xl font-bold text-amber-600">
-                            {estadisticas.asignaturas_sin_calificar || 0}
+                            {estadisticas.evaluaciones_pendientes || 0}
                         </p>
                     </div>
                 </div>
@@ -426,7 +478,9 @@ export default function Notas({
                                 No hay calificaciones disponibles
                             </h3>
                             <p className="text-sm sm:text-base text-gray-600">
-                                Aún no tienes calificaciones registradas para este periodo
+                                {selectedPeriodId 
+                                    ? 'No tienes calificaciones registradas para este periodo' 
+                                    : 'Aún no tienes calificaciones registradas'}
                             </p>
                         </div>
                     )}
@@ -435,6 +489,3 @@ export default function Notas({
         </Layout>
     );
 }
-
-
-///faltaaaaaaaaaaaaaaaaaa
