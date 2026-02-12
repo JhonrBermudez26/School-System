@@ -10,20 +10,22 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-{
-    Schema::create('meetings', function (Blueprint $table) {
-        $table->id();
-        $table->foreignId('teacher_id')->constrained('users')->onDelete('cascade');
-        $table->foreignId('grade_id')->constrained('grades')->onDelete('cascade');
-        $table->foreignId('subject_id')->nullable()->constrained('subjects')->onDelete('set null');
-        $table->string('title');
-        $table->text('description')->nullable();
-        $table->string('meeting_link'); // Enlace de la reunión (ej: Zoom, Meet)
-        $table->dateTime('scheduled_at'); // Fecha y hora de inicio
-        $table->timestamps();
-    });
-}
+    {
+        Schema::create('meetings', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('subject_id');
+            $table->unsignedBigInteger('group_id');
+            $table->unsignedBigInteger('user_id');
+            $table->string('room_name')->unique();
+            $table->string('url');
+            $table->boolean('is_active')->default(true);
+            $table->timestamp('ended_at')->nullable();
+            $table->timestamps();
 
+            $table->index(['subject_id', 'group_id']);
+            $table->index('is_active');
+        });
+    }
 
     /**
      * Reverse the migrations.

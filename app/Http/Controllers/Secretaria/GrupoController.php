@@ -19,6 +19,10 @@ class GrupoController extends Controller
     public function index(Request $request)
     {
         try {
+            // ✅ Verificar permiso directamente
+        if (!auth()->user()->can('groups.view')) {
+            abort(403, 'No tienes permiso para ver los grupos.');
+        }
             $query = Group::with(['grade:id,nombre', 'course:id,nombre'])
                 ->select('id', 'nombre', 'grade_id', 'course_id');
 
@@ -62,6 +66,11 @@ class GrupoController extends Controller
                 'grados' => $grados,
                 'cursos' => $cursos,
                 'filters' => $request->only(['search', 'grade_id', 'course_id']),
+                'can' => [
+                    'create' => auth()->user()->can('groups.create'),                    
+                    'update' => auth()->user()->can('groups.update'),
+                    'delete' => auth()->user()->can('groups.delete'),
+                ],
             ]);
         } catch (\Exception $e) {
             Log::error('Error en GrupoController::index', [
@@ -84,6 +93,11 @@ class GrupoController extends Controller
                 'cursos' => [],
                 'filters' => [],
                 'error' => 'Error al cargar datos: ' . $e->getMessage(),
+                'can' => [
+                    'create' => false,                    
+                    'update' => false,
+                    'delete' => false,
+                ],
             ]);
         }
     }
@@ -94,6 +108,10 @@ class GrupoController extends Controller
     public function store(Request $request)
     {
         try {
+            // ✅ Verificar permiso directamente
+        if (!auth()->user()->can('groups.create')) {
+            abort(403, 'No tienes permiso para crear los grupos.');
+        }
             $validated = $request->validate([
                 'nombre' => 'required|string|max:50',
                 'grado_nombre' => 'required|string|max:10',
@@ -173,7 +191,9 @@ class GrupoController extends Controller
     {
         try {
             $group = Group::findOrFail($id);
-            
+             if (!auth()->user()->can('gropus.update')) {
+            abort(403, 'No tienes permiso para actualizar Grupos.');
+             }
             $validated = $request->validate([
                 'nombre' => 'required|string|max:50',
                 'grado_nombre' => 'required|string|max:10',
@@ -259,16 +279,16 @@ class GrupoController extends Controller
     {
         try {
             $group = Group::findOrFail($id);
+            if (!auth()->user()->can('groups.delete')) {
+            abort(403, 'No tienes permiso para eliminar grupos.');
+        }
+            if ($group->students()->count() > 0) {
+               return back()->with('error', '❌ No se puede eliminar el grupo porque tiene ' . $group->students()->count() . ' estudiante(s) asignado(s)');
+            }
             
-            // Verificar si tiene estudiantes asignados (descomenta y ajusta según tu modelo)
-            // if ($group->students()->count() > 0) {
-            //     return back()->with('error', '❌ No se puede eliminar el grupo porque tiene ' . $group->students()->count() . ' estudiante(s) asignado(s)');
-            // }
-            
-            // Verificar si tiene profesores asignados (descomenta y ajusta según tu modelo)
-            // if ($group->teachers()->count() > 0) {
-            //     return back()->with('error', '❌ No se puede eliminar el grupo porque tiene profesores asignados');
-            // }
+            if ($group->teachers()->count() > 0) {
+               return back()->with('error', '❌ No se puede eliminar el grupo porque tiene profesores asignados');
+            }
 
             $nombreGrupo = $group->nombre;
             $group->delete();

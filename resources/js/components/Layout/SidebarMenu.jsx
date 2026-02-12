@@ -26,13 +26,16 @@ export default function SidebarMenu({ role }) {
       { icon: GraduationCap, label: "Dashboard", path: "/rector/dashboard" },
       { icon: Users, label: "Gestión de usuarios", path: "/rector/usuarios" },
       { icon: ChartPie, label: "Reportes institucionales", path: "/rector/reportes" },
-      { icon: Settings, label: "Configuración general", path: "/rector/configuracion" },
+      { icon: Settings, label: "Configuración", path: "/rector/configuracion" },
     ],
     coordinadora: [
       { icon: GraduationCap, label: "Dashboard", path: "/coordinadora/dashboard" },
       { icon: ClipboardList, label: "Asignar materias", path: "/coordinadora/materias" },
       { icon: Users, label: "Gestionar docentes", path: "/coordinadora/docentes" },
       { icon: FileText, label: "Planificación académica", path: "/coordinadora/planificacion" },
+            { icon: Calendar, label: "Horarios", path: "/coordinadora/horarios" },
+      { icon: Calendar, label: "Periodos académicos", path: "/coordinadora/periodos" },
+      { icon: FileText, label: "Generar boletines", path: "/coordinadora/boletines", module: "boletines" },
     ],
     secretaria: [
       { icon: GraduationCap, label: "Inicio", path: "/secretaria/dashboard" },
@@ -44,7 +47,6 @@ export default function SidebarMenu({ role }) {
       { icon: Calendar, label: "Horarios", path: "/secretaria/horarios" },
       { icon: Calendar, label: "Periodos académicos", path: "/secretaria/periodos" },
       { icon: FileText, label: "Generar boletines", path: "/secretaria/boletines", module: "boletines" },
-      { icon: Settings, label: "Configuración", path: "/secretaria/configuracion" },
     ],
     profesor: [
       { icon: GraduationCap, label: "Inicio", path: "/profesor/dashboard" },

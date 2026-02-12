@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { usePage } from '@inertiajs/react';
-import { BookOpen, Calendar, Clock, GraduationCap } from 'lucide-react';
+import { BookOpen, Calendar, Clock, GraduationCap, Printer } from 'lucide-react';
 import Layout from '@/Components/Layout/Layout';
 
 export default function Horario() {
@@ -97,14 +97,25 @@ export default function Horario() {
                                 <div>
                                     <h2 className="text-xl font-bold flex items-center gap-2">
                                         <Calendar className="h-6 w-6" />
-                                        Horario del Estudiante
+                                        {/* Título según el rol */}
                                     </h2>
-                                    <p className="mt-1 text-sm opacity-90">
-                                        {estudent_name}
-                                    </p>
+                                    <p className="mt-1 text-sm opacity-90">{/* Nombre */}</p>
                                 </div>
-                                <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg text-sm font-medium">
-                                    Año {current_year || 'Actual'}
+                                <div className="flex items-center gap-3">
+                                    <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg text-sm font-medium">
+                                        Año {current_year || 'Actual'}
+                                    </div>
+                                    {/* ✅ Botón de impresión */}
+                                    {can?.print && (
+                                        <button
+                                            onClick={() => window.open(route('profesor.horario.print'), '_blank')} // o 'estudiante.horario.print'
+                                            className="bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-lg transition-all flex items-center gap-2"
+                                            title="Imprimir mi horario"
+                                        >
+                                            <Printer className="h-5 w-5" />
+                                            <span className="hidden sm:inline text-sm font-medium">Imprimir</span>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
                         </div>

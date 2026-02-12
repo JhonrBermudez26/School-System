@@ -8,9 +8,7 @@
     use App\Http\Controllers\Secretaria\UsuarioController;
     use App\Http\Controllers\Secretaria\StudentController;
     use App\Http\Controllers\Secretaria\GrupoController;
-    use App\Http\Controllers\Secretaria\ScheduleController;
-    use App\Http\Controllers\Secretaria\PeriodController;
-    use App\Http\Controllers\Secretaria\SchoolSettingController;
+  
     use App\Http\Controllers\Secretaria\TeacherController;
     use App\Http\Controllers\Secretaria\SubjectController;
 
@@ -26,7 +24,6 @@
     use App\Http\Controllers\Profesor\RegistrarNotasController;
     use App\Http\Controllers\Profesor\TaskController;
 
-
     use App\Http\Controllers\Estudiante\EstudianteDashboardController;
     use App\Http\Controllers\Estudiante\EstudianteClasesController;
     use App\Http\Controllers\Estudiante\Estudiantepostcontroller;
@@ -36,8 +33,10 @@
     use App\Http\Controllers\Estudiante\AsistenciasEstudentController;
     use App\Http\Controllers\Estudiante\MisNotasController;
 
+    use App\Http\Controllers\Coordinadora\ScheduleController;
+    use App\Http\Controllers\Coordinadora\PeriodController;
 
-
+    use App\Http\Controllers\Rector\SchoolSettingController;
 
     Route::get('/sanctum/csrf-cookie', function () {
         return response()->noContent();
@@ -64,6 +63,13 @@
                 return Inertia::render('Rector/Dashboard');
             })->name('rector.dashboard');
 
+             // CONFIGURACIÓN
+    Route::middleware(['permission:institution.update'])->group(function () {
+        Route::get('/configuracion', [SchoolSettingController::class, 'index'])->name('rector.configuracion');
+        Route::post('/configuracion', [SchoolSettingController::class, 'update'])->name('rector.configuracion.actualizar');
+        Route::delete('/configuracion/logo', [SchoolSettingController::class, 'deleteLogo'])->name('rector.configuracion.deleteLogo');
+    });
+
         });
         
         //COORDINADOR
@@ -74,90 +80,168 @@
                 return Inertia::render('Coordinadora/Dashboard');
             })->name('coordinadora.dashboard');
 
+                // HORARIOS
+            Route::middleware(['permission:schedules.view'])->group(function () {
+                Route::get('/horarios', [ScheduleController::class, 'index'])->name('coordinadora.horarios');
+            });
+
+            Route::middleware(['permission:schedules.create'])->group(function () {
+                Route::post('/horarios', [ScheduleController::class, 'store'])->name('coordinadora.horarios.store');
+                Route::post('/horarios/generar', [ScheduleController::class, 'generate'])->name('coordinadora.horarios.generate');
+                Route::post('/horarios/add-slot', [ScheduleController::class, 'addSlot'])->name('coordinadora.horarios.add-slot');
+            });
+
+            Route::middleware(['permission:schedules.update'])->group(function () {
+                Route::put('/horarios/update-slot', [ScheduleController::class, 'updateSlot'])->name('coordinadora.horarios.update-slot');
+                Route::put('/horarios/{id}', [ScheduleController::class, 'update'])->name('coordinadora.horarios.update');
+                Route::post('/horarios/move', [ScheduleController::class, 'move'])->name('coordinadora.horarios.move');
+            });
+
+            Route::middleware(['permission:schedules.delete'])->group(function () {
+                Route::delete('/horarios/delete-slot', [ScheduleController::class, 'deleteSlot'])->name('coordinadora.horarios.delete-slot');
+                Route::delete('/horarios/{id}', [ScheduleController::class, 'destroy'])->name('coordinadora.horarios.destroy');
+            });
+
+            Route::middleware(['permission:schedules.print'])->group(function () {
+                Route::get('/horarios/print', [ScheduleController::class, 'print'])->name('coordinadora.horarios.print');
+            });
+            
+            // PERIODOS
+            Route::middleware(['permission:periods.view'])->group(function () {
+                Route::get('/periodos', [PeriodController::class, 'index'])->name('coordinadora.periodos');
+            });
+            
+            Route::middleware(['permission:periods.create'])->group(function () {
+                Route::post('/periodos', [PeriodController::class, 'store'])->name('coordinadora.periodos.crear');
+            });
+            
+            Route::middleware(['permission:periods.update'])->group(function () {
+                Route::put('/periodos/{id}', [PeriodController::class, 'update'])->name('coordinadora.periodos.actualizar');
+                Route::patch('/periodos/{id}/toggle', [PeriodController::class, 'toggle'])->name('coordinadora.periodos.toggle');
+            });
+            
+            Route::middleware(['permission:periods.delete'])->group(function () {
+                Route::delete('/periodos/{id}', [PeriodController::class, 'destroy'])->name('coordinadora.periodos.eliminar');
+            });
+            
+            // BOLETINES
+            Route::middleware(['permission:bulletins.view'])->group(function () {
+                Route::get('/boletines', function () {
+                    return Inertia::render('Coordinadora/Boletines');
+                })->name('coordinadora.boletines');
+            });
+   
+
         });
 
         //SECRETARIA
-        Route::middleware('role:secretaria')->prefix('secretaria')->group(function () {
+        // SECRETARIA - con permisos específicos
+Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(function () {
+    
+    // Dashboard
+    Route::get('/dashboard', [DashboardController::class, 'index'])
+        ->name('secretaria.dashboard');
+    
+    // USUARIOS - requiere permiso específico
+    Route::middleware(['permission:users.view'])->group(function () {
+        Route::get('/usuarios', [UsuarioController::class, 'index'])
+            ->name('secretaria.usuarios');
+    });
+    
+    Route::middleware(['permission:users.create'])->group(function () {
+        Route::post('/usuarios', [UsuarioController::class, 'store'])
+            ->name('usuarios.store');
+    });
+    
+    Route::middleware(['permission:users.update'])->group(function () {
+        Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])
+            ->name('usuarios.update');
+        Route::put('/usuarios/{id}/toggle', [UsuarioController::class, 'toggle'])
+            ->name('usuarios.toggle');
+    });
 
-            // Dashboard
-            Route::get('/dashboard', [DashboardController::class, 'index'])
-            ->name('secretaria.dashboard');
+    Route::middleware(['permission:users.delete'])->group(function () {
+        Route::delete('/usuarios/{id}', [UsuarioController::class, 'destroy'])
+            ->name('usuarios.destroy');
+    });
+    
+    // ESTUDIANTES
+    Route::middleware(['permission:students.view'])->group(function () {
+        Route::get('/estudiantes', [StudentController::class, 'index'])
+            ->name('secretaria.estudiantes');
+        
+        // ✅ Rutas de exportación
+        Route::get('/estudiantes/export/excel', [StudentController::class, 'exportExcel'])
+            ->name('estudiantes.export.excel');
+        Route::get('/estudiantes/export/pdf', [StudentController::class, 'exportPDF'])
+            ->name('estudiantes.export.pdf');
+    });
 
-            // USUARIOS
-        Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
-            Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
-            Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])->name('usuarios.update');
-            Route::delete('/usuarios/{id}', [UsuarioController::class, 'destroy'])->name('usuarios.destroy');
-            Route::put('/usuarios/{id}/toggle', [UsuarioController::class, 'toggle'])->name('usuarios.toggle');
-
-            // Estudiantes
-        Route::get('/estudiantes', [StudentController::class, 'index'])->name('secretaria.estudiantes');
-            Route::put('/estudiantes/{id}', [StudentController::class, 'update'])->name('estudiantes.update');
-            Route::put('/estudiantes/{id}/toggle', [StudentController::class, 'toggle'])->name('estudiantes.toggle');
-            Route::get('estudiantes/export/excel', [StudentController::class, 'exportExcel'])->name('estudiantes.export.excel');
-            Route::get('estudiantes/export/pdf', [StudentController::class, 'exportPDF'])->name('estudiantes.export.pdf');
-
-            // PROFESORES
+    Route::middleware(['permission:students.update'])->group(function () {
+        Route::put('/estudiantes/{id}', [StudentController::class, 'update'])
+            ->name('estudiantes.update');
+        Route::put('/estudiantes/{id}/toggle', [StudentController::class, 'toggle'])
+            ->name('estudiantes.toggle');
+    });
+    
+    // PROFESORES
+     Route::middleware(['permission:teachers.view'])->group(function () {
         Route::get('/profesores', [TeacherController::class, 'index'])
             ->name('secretaria.profesores');
-        Route::put('/profesores/{id}', [TeacherController::class, 'update'])
-            ->name('profesores.update');
-        Route::put('/profesores/{id}/toggle', [TeacherController::class, 'toggle'])
-            ->name('profesores.toggle');
+    });
 
-        // ASIGNATURAS
+    Route::middleware(['permission:teachers.update'])->group(function () {
+        Route::put('/profesores/{id}', [TeacherController::class, 'update'])->name('profesores.update');
+        Route::put('/profesores/{id}/toggle', [TeacherController::class, 'toggle'])->name('profesores.toggle');
+    });
+    
+    // ASIGNATURAS
+    Route::middleware(['permission:subjects.view'])->group(function () {
         Route::get('/asignaturas', [SubjectController::class, 'index'])
             ->name('secretaria.asignaturas');
-        Route::post('/asignaturas', [SubjectController::class, 'store'])
-            ->name('asignaturas.store');
-        Route::put('/asignaturas/{id}', [SubjectController::class, 'update'])
-            ->name('asignaturas.update');
-        Route::delete('/asignaturas/{id}', [SubjectController::class, 'destroy'])
-            ->name('asignaturas.destroy');
-        Route::put('/asignaturas/{id}/toggle', [SubjectController::class, 'toggle'])
-            ->name('asignaturas.toggle');
-
-            // Grupos
-            Route::get('/grupos', [GrupoController::class, 'index'])->name('secretaria.grupos');
-            Route::post('/grupos', [GrupoController::class, 'store'])->name('grupos.store');
-            Route::put('/grupos/{id}', [GrupoController::class, 'update'])->name('grupos.update');
-            Route::delete('/grupos/{id}', [GrupoController::class, 'destroy'])->name('grupos.destroy');
-
-            // Horarios
-            Route::get('/horarios', [ScheduleController::class, 'index'])->name('secretaria.horarios');
-            Route::post('/horarios', [ScheduleController::class, 'store'])->name('horarios.store');
-            Route::put('/horarios/{id}', [ScheduleController::class, 'update'])->name('horarios.update');
-            Route::delete('/horarios/{id}', [ScheduleController::class, 'destroy'])->name('horarios.destroy');
-            Route::post('/horarios/generar', [ScheduleController::class, 'generate'])->name('horarios.generate');
-
-            // Periodos
-    Route::get('/periodos', [PeriodController::class, 'index'])
-        ->name('secretaria.periodos');
-    Route::post('/periodos', [PeriodController::class, 'store'])
-        ->name('secretaria.periodos.crear');
-    Route::put('/periodos/{id}', [PeriodController::class, 'update'])
-        ->name('secretaria.periodos.actualizar');
-    Route::delete('/periodos/{id}', [PeriodController::class, 'destroy'])
-        ->name('secretaria.periodos.eliminar');
-    Route::patch('/periodos/{id}/toggle', [PeriodController::class, 'toggle'])
-        ->name('secretaria.periodos.toggle');
-    Route::post('/periodos/verify-password', [PeriodController::class, 'verifyPassword'])
-        ->name('secretaria.periodos.verify');
-
-            // Boletines
-            Route::get('/boletines', function () {
-                return Inertia::render('Secretaria/Boletines');
-            })->name('secretaria.boletines');
-
-            // Configuración
-            // Dentro del grupo de secretaria
-            Route::get('/configuracion', [SchoolSettingController::class, 'index'])
-                ->name('secretaria.configuracion');
-            Route::post('/configuracion', [SchoolSettingController::class, 'update'])
-                ->name('secretaria.configuracion.actualizar');
-            Route::delete('/configuracion/logo', [SchoolSettingController::class, 'deleteLogo'])
-                ->name('secretaria.configuracion.deleteLogo');
-        });
+    });
+    
+    Route::middleware(['permission:subjects.create'])->group(function () {
+        Route::post('/asignaturas', [SubjectController::class, 'store'])->name('asignaturas.store');
+    });
+    
+    Route::middleware(['permission:subjects.update'])->group(function () {
+        Route::put('/asignaturas/{id}', [SubjectController::class, 'update'])->name('asignaturas.update');
+    });
+    
+    Route::middleware(['permission:subjects.delete'])->group(function () {
+        Route::delete('/asignaturas/{id}', [SubjectController::class, 'destroy'])->name('asignaturas.destroy');
+    });
+    
+    // GRUPOS
+    Route::middleware(['permission:groups.view'])->group(function () {
+        Route::get('/grupos', [GrupoController::class, 'index'])->name('secretaria.grupos');
+    });
+    
+    Route::middleware(['permission:groups.create'])->group(function () {
+        Route::post('/grupos', [GrupoController::class, 'store'])->name('grupos.store');
+    });
+    
+    Route::middleware(['permission:groups.update'])->group(function () {
+        Route::put('/grupos/{id}', [GrupoController::class, 'update'])->name('grupos.update');
+    });
+    
+    Route::middleware(['permission:groups.delete'])->group(function () {
+        Route::delete('/grupos/{id}', [GrupoController::class, 'destroy'])->name('grupos.destroy');
+    });
+    
+    // horarios
+    Route::middleware(['permission:schedules.view'])->group(function () {
+        Route::get('/horarios', [\App\Http\Controllers\Coordinadora\ScheduleController::class, 'index'])
+            ->name('secretaria.horarios');
+    });
+    
+    Route::middleware(['permission:schedules.print'])->group(function () {
+        Route::get('/horarios/print', [\App\Http\Controllers\Coordinadora\ScheduleController::class, 'print'])
+            ->name('secretaria.horarios.print');
+    });
+   
+});
 
         //PROFESOR
         Route::middleware('role:profesor')->prefix('profesor')->group(function () {
@@ -262,7 +346,8 @@
     });
             
             //HORARIO
-            Route::get('/horario', [ScheduleTeacherController::class, 'index'])->name('profesor.horario');
+           Route::get('/horario', [ScheduleTeacherController::class, 'index'])->name('profesor.horario');
+    Route::get('/horario/print', [ScheduleTeacherController::class, 'print'])->name('profesor.horario.print');
 
             // ASISTENCIAS
             Route::get('/asistencias', [AsistenciasController::class, 'index'])
@@ -375,6 +460,7 @@
 
          //HORARIO
         Route::get('/horario', [ScheduleEstudentController::class, 'index'])->name('estudiante.horario');
+    Route::get('/horario/print', [ScheduleEstudentController::class, 'print'])->name('estudiante.horario.print');
 
              // ASISTENCIAS
         Route::get('/asistencias', [AsistenciasEstudentController::class, 'index'])

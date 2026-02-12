@@ -4,7 +4,7 @@ import { useState, useMemo, useRef } from 'react';
 import Layout from '@/Components/Layout/Layout';
 
 export default function Estudiantes() {
-    const { estudiantes, grupos, error, flash } = usePage().props;
+    const { estudiantes, grupos, error, flash, can} = usePage().props;
     const editFormRef = useRef(null);
 
     const [search, setSearch] = useState('');
@@ -416,6 +416,7 @@ export default function Estudiantes() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex justify-end space-x-2">
+                                                {can?.update && (
                                                 <button
                                                     onClick={() => toggleActive(est.id, est.is_active)}
                                                     className={`${est.is_active
@@ -427,6 +428,8 @@ export default function Estudiantes() {
                                                 >
                                                     <Users className="h-4 w-4" />
                                                 </button>
+                                                )}
+                                                {can?.update && (
                                                 <button
                                                     onClick={() => handleEditClick(est)}
                                                     className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded"
@@ -435,6 +438,13 @@ export default function Estudiantes() {
                                                 >
                                                     <Edit3 className="h-4 w-4" />
                                                 </button>
+                                                )}
+                                                {/* ✅ Mostrar mensaje si no tiene permisos */}
+                                                {!can?.update && (
+                                                    <span className="text-gray-400 text-xs italic px-2">
+                                                        Solo lectura
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>
@@ -454,6 +464,7 @@ export default function Estudiantes() {
             </div>
 
             {/* Export Buttons */}
+             {can?.export && (
             <div className="mt-6 flex justify-end space-x-3">
                 <button
                     onClick={() => handleExport('excel')}
@@ -472,6 +483,7 @@ export default function Estudiantes() {
                     <span>Exportar PDF</span>
                 </button>
             </div>
+             )}
         </Layout>
     );
 }

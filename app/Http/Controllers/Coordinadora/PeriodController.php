@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Secretaria;
+namespace App\Http\Controllers\Coordinadora;
 
 use App\Http\Controllers\Controller;
 use App\Models\AcademicPeriod;
@@ -38,7 +38,7 @@ class PeriodController extends Controller
         $porcentajeTotal = AcademicPeriod::sum('grade_weight') ?? 0;
         $porcentajeDisponible = 100 - $porcentajeTotal;
 
-        return Inertia::render('Secretaria/Periodos', [
+        return Inertia::render('Coordinadora/Periodos', [
             'periodos' => $periodos,
             'stats' => [
                 'periodoActual' => $periodoActual?->name ?? 'No definido',
@@ -106,7 +106,7 @@ class PeriodController extends Controller
             'grade_weight' => $data['porcentaje'] ?? null,
         ]);
 
-        return redirect()->route('secretaria.periodos')
+        return redirect()->route('coordinadora.periodos')
             ->with('success', 'Periodo creado correctamente');
     }
 
@@ -165,7 +165,7 @@ class PeriodController extends Controller
             'grade_weight' => $data['porcentaje'] ?? null,
         ]);
 
-        return redirect()->route('secretaria.periodos')
+        return redirect()->route('coordinadora.periodos')
             ->with('success', 'Periodo actualizado correctamente');
     }
 
@@ -173,7 +173,7 @@ class PeriodController extends Controller
     {
         AcademicPeriod::findOrFail($id)->delete();
         
-        return redirect()->route('secretaria.periodos')
+        return redirect()->route('coordinadora.periodos')
             ->with('success', 'Periodo eliminado correctamente');
     }
 
@@ -204,7 +204,7 @@ class PeriodController extends Controller
         
         $estado = $periodo->grades_enabled ? 'habilitada' : 'deshabilitada';
         
-        return redirect()->route('secretaria.periodos')
+        return redirect()->route('coordinadora.periodos')
             ->with('success', "Carga de notas {$estado} correctamente");
     }
 }

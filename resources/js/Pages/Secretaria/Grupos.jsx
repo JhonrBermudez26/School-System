@@ -17,7 +17,7 @@ import { useState, useEffect, useMemo } from 'react';
 import Layout from '@/Components/Layout/Layout';
 
 export default function Grupos() {
-    const { grupos, grados, cursos, auth, error, flash } = usePage().props;
+    const { grupos, grados, cursos, auth, error, flash, can } = usePage().props;
     const user = auth?.user;
 
     const [search, setSearch] = useState('');
@@ -219,6 +219,7 @@ export default function Grupos() {
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Gestionar Grupos</h1>
                     <p className="text-gray-600 mt-2">Combina grados y cursos para crear grupos escolares</p>
                 </div>
+                {can?.create && (
                 <button
                     onClick={() => {
                         if (showForm) {
@@ -232,6 +233,7 @@ export default function Grupos() {
                     {showForm ? <X className="h-5 w-5" /> : <Plus className="h-5 w-5" />}
                     <span>{showForm ? 'Cancelar' : 'Nuevo Grupo'}</span>
                 </button>
+                )}
             </div>
 
             {/* Mensajes Flash */}
@@ -469,6 +471,7 @@ export default function Grupos() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
+                        {can?.update && (
                         <button
                           onClick={() => handleEdit(grupo)}
                           className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded transition"
@@ -476,6 +479,8 @@ export default function Grupos() {
                         >
                           <Edit3 className="h-4 w-4" />
                         </button>
+                        )}
+                         {can?.delete && (
                         <button
                           onClick={() => handleDelete(grupo)}
                           className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded transition"
@@ -483,6 +488,7 @@ export default function Grupos() {
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
+                        )}
                       </div>
                     </td>
                   </tr>

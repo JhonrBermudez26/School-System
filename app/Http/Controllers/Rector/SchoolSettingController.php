@@ -1,5 +1,5 @@
 <?php
-namespace App\Http\Controllers\Secretaria;
+namespace App\Http\Controllers\Rector;
 
 use App\Http\Controllers\Controller;
 use App\Models\SchoolSetting;
@@ -13,7 +13,7 @@ class SchoolSettingController extends Controller
     {
         $settings = SchoolSetting::first();
         
-        return Inertia::render('Secretaria/Configuracion', [
+        return Inertia::render('Rector/Configuracion', [
             'settings' => $settings,
         ]);
     }
@@ -77,7 +77,7 @@ class SchoolSettingController extends Controller
         $settings->fill($data);
         $settings->save();
 
-        return redirect()->route('secretaria.configuracion')
+        return redirect()->route('rector.configuracion')
             ->with('success', '¡Configuración actualizada exitosamente!');
     }
 

@@ -1,0 +1,64 @@
+permisos
+
+secretaria
+
+users.create
+users.edit
+users.view
+users.activate_deactivate
+
+students.create
+students.edit
+students.view
+
+teachers.view
+
+academic_periods.create
+academic_periods.edit
+academic_periods.view
+
+enrollments.create
+enrollments.edit
+enrollments.view
+
+documents.generate
+documents.view
+
+
+profesor
+
+courses.view_assigned
+
+students.view_assigned
+
+grades.create
+grades.edit
+grades.view
+
+attendance.create
+attendance.edit
+attendance.view
+
+
+estudiantes:
+
+grades.view_own
+attendance.view_own
+schedule.view
+
+como corren:
+npm run dev
+php artisan server
+php artisan reverb:start
+php artisan queue:work --verbose
+
+
+PARA MAÑANA ///////////////////////////////
+
+0.las vistas de secretaria responsive
+1. ajustar los permisos que faltan se de la secretaria
+2. los boletines los revisa y aprueba la coordinadora
+3. cuando la coordinadora apruebe boletines se le ven a la secretaria y ella los imprime
+4. los horarios los gestiona la coordinadora la secretaria tambien puede verlos
+5. los periodos academicos los define la coordinadora, la secretariasolo tiene una visual
+6. la configuracion del colegio la tiene el rector

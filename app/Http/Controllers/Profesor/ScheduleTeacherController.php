@@ -3,29 +3,22 @@ namespace App\Http\Controllers\Profesor;
 
 use App\Http\Controllers\Controller;
 use App\Models\Schedule;
-use App\Models\User;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Barryvdh\DomPDF\Facade\Pdf;
 
 class ScheduleTeacherController extends Controller
 {
-    /**
-     * Mostrar el horario del profesor autenticado
-     */
     public function index()
     {
+        $this->authorize('viewAny', Schedule::class);
+
         $teacher = Auth::user();
         $current_year = date('Y');
 
-        // Obtener todos los bloques horarios
-        $time_slots = DB::table('time_slots')
-            ->orderBy('start_time')
-            ->get();
+        $time_slots = DB::table('time_slots')->orderBy('start_time')->get();
 
-        // Obtener el horario del profesor autenticado desde timetable_slots
-        // Esta es la misma lógica que usa la secretaria para ver horarios de profesores
         $teacher_timetable_slots = DB::table('timetable_slots as ts')
             ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
             ->join('groups as g', 'g.id', '=', 'tt.group_id')
@@ -47,6 +40,42 @@ class ScheduleTeacherController extends Controller
             'time_slots' => $time_slots,
             'teacher_name' => $teacher->name . ' ' . $teacher->last_name,
             'current_year' => $current_year,
+            'can' => [
+                'print' => auth()->user()->can('print', Schedule::class),
+            ],
         ]);
+    }
+
+    public function print()
+    {
+        $this->authorize('print', Schedule::class);
+
+        $teacher = Auth::user();
+        $timeSlots = DB::table('time_slots')->orderBy('start_time')->get();
+        $days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+
+        $teacherSlots = DB::table('timetable_slots as ts')
+            ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
+            ->join('groups as g', 'g.id', '=', 'tt.group_id')
+            ->leftJoin('subjects as s', 's.id', '=', 'ts.subject_id')
+            ->select('ts.day', 'ts.time_slot_id', 's.name as subject_name', 'g.nombre as group_name')
+            ->where('ts.user_id', $teacher->id)
+            ->get();
+
+        $grid = [];
+        foreach ($days as $d) $grid[$d] = [];
+        foreach ($teacherSlots as $ts) {
+            $grid[$ts->day][$ts->time_slot_id] = $ts;
+        }
+
+        $pdf = Pdf::loadView('pdf.horario-docente', [
+            'teacher' => $teacher,
+            'time_slots' => $timeSlots,
+            'days' => $days,
+            'grid' => $grid,
+            'current_year' => now()->year,
+        ])->setPaper('a4', 'landscape');
+
+        return $pdf->download("mi-horario-{$teacher->name}-{$teacher->last_name}.pdf");
     }
 }
