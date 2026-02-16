@@ -22,8 +22,22 @@ class PeriodRequest extends FormRequest
             'status' => 'nullable|string|in:draft,active,closed,archived',
             'habilitado' => 'nullable|boolean',
             'directrices' => 'nullable|string|max:1000',
-            'porcentaje' => 'nullable|numeric|min:0|max:100',
+            'porcentaje' => 'required|numeric|min:0|max:100', // ⭐ AHORA ES OBLIGATORIO
             'password' => 'nullable|string',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'name.required' => 'El nombre del periodo es obligatorio',
+            'start_date.required' => 'La fecha de inicio es obligatoria',
+            'end_date.required' => 'La fecha de fin es obligatoria',
+            'end_date.after' => 'La fecha de fin debe ser posterior a la fecha de inicio',
+            'porcentaje.required' => 'El porcentaje es obligatorio para calcular las notas finales',
+            'porcentaje.numeric' => 'El porcentaje debe ser un número',
+            'porcentaje.min' => 'El porcentaje no puede ser negativo',
+            'porcentaje.max' => 'El porcentaje no puede exceder el 100%',
         ];
     }
 }

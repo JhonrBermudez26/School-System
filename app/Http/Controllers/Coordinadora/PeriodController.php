@@ -25,6 +25,9 @@ class PeriodController extends Controller
             ->orderByDesc('period_number')
             ->get()
             ->map(function ($p) use ($hoy) {
+                // ⭐ Determinar si es el periodo actual por FECHA
+                $esPeriodoActual = $p->start_date <= $hoy && $p->end_date >= $hoy;
+                
                 return [
                     'id' => $p->id,
                     'nombre' => $p->name,
@@ -32,7 +35,7 @@ class PeriodController extends Controller
                     'fecha_fin' => $p->end_date->format('Y-m-d'),
                     'habilitado' => (bool) $p->grades_enabled,
                     'status' => $p->status,
-                    'es_periodo_actual' => $p->is_active,
+                    'es_periodo_actual' => $esPeriodoActual, // ⭐ Automático por fecha
                     'directrices' => $p->guidelines,
                     'porcentaje' => $p->grade_weight,
                 ];
@@ -60,14 +63,12 @@ class PeriodController extends Controller
         $validated = $request->validated();
 
         // Validar porcentaje
-        if (isset($validated['porcentaje'])) {
-            $porcentajeTotal = AcademicPeriod::sum('grade_weight') ?? 0;
-            
-            if (($porcentajeTotal + $validated['porcentaje']) > 100) {
-                return back()->withErrors([
-                    'porcentaje' => 'La suma de porcentajes no puede exceder el 100%. Disponible: ' . (100 - $porcentajeTotal) . '%'
-                ]);
-            }
+        $porcentajeTotal = AcademicPeriod::sum('grade_weight') ?? 0;
+        
+        if (($porcentajeTotal + $validated['porcentaje']) > 100) {
+            return back()->withErrors([
+                'porcentaje' => 'La suma de porcentajes no puede exceder el 100%. Disponible: ' . (100 - $porcentajeTotal) . '%'
+            ]);
         }
 
         // Derivar año y número
@@ -78,30 +79,18 @@ class PeriodController extends Controller
             $periodNumber = (int) $m[1];
         }
 
-        // Validar habilitación fuera de fecha
-        $hoy = now();
-        $dentroFecha = $validated['start_date'] <= $hoy && $validated['end_date'] >= $hoy;
-        
-        if (($validated['habilitado'] ?? false) && !$dentroFecha) {
-            $request->validate(['password' => 'required|string']);
-            
-            if (!Hash::check($request->password, auth()->user()->password)) {
-                return back()->withErrors(['password' => 'La contraseña es incorrecta']);
-            }
-        }
-
         $periodo = AcademicPeriod::create([
             'name' => $validated['name'],
             'year' => $year ?? (int) date('Y', strtotime($validated['start_date'])),
             'period_number' => $periodNumber ?? 1,
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
-            'grades_enabled' => $validated['habilitado'] ?? false,
-            'grades_enabled_manually' => ($validated['habilitado'] ?? false) && !$dentroFecha,
-            'status' => $validated['status'] ?? 'draft',
-            'is_active' => $dentroFecha && ($validated['status'] ?? 'draft') === 'active',
+            'grades_enabled' => $validated['habilitado'] ?? true, // Por defecto habilitado
+            'grades_enabled_manually' => false, // Se marca después si aplica
+            'status' => 'draft',
+            'is_active' => false, // Se actualizará automáticamente
             'guidelines' => $validated['directrices'] ?? null,
-            'grade_weight' => $validated['porcentaje'] ?? null,
+            'grade_weight' => $validated['porcentaje'],
         ]);
 
         $this->activityLog->log($periodo, 'created', null, $periodo->toArray());
@@ -118,14 +107,12 @@ class PeriodController extends Controller
         $validated = $request->validated();
 
         // Validar porcentaje
-        if (isset($validated['porcentaje'])) {
-            $porcentajeTotal = AcademicPeriod::where('id', '!=', $id)->sum('grade_weight') ?? 0;
-            
-            if (($porcentajeTotal + $validated['porcentaje']) > 100) {
-                return back()->withErrors([
-                    'porcentaje' => 'La suma de porcentajes no puede exceder el 100%. Disponible: ' . (100 - $porcentajeTotal) . '%'
-                ]);
-            }
+        $porcentajeTotal = AcademicPeriod::where('id', '!=', $id)->sum('grade_weight') ?? 0;
+        
+        if (($porcentajeTotal + $validated['porcentaje']) > 100) {
+            return back()->withErrors([
+                'porcentaje' => 'La suma de porcentajes no puede exceder el 100%. Disponible: ' . (100 - $porcentajeTotal) . '%'
+            ]);
         }
 
         $year = $validated['year'] ?? $periodo->year;
@@ -135,29 +122,14 @@ class PeriodController extends Controller
             $periodNumber = (int) $m[1];
         }
 
-        $hoy = now();
-        $dentroFecha = $validated['start_date'] <= $hoy && $validated['end_date'] >= $hoy;
-        
-        if (($validated['habilitado'] ?? false) && !$dentroFecha && ($validated['habilitado'] != $periodo->grades_enabled)) {
-            $request->validate(['password' => 'required|string']);
-            
-            if (!Hash::check($request->password, auth()->user()->password)) {
-                return back()->withErrors(['password' => 'La contraseña es incorrecta']);
-            }
-        }
-
         $periodo->update([
             'name' => $validated['name'],
             'year' => $year,
             'period_number' => $periodNumber,
             'start_date' => $validated['start_date'],
             'end_date' => $validated['end_date'],
-            'grades_enabled' => $validated['habilitado'] ?? false,
-            'grades_enabled_manually' => ($validated['habilitado'] ?? false) && !$dentroFecha,
-            'status' => $validated['status'] ?? $periodo->status,
-            'is_active' => $dentroFecha && ($validated['status'] ?? $periodo->status) === 'active',
             'guidelines' => $validated['directrices'] ?? null,
-            'grade_weight' => $validated['porcentaje'] ?? null,
+            'grade_weight' => $validated['porcentaje'],
         ]);
 
         $this->activityLog->log($periodo, 'updated', $oldValues, $periodo->getChanges());
@@ -166,9 +138,6 @@ class PeriodController extends Controller
             ->with('success', 'Periodo actualizado correctamente');
     }
 
-    /**
-     * Eliminar un periodo
-     */
     public function destroy(string $id)
     {
         $periodo = AcademicPeriod::findOrFail($id);
@@ -184,7 +153,9 @@ class PeriodController extends Controller
     }
 
     /**
-     * Habilitar/deshabilitar carga de notas
+     * ⭐ Habilitar/Deshabilitar carga de notas
+     * - Si es periodo actual: toggle directo
+     * - Si NO es periodo actual: requiere contraseña
      */
     public function toggle(Request $request, string $id)
     {
@@ -192,9 +163,10 @@ class PeriodController extends Controller
         $this->authorize('update', $periodo);
 
         $oldValues = $periodo->toArray();
-        $dentroFecha = $periodo->isDentroFecha();
-        
-        if (!$periodo->grades_enabled && !$dentroFecha) {
+        $esPeriodoActual = $periodo->isDentroFecha();
+
+        // Si NO es el periodo actual y se quiere habilitar, requiere contraseña
+        if (!$esPeriodoActual && !$periodo->grades_enabled) {
             $request->validate(['password' => 'required|string']);
             
             if (!Hash::check($request->password, auth()->user()->password)) {
@@ -204,9 +176,10 @@ class PeriodController extends Controller
             $periodo->grades_enabled = true;
             $periodo->grades_enabled_manually = true;
         } else {
+            // Toggle normal
             $periodo->grades_enabled = !$periodo->grades_enabled;
             
-            if ($dentroFecha) {
+            if ($esPeriodoActual) {
                 $periodo->grades_enabled_manually = false;
             }
         }
@@ -220,36 +193,9 @@ class PeriodController extends Controller
             ->with('success', "Carga de notas {$estado} correctamente");
     }
 
-    /**
-     * Activar un periodo (draft → active)
-     */
-    public function activate($id)
-    {
-        $periodo = AcademicPeriod::findOrFail($id);
-
-        $this->authorize('activate', $periodo);
-
-        if (!$periodo->isDraft()) {
-            return back()->withErrors(['error' => 'Solo se pueden activar periodos en estado borrador']);
-        }
-
-        $oldValues = $periodo->toArray();
-        if ($periodo->activate(auth()->id())) {
-            $this->activityLog->log($periodo, 'activated', $oldValues, $periodo->getChanges());
-            return redirect()->route('coordinadora.periodos')
-                ->with('success', 'Periodo activado correctamente. Los profesores ya pueden cargar notas.');
-        }
-
-        return back()->withErrors(['error' => 'No se pudo activar el periodo']);
-    }
-
-    /**
-     * Cerrar un periodo (active → closed)
-     */
     public function close($id)
     {
         $periodo = AcademicPeriod::findOrFail($id);
-
         $this->authorize('close', $periodo);
 
         if (!$periodo->isActive()) {
@@ -257,8 +203,10 @@ class PeriodController extends Controller
         }
 
         $oldValues = $periodo->toArray();
+
         if ($periodo->close(auth()->id())) {
             $this->activityLog->log($periodo, 'closed', $oldValues, $periodo->getChanges());
+            
             return redirect()->route('coordinadora.periodos')
                 ->with('success', 'Periodo cerrado correctamente. Los profesores ya no pueden modificar notas.');
         }
@@ -266,13 +214,9 @@ class PeriodController extends Controller
         return back()->withErrors(['error' => 'No se pudo cerrar el periodo']);
     }
 
-    /**
-     * Reabrir un periodo cerrado (closed → active)
-     */
     public function reopen($id)
     {
         $periodo = AcademicPeriod::findOrFail($id);
-
         $this->authorize('reopen', $periodo);
 
         if (!$periodo->isClosed()) {
@@ -280,8 +224,10 @@ class PeriodController extends Controller
         }
 
         $oldValues = $periodo->toArray();
+
         if ($periodo->reopen(auth()->id())) {
             $this->activityLog->log($periodo, 'reopened', $oldValues, $periodo->getChanges());
+            
             return redirect()->route('coordinadora.periodos')
                 ->with('success', 'Periodo reabierto correctamente. Los profesores pueden volver a modificar notas.');
         }
@@ -289,13 +235,9 @@ class PeriodController extends Controller
         return back()->withErrors(['error' => 'No se pudo reabrir el periodo']);
     }
 
-    /**
-     * Archivar un periodo (closed → archived)
-     */
     public function archive($id)
     {
         $periodo = AcademicPeriod::findOrFail($id);
-
         $this->authorize('archive', $periodo);
 
         if (!$periodo->isClosed()) {
@@ -303,8 +245,10 @@ class PeriodController extends Controller
         }
 
         $oldValues = $periodo->toArray();
+
         if ($periodo->archive()) {
             $this->activityLog->log($periodo, 'archived', $oldValues, $periodo->getChanges());
+            
             return redirect()->route('coordinadora.periodos')
                 ->with('success', 'Periodo archivado correctamente');
         }

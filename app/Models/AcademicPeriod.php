@@ -49,6 +49,22 @@ class AcademicPeriod extends Model
         return $this->start_date <= $hoy && $this->end_date >= $hoy;
     }
 
+    /**
+     * ✅ MÉTODO QUE FALTABA: Verifica si una fecha específica está dentro del periodo
+     * @param Carbon|string $fecha
+     * @return bool
+     */
+    public function contieneFecha($fecha): bool
+    {
+        // Convertir a Carbon si es string
+        if (is_string($fecha)) {
+            $fecha = Carbon::parse($fecha);
+        }
+
+        return $fecha->greaterThanOrEqualTo($this->start_date) && 
+               $fecha->lessThanOrEqualTo($this->end_date);
+    }
+
     public function isActivo(): bool
     {
         return $this->grades_enabled &&
@@ -153,7 +169,6 @@ class AcademicPeriod extends Model
     public static function getPeriodoActual()
     {
         $hoy = now();
-
         return static::where('start_date', '<=', $hoy)
             ->where('end_date', '>=', $hoy)
             ->first();
@@ -191,7 +206,6 @@ class AcademicPeriod extends Model
     public function scopeDentroFecha($query)
     {
         $hoy = now();
-
         return $query->where('start_date', '<=', $hoy)
                      ->where('end_date', '>=', $hoy);
     }
@@ -232,16 +246,14 @@ class AcademicPeriod extends Model
         if ($this->isDentroFecha()) {
             return 'Activo';
         }
-
         if ($this->end_date < now()) {
             return 'Finalizado';
         }
-
         return 'Próximo';
     }
 
     /* =====================================================
-     |  UTILIDADES (🔥 AQUÍ ESTABA EL BUG)
+     |  UTILIDADES
      ===================================================== */
 
     /**
@@ -252,7 +264,6 @@ class AcademicPeriod extends Model
         if (!$this->start_date || !$this->end_date) {
             return 0;
         }
-
         return $this->start_date->diffInDays($this->end_date) + 1;
     }
 
@@ -264,7 +275,6 @@ class AcademicPeriod extends Model
         if (!$this->end_date || now()->gt($this->end_date)) {
             return 0;
         }
-
         return now()->diffInDays($this->end_date);
     }
 
@@ -274,7 +284,6 @@ class AcademicPeriod extends Model
     public function getProgreso(): float
     {
         $hoy = now();
-
         if ($hoy < $this->start_date) return 0;
         if ($hoy > $this->end_date) return 100;
 
@@ -282,20 +291,17 @@ class AcademicPeriod extends Model
         if ($totalDias === 0) return 100;
 
         $diasTranscurridos = $this->start_date->diffInDays($hoy);
-
         return round(($diasTranscurridos / $totalDias) * 100, 2);
     }
 
     public static function getPorcentajeDisponible(?int $exceptoId = null): int
     {
         $query = static::query();
-
         if ($exceptoId) {
             $query->where('id', '!=', $exceptoId);
         }
 
         $usado = $query->sum('grade_weight') ?? 0;
-
         return max(0, 100 - $usado);
     }
 
@@ -350,4 +356,3 @@ class AcademicPeriod extends Model
         });
     }
 }
-
