@@ -190,9 +190,10 @@
                 Route::get('/asistencia', [AttendanceSupervisionController::class, 'index'])->name('coordinadora.asistencia');
                 Route::get('/asistencia/global', [AttendanceSupervisionController::class, 'globalAttendance'])->name('coordinadora.asistencia.global');
                 Route::get('/asistencia/grupo/{id}', [AttendanceSupervisionController::class, 'byGroup'])->name('coordinadora.asistencia.grupo');
-                Route::get('/asistencia/alerta-inasistencia', [AttendanceSupervisionController::class, 'highAbsenceAlert'])->name('coordinadora.asistencia.alerta');
                 Route::get('/asistencia/stats', [AttendanceSupervisionController::class, 'statistics'])->name('coordinadora.asistencia.stats');
                 Route::get('/asistencia/export', [AttendanceSupervisionController::class, 'export'])->name('coordinadora.asistencia.export');
+                Route::post('/asistencia/generar-alertas', [AttendanceSupervisionController::class, 'generateAlerts'])
+                    ->name('coordinadora.asistencia.generar-alertas');
             });
 
             // GESTIÓN DISCIPLINARIA

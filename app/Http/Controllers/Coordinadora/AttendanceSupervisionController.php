@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Attendance;
 use App\Models\Group;
 use App\Models\User;
+use App\Models\AttendanceAlert; // ⚠️ Crear este modelo si usas Opción 2
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
@@ -24,7 +25,21 @@ class AttendanceSupervisionController extends Controller
         $endDate = $request->get('end_date', now()->endOfMonth()->format('Y-m-d'));
         $groupId = $request->get('group_id');
 
-        $groups = Group::with('grade')->get();
+        // ✅ Cargar grupos con grade y course
+        $groups = Group::with(['grade', 'course'])->get()->map(function($group) {
+            return [
+                'id' => $group->id,
+                'name' => $group->nombre, // ✅ Usar 'nombre' directamente
+                'grade' => $group->grade ? [
+                    'id' => $group->grade->id,
+                    'name' => $group->grade->name ?? $group->grade->nombre ?? 'N/A'
+                ] : null,
+                'course' => $group->course ? [
+                    'id' => $group->course->id,
+                    'name' => $group->course->name ?? $group->course->nombre ?? 'N/A'
+                ] : null,
+            ];
+        });
 
         // Estadísticas globales
         $totalAttendances = Attendance::whereBetween('date', [$startDate, $endDate])->count();
@@ -39,7 +54,7 @@ class AttendanceSupervisionController extends Controller
             ? round(($presentCount / $totalAttendances) * 100, 2)
             : 0;
 
-        // Estudiantes críticos (con alta inasistencia)
+        // Estudiantes críticos
         $criticalStudents = $this->getHighAbsenceData(20);
 
         // Periodo actual
@@ -59,27 +74,9 @@ class AttendanceSupervisionController extends Controller
                     ->where('status', 'absent')
                     ->count(),
                 'criticalStudents' => $criticalStudents,
-                'highRiskGroups' => 0, // Podría calcularse después
+                'highRiskGroups' => $this->countHighRiskGroups(),
             ],
         ]);
-    }
-
-    /**
-     * Obtener asistencia global
-     */
-    public function globalAttendance(Request $request)
-    {
-        $this->authorize('viewAll', Attendance::class);
-
-        $startDate = $request->get('start_date', now()->startOfMonth()->format('Y-m-d'));
-        $endDate = $request->get('end_date', now()->endOfMonth()->format('Y-m-d'));
-
-        $attendanceData = Attendance::with(['user', 'subjectGroup.subject', 'subjectGroup.group'])
-            ->whereBetween('date', [$startDate, $endDate])
-            ->orderBy('date', 'desc')
-            ->paginate(50);
-
-        return response()->json($attendanceData);
     }
 
     /**
@@ -92,27 +89,31 @@ class AttendanceSupervisionController extends Controller
         $startDate = $request->get('start_date', now()->startOfMonth()->format('Y-m-d'));
         $endDate = $request->get('end_date', now()->endOfMonth()->format('Y-m-d'));
 
-        $group = Group::with(['students', 'subjects'])->findOrFail($groupId);
+        $group = Group::with(['grade', 'course', 'students'])->findOrFail($groupId);
 
         // Asistencia por estudiante
         $attendanceByStudent = [];
-
+        
         foreach ($group->students as $student) {
             $totalClasses = Attendance::where('user_id', $student->id)
+                ->where('group_id', $groupId)
                 ->whereBetween('date', [$startDate, $endDate])
                 ->count();
 
             $presentCount = Attendance::where('user_id', $student->id)
+                ->where('group_id', $groupId)
                 ->whereBetween('date', [$startDate, $endDate])
                 ->where('status', 'present')
                 ->count();
 
             $absentCount = Attendance::where('user_id', $student->id)
+                ->where('group_id', $groupId)
                 ->whereBetween('date', [$startDate, $endDate])
                 ->where('status', 'absent')
                 ->count();
 
             $lateCount = Attendance::where('user_id', $student->id)
+                ->where('group_id', $groupId)
                 ->whereBetween('date', [$startDate, $endDate])
                 ->where('status', 'late')
                 ->count();
@@ -133,16 +134,25 @@ class AttendanceSupervisionController extends Controller
             ];
         }
 
-        // Ordenar por tasa de asistencia ascendente (los peores primero)
+        // Ordenar por tasa de asistencia ascendente
         usort($attendanceByStudent, function($a, $b) {
             return $a['attendance_rate'] <=> $b['attendance_rate'];
         });
 
+        $averageRate = count($attendanceByStudent) > 0 
+            ? round(array_sum(array_column($attendanceByStudent, 'attendance_rate')) / count($attendanceByStudent), 2) 
+            : 0;
+
         return response()->json([
-            'group' => $group,
-            'average' => $group->students->count() > 0 ? round(array_sum(array_column($attendanceByStudent, 'attendance_rate')) / $group->students->count(), 2) : 0,
+            'group' => [
+                'id' => $group->id,
+                'name' => $group->nombre, // ✅ Usar 'nombre'
+                'grade' => $group->grade ? ($group->grade->name ?? $group->grade->nombre ?? 'N/A') : 'N/A',
+                'course' => $group->course ? ($group->course->name ?? $group->course->nombre ?? 'N/A') : 'N/A',
+            ],
+            'average' => $averageRate,
             'totalRecords' => array_sum(array_column($attendanceByStudent, 'total_classes')),
-            'director' => 'Director de Grupo', // Placeholder o relación si existe
+            'director' => 'Director de Grupo', // ✅ Si tienes esta relación, agrégala
             'students' => array_map(function($s) {
                 return [
                     'name' => $s['student_name'],
@@ -156,63 +166,90 @@ class AttendanceSupervisionController extends Controller
     }
 
     /**
-     * Detectar estudiantes con alta inasistencia
+     * ✅ OPCIÓN 2: Generar alertas con guardado en BD
      */
-    public function highAbsenceAlert(Request $request)
+    public function generateAlerts(Request $request)
     {
         $this->authorize('viewAll', Attendance::class);
 
-        $threshold = $request->get('threshold', 20); // % mínimo de inasistencia
+        $threshold = $request->get('threshold', 15);
         $startDate = $request->get('start_date', now()->startOfMonth()->format('Y-m-d'));
         $endDate = $request->get('end_date', now()->endOfMonth()->format('Y-m-d'));
+        
+        $alertsCreated = 0;
+        $alerts = [];
 
-        $students = User::role('estudiante')
-            ->with(['groups'])
-            ->get()
-            ->map(function ($student) use ($startDate, $endDate, $threshold) {
-                $totalClasses = Attendance::where('user_id', $student->id)
-                    ->whereBetween('date', [$startDate, $endDate])
-                    ->count();
+        User::role('estudiante')
+            ->with(['groups.grade'])
+            ->chunk(100, function ($students) use ($threshold, $startDate, $endDate, &$alertsCreated, &$alerts) {
+                foreach ($students as $student) {
+                    $total = Attendance::where('user_id', $student->id)
+                        ->whereBetween('date', [$startDate, $endDate])
+                        ->count();
+                    
+                    $absent = Attendance::where('user_id', $student->id)
+                        ->whereBetween('date', [$startDate, $endDate])
+                        ->where('status', 'absent')
+                        ->count();
 
-                $absentCount = Attendance::where('user_id', $student->id)
-                    ->whereBetween('date', [$startDate, $endDate])
-                    ->where('status', 'absent')
-                    ->count();
+                    if ($total == 0) continue;
 
-                $absenceRate = $totalClasses > 0 
-                    ? round(($absentCount / $totalClasses) * 100, 2)
-                    : 0;
+                    $rate = round(($absent / $total) * 100, 2);
 
-                return [
-                    'student_id' => $student->id,
-                    'student_name' => $student->name,
-                    'student_email' => $student->email,
-                    'groups' => $student->groups->pluck('name'),
-                    'total_classes' => $totalClasses,
-                    'absent_count' => $absentCount,
-                    'absence_rate' => $absenceRate,
-                    'alert' => $absenceRate >= $threshold,
-                ];
-            })
-            ->filter(function ($student) {
-                return $student['alert'];
-            })
-            ->sortByDesc('absence_rate')
-            ->values();
+                    if ($rate >= $threshold) {
+                        $severity = $rate >= 30 ? 'crítico' : ($rate >= 20 ? 'alto' : 'medio');
+                        
+                        $alerts[] = [
+                            'student_id' => $student->id,
+                            'student_name' => $student->name,
+                            'student_email' => $student->email,
+                            'group' => $student->groups->first() ? $student->groups->first()->nombre : 'N/A',
+                            'grade' => $student->groups->first() && $student->groups->first()->grade 
+                                ? ($student->groups->first()->grade->name ?? $student->groups->first()->grade->nombre ?? 'N/A')
+                                : 'N/A',
+                            'absence_rate' => $rate,
+                            'absent_count' => $absent,
+                            'total_classes' => $total,
+                            'severity' => $severity,
+                            'generated_at' => now()->toDateTimeString(),
+                        ];
+                        
+                        $alertsCreated++;
+
+                        // ⚠️ Si quieres guardar en BD (Opción 2), descomenta:
+                        /*
+                        AttendanceAlert::updateOrCreate(
+                            [
+                                'student_id' => $student->id,
+                                'status' => 'pendiente',
+                            ],
+                            [
+                                'group_id' => $student->groups->first()->id ?? null,
+                                'absence_rate' => $rate,
+                                'absent_count' => $absent,
+                                'severity' => $severity,
+                            ]
+                        );
+                        */
+                    }
+                }
+            });
 
         return response()->json([
+            'success' => true,
+            'message' => "$alertsCreated alertas generadas",
+            'alerts_count' => $alertsCreated,
+            'alerts' => $alerts,
             'threshold' => $threshold,
             'date_range' => [
                 'start' => $startDate,
                 'end' => $endDate,
             ],
-            'high_absence_students' => $students,
-            'count' => $students->count(),
         ]);
     }
 
     /**
-     * Exportar asistencia a Excel
+     * Exportar asistencia a CSV
      */
     public function export(Request $request)
     {
@@ -222,28 +259,55 @@ class AttendanceSupervisionController extends Controller
         $endDate = $request->get('end_date', now()->endOfMonth()->format('Y-m-d'));
         $groupId = $request->get('group_id');
 
-        $query = Attendance::with(['user', 'subjectGroup.subject', 'subjectGroup.group'])
+        $query = Attendance::with(['student', 'subject', 'group.grade', 'teacher'])
             ->whereBetween('date', [$startDate, $endDate]);
 
         if ($groupId) {
-            $query->whereHas('subjectGroup', function($q) use ($groupId) {
-                $q->where('group_id', $groupId);
-            });
+            $query->where('group_id', $groupId);
         }
 
         $attendances = $query->orderBy('date', 'desc')->get();
 
-        // Aquí implementarías la lógica de exportación a Excel
-        // Por ahora retornamos JSON para el ejemplo
-        return response()->json([
-            'message' => 'Exportación preparada',
-            'records' => $attendances->count(),
-            'data' => $attendances,
-        ]);
+        $filename = 'asistencia_' . $startDate . '_' . $endDate . '.csv';
+        
+        $headers = [
+            'Content-Type' => 'text/csv; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ];
+
+        $callback = function() use ($attendances) {
+            $file = fopen('php://output', 'w');
+            
+            // BOM para UTF-8
+            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF));
+            
+            // Encabezados
+            fputcsv($file, ['Fecha', 'Estudiante', 'Grupo', 'Grado', 'Asignatura', 'Estado', 'Profesor', 'Notas']);
+
+            // Datos
+            foreach ($attendances as $attendance) {
+                fputcsv($file, [
+                    $attendance->date->format('Y-m-d'),
+                    $attendance->student->name ?? 'N/A',
+                    $attendance->group->nombre ?? 'N/A',
+                    $attendance->group && $attendance->group->grade 
+                        ? ($attendance->group->grade->name ?? $attendance->group->grade->nombre ?? 'N/A')
+                        : 'N/A',
+                    $attendance->subject->name ?? $attendance->subject->nombre ?? 'N/A',
+                    ucfirst($attendance->status),
+                    $attendance->teacher->name ?? 'N/A',
+                    $attendance->notes ?? '',
+                ]);
+            }
+
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
     }
 
     /**
-     * Resumen estadístico de asistencia
+     * Resumen estadístico
      */
     public function statistics(Request $request)
     {
@@ -269,25 +333,21 @@ class AttendanceSupervisionController extends Controller
         $groupStats = Group::with('grade')
             ->get()
             ->map(function ($group) use ($startDate, $endDate) {
-                $total = Attendance::whereHas('subjectGroup', function($q) use ($group) {
-                    $q->where('group_id', $group->id);
-                })
-                ->whereBetween('date', [$startDate, $endDate])
-                ->count();
+                $total = Attendance::where('group_id', $group->id)
+                    ->whereBetween('date', [$startDate, $endDate])
+                    ->count();
 
-                $present = Attendance::whereHas('subjectGroup', function($q) use ($group) {
-                    $q->where('group_id', $group->id);
-                })
-                ->whereBetween('date', [$startDate, $endDate])
-                ->where('status', 'present')
-                ->count();
+                $present = Attendance::where('group_id', $group->id)
+                    ->whereBetween('date', [$startDate, $endDate])
+                    ->where('status', 'present')
+                    ->count();
 
                 $rate = $total > 0 ? round(($present / $total) * 100, 2) : 0;
 
                 return [
                     'group_id' => $group->id,
-                    'group_name' => $group->name,
-                    'grade_name' => $group->grade->name ?? 'N/A',
+                    'group_name' => $group->nombre,
+                    'grade_name' => $group->grade ? ($group->grade->name ?? $group->grade->nombre ?? 'N/A') : 'N/A',
                     'total_records' => $total,
                     'present_count' => $present,
                     'attendance_rate' => $rate,
@@ -305,13 +365,14 @@ class AttendanceSupervisionController extends Controller
             ],
         ]);
     }
+
     /**
-     * Helper para obtener datos de inasistencia (reutilizable)
+     * Helper: Estudiantes con alta inasistencia
      */
     private function getHighAbsenceData($threshold)
     {
         return User::role('estudiante')
-            ->with(['groups'])
+            ->with(['groups.grade'])
             ->get()
             ->map(function ($student) use ($threshold) {
                 $totalClasses = Attendance::where('user_id', $student->id)->count();
@@ -323,7 +384,7 @@ class AttendanceSupervisionController extends Controller
 
                 return [
                     'name' => $student->name,
-                    'group' => $student->groups->first()->name ?? 'N/A',
+                    'group' => $student->groups->first() ? $student->groups->first()->nombre : 'N/A',
                     'absences' => $absentCount,
                     'rate' => $rate,
                 ];
@@ -332,5 +393,27 @@ class AttendanceSupervisionController extends Controller
             ->sortByDesc('rate')
             ->take(5)
             ->values();
+    }
+
+    /**
+     * Helper: Contar grupos de alto riesgo
+     */
+    private function countHighRiskGroups()
+    {
+        $threshold = 80;
+
+        return Group::get()->filter(function ($group) use ($threshold) {
+            $total = Attendance::where('group_id', $group->id)->count();
+            
+            if ($total == 0) return false;
+
+            $present = Attendance::where('group_id', $group->id)
+                ->where('status', 'present')
+                ->count();
+
+            $rate = round(($present / $total) * 100, 2);
+
+            return $rate < $threshold;
+        })->count();
     }
 }
