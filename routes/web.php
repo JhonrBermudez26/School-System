@@ -35,8 +35,15 @@
 
     use App\Http\Controllers\Coordinadora\ScheduleController;
     use App\Http\Controllers\Coordinadora\PeriodController;
+    use App\Http\Controllers\Coordinadora\SupervisionController;
+    use App\Http\Controllers\Coordinadora\AttendanceSupervisionController;
+    use App\Http\Controllers\Coordinadora\DisciplineRecordController;
 
-    use App\Http\Controllers\Rector\SchoolSettingController;
+    use App\Http\Controllers\Rector\RectorDashboardController;
+    use App\Http\Controllers\Rector\InstitutionController;
+    use App\Http\Controllers\Rector\RoleManagementController;
+    use App\Http\Controllers\Rector\UserManagementController;
+    use App\Http\Controllers\Rector\AuditController;
 
     Route::get('/sanctum/csrf-cookie', function () {
         return response()->noContent();
@@ -56,31 +63,72 @@
     Route::middleware(['auth'])->group(function () {
         
         //RECTOR
-        Route::middleware('role:rector')->prefix('rector')->group(function () {
+        Route::middleware(['role:rector', 'log.activity'])->prefix('rector')->group(function () {
 
-            // Dashboard
-            Route::get('/dashboard', function () {
-                return Inertia::render('Rector/Dashboard');
-            })->name('rector.dashboard');
+            // Dashboard Ejecutivo
+            Route::get('/dashboard', [RectorDashboardController::class, 'index'])->name('rector.dashboard');
+            Route::get('/performance', [RectorDashboardController::class, 'institutionalPerformance'])->name('rector.performance');
 
-             // CONFIGURACIÓN
-    Route::middleware(['permission:institution.update'])->group(function () {
-        Route::get('/configuracion', [SchoolSettingController::class, 'index'])->name('rector.configuracion');
-        Route::post('/configuracion', [SchoolSettingController::class, 'update'])->name('rector.configuracion.actualizar');
-        Route::delete('/configuracion/logo', [SchoolSettingController::class, 'deleteLogo'])->name('rector.configuracion.deleteLogo');
-    });
+            // GESTIÓN INSTITUCIONAL
+            Route::middleware(['permission:institution.update'])->group(function () {
+                Route::get('/configuracion', [InstitutionController::class, 'index'])->name('rector.configuracion');
+                Route::post('/configuracion', [InstitutionController::class, 'update'])->name('rector.configuracion.actualizar');
+                Route::post('/configuracion/grading-scale', [InstitutionController::class, 'configureGradingScale'])->name('rector.configuracion.grading-scale');
+                Route::post('/configuracion/approval-criteria', [InstitutionController::class, 'configureApprovalCriteria'])->name('rector.configuracion.approval-criteria');
+                Route::post('/configuracion/logo', [InstitutionController::class, 'uploadLogo'])->name('rector.configuracion.upload-logo');
+            });
+
+            // GESTIÓN DE ROLES Y PERMISOS
+            Route::middleware(['permission:roles.manage'])->group(function () {
+                Route::get('/roles', [RoleManagementController::class, 'index'])->name('rector.roles');
+                Route::post('/roles', [RoleManagementController::class, 'store'])->name('rector.roles.store');
+                Route::put('/roles/{id}', [RoleManagementController::class, 'update'])->name('rector.roles.update');
+                Route::delete('/roles/{id}', [RoleManagementController::class, 'destroy'])->name('rector.roles.destroy');
+                Route::post('/roles/{id}/permissions', [RoleManagementController::class, 'assignPermissions'])->name('rector.roles.assign');
+                Route::get('/roles/{id}/permissions', [RoleManagementController::class, 'getRolePermissions'])->name('rector.roles.permissions');
+            });
+
+            // GESTIÓN DE USUARIOS (ACTIVAR/SUSPENDER)
+            Route::middleware(['permission:users.view'])->group(function () {
+                Route::get('/usuarios', [UserManagementController::class, 'index'])->name('rector.usuarios');
+                Route::post('/usuarios/{id}/activate', [UserManagementController::class, 'activate'])->name('rector.usuarios.activate');
+                Route::post('/usuarios/{id}/suspend', [UserManagementController::class, 'suspend'])->name('rector.usuarios.suspend');
+                Route::post('/usuarios/{id}/role', [UserManagementController::class, 'assignRole'])->name('rector.usuarios.role');
+                Route::get('/usuarios/{id}/history', [UserManagementController::class, 'history'])->name('rector.usuarios.history');
+            });
+
+            // AUDITORÍA Y LOGS
+            Route::middleware(['permission:audit.view'])->group(function () {
+                Route::get('/auditoria', [AuditController::class, 'index'])->name('rector.auditoria');
+                Route::get('/auditoria/stats', [AuditController::class, 'statistics'])->name('rector.auditoria.stats');
+                Route::get('/auditoria/recent', [AuditController::class, 'recentActivity'])->name('rector.auditoria.recent');
+                Route::get('/auditoria/{id}', [AuditController::class, 'show'])->name('rector.auditoria.show');
+                Route::get('/auditoria/export', [AuditController::class, 'export'])->name('rector.auditoria.export');
+            });
 
         });
         
+        Route::get('/debug-auth', function () {
+            $user = auth()->user();
+            if (!$user) return response()->json(['error' => 'Not authenticated']);
+            return response()->json([
+                'user' => $user->only(['id', 'name', 'email']),
+                'roles' => $user->getRoleNames(),
+                'permissions' => $user->getAllPermissions()->pluck('name'),
+                'guard' => auth()->guard()->getName(),
+                'default_guard' => config('auth.defaults.guard'),
+            ]);
+        });
+        
         //COORDINADOR
-        Route::middleware('role:coordinadora')->prefix('coordinadora')->group(function () {
+        Route::middleware(['role:coordinadora', 'log.activity'])->prefix('coordinadora')->group(function () {
 
             // Dashboard
             Route::get('/dashboard', function () {
                 return Inertia::render('Coordinadora/Dashboard');
             })->name('coordinadora.dashboard');
 
-                // HORARIOS
+            // HORARIOS
             Route::middleware(['permission:schedules.view'])->group(function () {
                 Route::get('/horarios', [ScheduleController::class, 'index'])->name('coordinadora.horarios');
             });
@@ -106,31 +154,65 @@
                 Route::get('/horarios/print', [ScheduleController::class, 'print'])->name('coordinadora.horarios.print');
             });
             
-            // PERIODOS
-            Route::middleware(['permission:periods.view'])->group(function () {
+            // PERIODOS ACADÉMICOS
+            Route::middleware(['permission:academic_period.view'])->group(function () {
                 Route::get('/periodos', [PeriodController::class, 'index'])->name('coordinadora.periodos');
             });
             
-            Route::middleware(['permission:periods.create'])->group(function () {
+            Route::middleware(['permission:academic_period.create'])->group(function () {
                 Route::post('/periodos', [PeriodController::class, 'store'])->name('coordinadora.periodos.crear');
+                Route::post('/periodos/{id}/activate', [PeriodController::class, 'activate'])->name('coordinadora.periodos.activate');
             });
             
-            Route::middleware(['permission:periods.update'])->group(function () {
+            Route::middleware(['permission:academic_period.update'])->group(function () {
                 Route::put('/periodos/{id}', [PeriodController::class, 'update'])->name('coordinadora.periodos.actualizar');
                 Route::patch('/periodos/{id}/toggle', [PeriodController::class, 'toggle'])->name('coordinadora.periodos.toggle');
+                Route::post('/periodos/{id}/close', [PeriodController::class, 'close'])->name('coordinadora.periodos.close');
+                Route::post('/periodos/{id}/reopen', [PeriodController::class, 'reopen'])->name('coordinadora.periodos.reopen');
+                Route::post('/periodos/{id}/archive', [PeriodController::class, 'archive'])->name('coordinadora.periodos.archive');
             });
             
-            Route::middleware(['permission:periods.delete'])->group(function () {
+            Route::middleware(['permission:academic_period.delete'])->group(function () {
                 Route::delete('/periodos/{id}', [PeriodController::class, 'destroy'])->name('coordinadora.periodos.eliminar');
             });
-            
+
+            // SUPERVISIÓN ACADÉMICA
+            Route::middleware(['can:grades.view_all'])->group(function () {
+                Route::get('/supervision', [SupervisionController::class, 'index'])->name('coordinadora.supervision');
+                Route::get('/supervision/grupo', [SupervisionController::class, 'academicByGroup'])->name('coordinadora.supervision.grupo');
+                Route::get('/supervision/asignatura', [SupervisionController::class, 'academicBySubject'])->name('coordinadora.supervision.asignatura');
+                Route::get('/supervision/alerta-desempeno', [SupervisionController::class, 'lowPerformanceStudents'])->name('coordinadora.supervision.alerta');
+                Route::get('/supervision/reporte-rendimiento', [SupervisionController::class, 'performanceReport'])->name('coordinadora.supervision.performance');
+            });
+
+            // CONTROL DE ASISTENCIA (SUPERVISIÓN)
+            Route::middleware(['permission:attendance.view_all'])->group(function () {
+                Route::get('/asistencia', [AttendanceSupervisionController::class, 'index'])->name('coordinadora.asistencia');
+                Route::get('/asistencia/global', [AttendanceSupervisionController::class, 'globalAttendance'])->name('coordinadora.asistencia.global');
+                Route::get('/asistencia/grupo/{id}', [AttendanceSupervisionController::class, 'byGroup'])->name('coordinadora.asistencia.grupo');
+                Route::get('/asistencia/alerta-inasistencia', [AttendanceSupervisionController::class, 'highAbsenceAlert'])->name('coordinadora.asistencia.alerta');
+                Route::get('/asistencia/stats', [AttendanceSupervisionController::class, 'statistics'])->name('coordinadora.asistencia.stats');
+                Route::get('/asistencia/export', [AttendanceSupervisionController::class, 'export'])->name('coordinadora.asistencia.export');
+            });
+
+            // GESTIÓN DISCIPLINARIA
+            Route::middleware(['permission:discipline.view'])->group(function () {
+                Route::get('/disciplina', [DisciplineRecordController::class, 'index'])->name('coordinadora.disciplina');
+                Route::post('/disciplina', [DisciplineRecordController::class, 'store'])->name('coordinadora.disciplina.store');
+                Route::put('/disciplina/{id}', [DisciplineRecordController::class, 'update'])->name('coordinadora.disciplina.update');
+                Route::patch('/disciplina/{id}/close', [DisciplineRecordController::class, 'close'])->name('coordinadora.disciplina.close');
+                Route::patch('/disciplina/{id}/reopen', [DisciplineRecordController::class, 'reopen'])->name('coordinadora.disciplina.reopen');
+                Route::delete('/disciplina/{id}', [DisciplineRecordController::class, 'destroy'])->name('coordinadora.disciplina.destroy');
+                Route::get('/disciplina/estudiante/{id}', [DisciplineRecordController::class, 'studentHistory'])->name('coordinadora.disciplina.estudiante');
+                Route::get('/disciplina/stats', [DisciplineRecordController::class, 'statistics'])->name('coordinadora.disciplina.stats');
+            });
+
             // BOLETINES
             Route::middleware(['permission:bulletins.view'])->group(function () {
                 Route::get('/boletines', function () {
                     return Inertia::render('Coordinadora/Boletines');
                 })->name('coordinadora.boletines');
             });
-   
 
         });
 

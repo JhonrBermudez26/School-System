@@ -21,6 +21,11 @@ class AcademicPeriod extends Model
         'is_active',
         'guidelines',
         'grade_weight',
+        'status',
+        'closed_at',
+        'reopened_at',
+        'closed_by',
+        'reopened_by',
     ];
 
     protected $casts = [
@@ -30,6 +35,8 @@ class AcademicPeriod extends Model
         'grades_enabled_manually' => 'boolean',
         'is_active' => 'boolean',
         'grade_weight' => 'integer',
+        'closed_at' => 'datetime',
+        'reopened_at' => 'datetime',
     ];
 
     /* =====================================================
@@ -46,6 +53,97 @@ class AcademicPeriod extends Model
     {
         return $this->grades_enabled &&
             ($this->isDentroFecha() || $this->grades_enabled_manually);
+    }
+
+    /**
+     * Verifica si el periodo está en estado draft
+     */
+    public function isDraft(): bool
+    {
+        return $this->status === 'draft';
+    }
+
+    /**
+     * Verifica si el periodo está activo
+     */
+    public function isActive(): bool
+    {
+        return $this->status === 'active';
+    }
+
+    /**
+     * Verifica si el periodo está cerrado
+     */
+    public function isClosed(): bool
+    {
+        return $this->status === 'closed';
+    }
+
+    /**
+     * Verifica si el periodo está archivado
+     */
+    public function isArchived(): bool
+    {
+        return $this->status === 'archived';
+    }
+
+    /**
+     * Activa el periodo (solo desde draft)
+     */
+    public function activate(?int $userId = null): bool
+    {
+        if (!$this->isDraft()) {
+            return false;
+        }
+
+        $this->status = 'active';
+        $this->grades_enabled = true;
+        return $this->save();
+    }
+
+    /**
+     * Cierra el periodo (solo desde active)
+     */
+    public function close(?int $userId = null): bool
+    {
+        if (!$this->isActive()) {
+            return false;
+        }
+
+        $this->status = 'closed';
+        $this->grades_enabled = false;
+        $this->closed_at = now();
+        $this->closed_by = $userId;
+        return $this->save();
+    }
+
+    /**
+     * Reabre el periodo cerrado (solo desde closed)
+     */
+    public function reopen(?int $userId = null): bool
+    {
+        if (!$this->isClosed()) {
+            return false;
+        }
+
+        $this->status = 'active';
+        $this->grades_enabled = true;
+        $this->reopened_at = now();
+        $this->reopened_by = $userId;
+        return $this->save();
+    }
+
+    /**
+     * Archiva el periodo (solo desde closed)
+     */
+    public function archive(): bool
+    {
+        if (!$this->isClosed()) {
+            return false;
+        }
+
+        $this->status = 'archived';
+        return $this->save();
     }
 
     /* =====================================================
@@ -107,6 +205,22 @@ class AcademicPeriod extends Model
     {
         return $query->orderByDesc('year')
                      ->orderByDesc('period_number');
+    }
+
+    /**
+     * Scope para filtrar por estado
+     */
+    public function scopeByStatus($query, string $status)
+    {
+        return $query->where('status', $status);
+    }
+
+    /**
+     * Scope para periodos no archivados
+     */
+    public function scopeNotArchived($query)
+    {
+        return $query->where('status', '!=', 'archived');
     }
 
     /* =====================================================
@@ -207,6 +321,22 @@ class AcademicPeriod extends Model
         return $this->hasMany(ManualGrade::class, 'academic_period_id');
     }
 
+    /**
+     * Usuario que cerró el periodo
+     */
+    public function closedByUser()
+    {
+        return $this->belongsTo(User::class, 'closed_by');
+    }
+
+    /**
+     * Usuario que reabrió el periodo
+     */
+    public function reopenedByUser()
+    {
+        return $this->belongsTo(User::class, 'reopened_by');
+    }
+
     /* =====================================================
      |  BOOT
      ===================================================== */
@@ -220,3 +350,4 @@ class AcademicPeriod extends Model
         });
     }
 }
+

@@ -48,17 +48,184 @@ schedule.view
 
 como corren:
 npm run dev
-php artisan server
+php artisan serve
 php artisan reverb:start
 php artisan queue:work --verbose
 
 
 PARA MAÑANA ///////////////////////////////
 
-0.las vistas de secretaria responsive
-1. ajustar los permisos que faltan se de la secretaria
-2. los boletines los revisa y aprueba la coordinadora
-3. cuando la coordinadora apruebe boletines se le ven a la secretaria y ella los imprime
-4. los horarios los gestiona la coordinadora la secretaria tambien puede verlos
-5. los periodos academicos los define la coordinadora, la secretariasolo tiene una visual
-6. la configuracion del colegio la tiene el rector
+por hacer:
+funcionaldades de rector y coordinadora
+
+🔵 COORDINADORA
+1️⃣ Vista: Asistencia – Supervisión
+🎯 Objetivo
+Supervisar la asistencia institucional a nivel global, no registrar asistencia (eso es del profesor).
+👀 Qué puede ver
+Asistencia por:
+Grupo
+Asignatura
+Docente
+Periodo académico
+Porcentaje de asistencia por estudiante
+Ranking de mayor a menor asistencia
+Historial completo de asistencia de un estudiante
+Estadística global (ej: 87% asistencia promedio institucional)
+⚙️ Qué puede hacer
+Filtrar por:
+Periodo
+Grupo
+Fecha
+Exportar reporte (PDF / Excel)
+Configurar porcentaje mínimo permitido (ej: 80%)
+Generar alerta automática para estudiantes con inasistencia superior al límite
+🔒 Reglas
+No puede modificar asistencia registrada por docentes.
+Solo visualización + análisis.
+Si detecta error → puede marcar como “requiere revisión”.
+
+2️⃣ Vista: Disciplina
+🎯 Objetivo
+Gestionar el historial disciplinario de estudiantes.
+👀 Qué puede ver
+Listado de registros disciplinarios
+Historial completo por estudiante
+Estado del caso (activo/cerrado)
+Tipo de falta (observación, citación, suspensión, compromiso)
+⚙️ Qué puede hacer
+Crear registro disciplinario
+Editar descripción
+Cambiar estado (cerrar caso)
+Adjuntar evidencia (archivo opcional)
+Registrar fecha de citación
+Ver estadísticas (estudiantes con más faltas)
+🔒 Reglas
+No puede eliminar registros (solo cerrarlos).
+Todo cambio debe registrarse en activity_logs.
+
+3️⃣ Vista: Supervisión Académica
+🎯 Objetivo
+Controlar rendimiento académico institucional.
+👀 Qué puede ver
+Todas las notas de todos los grupos
+Promedio por grupo
+Promedio por asignatura
+Promedio por docente
+Estudiantes con bajo rendimiento
+Ranking académico
+⚙️ Qué puede hacer
+Filtrar por:
+Periodo
+Grupo
+Asignatura
+Ver detalle de cálculo de promedio
+Desbloquear notas (si el periodo lo permite)
+Aprobar modificaciones extraordinarias de notas
+🔒 Reglas
+No puede modificar notas directamente.
+Solo puede desbloquear si el periodo está cerrado.
+Cada desbloqueo debe quedar auditado.
+
+4️⃣ Vista: Periodos (Modificado)
+🎯 Objetivo
+Controlar el ciclo académico.
+👀 Qué puede ver
+Lista de periodos
+Estado actual
+Fechas
+Si está habilitado para cargue de notas
+⚙️ Qué puede hacer
+Crear periodo
+Editar fechas
+Activar periodo
+Cerrar periodo
+Reabrir periodo
+Habilitar cargue de notas
+Bloquear edición de notas automáticamente al cerrar
+🔒 Reglas críticas
+Solo puede haber 1 periodo activo.
+Si periodo está cerrado:
+Profesor no puede editar notas.
+Reapertura genera registro en activity_logs.
+
+🔴 RECTOR
+1️⃣ Vista: AuditLog
+🎯 Objetivo
+Auditoría completa del sistema.
+👀 Qué puede ver
+Lista de acciones realizadas:
+Usuario
+Acción (create, update, delete)
+Modelo afectado
+Valores antiguos y nuevos
+Fecha
+IP
+⚙️ Qué puede hacer
+Filtrar por:
+Usuario
+Modelo
+Rango de fecha
+Ver detalle completo del cambio
+Exportar logs
+🔒 Reglas
+Solo lectura.
+No puede editar ni eliminar logs.
+Solo rector accede.
+
+2️⃣ Vista: RoleManagement
+🎯 Objetivo
+Gestionar roles y permisos del sistema.
+👀 Qué puede ver
+Lista de roles
+Permisos asociados a cada rol
+Usuarios asignados a cada rol
+⚙️ Qué puede hacer
+Crear nuevo rol
+Editar rol
+Asignar/quitar permisos
+Eliminar rol (si no está en uso)
+Duplicar rol
+🔒 Reglas
+No puede eliminar roles base del sistema (ej: rector).
+Cambios impactan inmediatamente en policies.
+
+3️⃣ Vista: UserManagement
+🎯 Objetivo
+Control global de usuarios.
+👀 Qué puede ver
+Lista de todos los usuarios
+Rol
+Estado (activo/suspendido)
+Último acceso
+⚙️ Qué puede hacer
+Activar usuario
+Suspender usuario
+Cambiar rol
+Resetear contraseña
+Ver historial de actividad del usuario
+Forzar cierre de sesión
+🔒 Reglas
+No puede eliminar usuarios con historial académico.
+Suspensión bloquea acceso inmediato.
+Todo cambio se registra en activity_logs.
+
+🧠 Arquitectónicamente hablando
+Coordinadora = Control académico y disciplinario.
+Rector = Control estructural y estratégico.
+Secretaria = Gestión operativa.
+Profesor = Operación académica.
+Estudiante = Consumidor académico.
+
+
+
+
+
+
+
+
+
+cosas hacer a futuro:
+
+//estudiante
+pueda ver sus registro disciplinario para en caso de citas y vainas el pueda verlo 

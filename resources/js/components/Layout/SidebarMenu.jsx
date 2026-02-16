@@ -10,10 +10,12 @@ import {
   ClipboardList,
   UserCheck,
   UserCog,
-  ChartPie,
   Book,
   MessageSquare,
-
+  ShieldAlert,
+  History,
+  TrendingUp,
+  Scale
 } from "lucide-react";
 
 export default function SidebarMenu({ role }) {
@@ -25,17 +27,19 @@ export default function SidebarMenu({ role }) {
     rector: [
       { icon: GraduationCap, label: "Dashboard", path: "/rector/dashboard" },
       { icon: Users, label: "Gestión de usuarios", path: "/rector/usuarios" },
-      { icon: ChartPie, label: "Reportes institucionales", path: "/rector/reportes" },
+      { icon: ShieldAlert, label: "Roles y Permisos", path: "/rector/roles" },
+      { icon: History, label: "Auditoría", path: "/rector/auditoria" },
+      { icon: TrendingUp, label: "Rendimiento", path: "/rector/performance" },
       { icon: Settings, label: "Configuración", path: "/rector/configuracion" },
     ],
     coordinadora: [
       { icon: GraduationCap, label: "Dashboard", path: "/coordinadora/dashboard" },
-      { icon: ClipboardList, label: "Asignar materias", path: "/coordinadora/materias" },
-      { icon: Users, label: "Gestionar docentes", path: "/coordinadora/docentes" },
-      { icon: FileText, label: "Planificación académica", path: "/coordinadora/planificacion" },
-            { icon: Calendar, label: "Horarios", path: "/coordinadora/horarios" },
-      { icon: Calendar, label: "Periodos académicos", path: "/coordinadora/periodos" },
-      { icon: FileText, label: "Generar boletines", path: "/coordinadora/boletines", module: "boletines" },
+      { icon: Calendar, label: "Horarios", path: "/coordinadora/horarios" },
+      { icon: FileText, label: "Periodos Académicos", path: "/coordinadora/periodos" },
+      { icon: TrendingUp, label: "Supervisión Académica", path: "/coordinadora/supervision" },
+      { icon: UserCheck, label: "Control Asistencia", path: "/coordinadora/asistencia" },
+      { icon: Scale, label: "Registro Disciplinario", path: "/coordinadora/disciplina" },
+      { icon: ClipboardList, label: "Boletines", path: "/coordinadora/boletines" },
     ],
     secretaria: [
       { icon: GraduationCap, label: "Inicio", path: "/secretaria/dashboard" },
@@ -45,7 +49,6 @@ export default function SidebarMenu({ role }) {
       { icon: Book, label: "Gestionar Asignaturas", path: "/secretaria/asignaturas" },
       { icon: ClipboardList, label: "Gestionar Grupos", path: "/secretaria/grupos" },
       { icon: Calendar, label: "Horarios", path: "/secretaria/horarios" },
-      { icon: Calendar, label: "Periodos académicos", path: "/secretaria/periodos" },
       { icon: FileText, label: "Generar boletines", path: "/secretaria/boletines", module: "boletines" },
     ],
     profesor: [

@@ -20,6 +20,7 @@ class RolePermissionSeeder extends Seeder
         $permissions = [
             // Usuarios
             'users.view', 'users.create', 'users.update', 'users.delete',
+            'users.activate', 'users.suspend',
             
             // Estudiantes
             'students.view', 'students.create', 'students.update', 'students.delete',
@@ -38,12 +39,14 @@ class RolePermissionSeeder extends Seeder
             
             // Notas
             'grades.view', 'grades.create', 'grades.update', 'grades.correct', 'grades.delete',
+            'grades.view_all',
             
             // Notas manuales
             'manual_grades.view', 'manual_grades.create', 'manual_grades.update', 'manual_grades.correct',
             
             // Asistencias
             'attendances.view', 'attendances.create', 'attendances.update',
+            'attendance.view_all', 'attendance.export',
             
             // Tareas
             'assignments.view', 'assignments.create', 'assignments.update', 'assignments.delete', 'assignments.grade',
@@ -54,30 +57,39 @@ class RolePermissionSeeder extends Seeder
             // Reuniones
             'meetings.create', 'meetings.join', 'meetings.end',
             
-            // Periodos
+            // Periodos Académicos
             'periods.view', 'periods.reopen', 'periods.close', 'periods.create', 'periods.update', 'periods.delete',
+            'academic_period.view', 'academic_period.create', 'academic_period.update',
+            'academic_period.activate', 'academic_period.close', 'academic_period.reopen', 'academic_period.archive',
             
             // Pagos
             'payments.view', 'payments.create', 'payments.validate', 'payments.reports',
             
             // Reportes
             'reports.academic', 'reports.financial', 'reports.general',
+            'reports.institutional', 'reports.performance',
             
             // Boletines
             'bulletins.view', 'bulletins.generate', 'bulletins.download',
             
+            // Disciplina
+            'discipline.create', 'discipline.update', 'discipline.view', 'discipline.close',
+            
             // Auditoría
-            'audit_logs.view',
+            'audit_logs.view', 'audit.view', 'system.logs',
             
             // Chat
             'chat.use', 'chat.create_group',
             
             // Configuración institucional
-            'institution.update',
+            'institution.update', 'grading.scale.configure', 'approval.criteria.configure',
+            
+            // Roles y permisos
+            'roles.manage', 'permissions.manage',
         ];
 
         foreach ($permissions as $permission) {
-            Permission::create(['name' => $permission]);
+            Permission::findOrCreate($permission);
         }
 
         /*
@@ -87,15 +99,15 @@ class RolePermissionSeeder extends Seeder
         */
 
         // ═══════════════════════════════════════════════════════════════════════
-        // RECTOR - Control total del sistema
+        // RECTOR - Control total del sistema + Gestión institucional
         // ═══════════════════════════════════════════════════════════════════════
-        $rector = Role::create(['name' => 'rector']);
+        $rector = Role::findOrCreate('rector');
         $rector->syncPermissions(Permission::all());
 
         // ═══════════════════════════════════════════════════════════════════════
         // COORDINADORA - Gestión académica completa
         // ═══════════════════════════════════════════════════════════════════════
-        $coordinadora = Role::create(['name' => 'coordinadora']);
+        $coordinadora = Role::findOrCreate('coordinadora');
         $coordinadora->syncPermissions([
             // Consultas
             'students.view',
@@ -103,15 +115,18 @@ class RolePermissionSeeder extends Seeder
             'subjects.view',
             'groups.view',
             
-            // Notas (actualizar y corregir)
+            // Notas (actualizar, corregir y ver todas)
             'grades.view',
+            'grades.view_all',
             'grades.update',
             'grades.correct',
             'manual_grades.view',
             'manual_grades.correct',
             
-            // Asistencias (solo consulta)
+            // Asistencias (ver todas y exportar)
             'attendances.view',
+            'attendance.view_all',
+            'attendance.export',
             
             // Tareas (solo consulta)
             'assignments.view',
@@ -123,16 +138,30 @@ class RolePermissionSeeder extends Seeder
             'schedules.delete',
             'schedules.print',
             
-            // Periodos académicos
+            // Periodos académicos - Gestión completa
             'periods.view',
             'periods.create',
             'periods.update',
             'periods.reopen',
             'periods.close',
+            'academic_period.view',
+            'academic_period.create',
+            'academic_period.update',
+            'academic_period.activate',
+            'academic_period.close',
+            'academic_period.reopen',
+            'academic_period.archive',
             
-            // Reportes
+            // Supervisión académica
             'reports.academic',
+            'reports.performance',
             'reports.general',
+            
+            // Disciplina
+            'discipline.view',
+            'discipline.create',
+            'discipline.update',
+            'discipline.close',
             
             // Boletines
             'bulletins.view',
@@ -141,6 +170,7 @@ class RolePermissionSeeder extends Seeder
             
             // Auditoría
             'audit_logs.view',
+            'audit.view',
             
             // Chat
             'chat.use',
@@ -149,7 +179,7 @@ class RolePermissionSeeder extends Seeder
         // ═══════════════════════════════════════════════════════════════════════
         // SECRETARIA - Gestión administrativa
         // ═══════════════════════════════════════════════════════════════════════
-        $secretaria = Role::create(['name' => 'secretaria']);
+        $secretaria = Role::findOrCreate('secretaria');
         $secretaria->syncPermissions([
             // Usuarios
             'users.view',
@@ -197,7 +227,7 @@ class RolePermissionSeeder extends Seeder
         // ═══════════════════════════════════════════════════════════════════════
         // PROFESOR - Gestión de clases
         // ═══════════════════════════════════════════════════════════════════════
-        $profesor = Role::create(['name' => 'profesor']);
+        $profesor = Role::findOrCreate('profesor');
         $profesor->syncPermissions([
             // Estudiantes (solo consulta)
             'students.view',
@@ -241,7 +271,7 @@ class RolePermissionSeeder extends Seeder
         // ═══════════════════════════════════════════════════════════════════════
         // ESTUDIANTE - Consulta académica
         // ═══════════════════════════════════════════════════════════════════════
-        $estudiante = Role::create(['name' => 'estudiante']);
+        $estudiante = Role::findOrCreate('estudiante');
         $estudiante->syncPermissions([
             // Notas (solo ver)
             'grades.view',
