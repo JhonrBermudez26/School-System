@@ -128,6 +128,15 @@
                 Route::get('/auditoria/export', [AuditController::class, 'export'])->name('rector.auditoria.export');
             });
 
+          // RENDIMIENTO INSTITUCIONAL
+           Route::middleware(['permission:reports.performance'])->group(function () {
+                Route::get('/performance', [\App\Http\Controllers\Rector\PerformanceController::class, 'index'])
+                    ->name('rector.performance');
+                Route::get('/performance/export/pdf', [\App\Http\Controllers\Rector\PerformanceController::class, 'exportPDF'])
+                    ->name('rector.performance.export.pdf');
+                Route::get('/performance/export/excel', [\App\Http\Controllers\Rector\PerformanceController::class, 'exportExcel'])
+                    ->name('rector.performance.export.excel');
+            }); 
         });
         
         Route::get('/debug-auth', function () {
