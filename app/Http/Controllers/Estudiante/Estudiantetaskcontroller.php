@@ -23,13 +23,7 @@ class EstudianteTaskController extends Controller
      */
     private function assertGroupMembership(int $groupId): void
     {
-        $userId = Auth::id();
-        $belongs = DB::table('group_user')
-            ->where('group_id', $groupId)
-            ->where('user_id', $userId)
-            ->exists();
-        
-        abort_unless($belongs, 403, 'No tienes acceso a este grupo');
+        Gate::authorize('access-class', [0, $groupId]); // 0 as subjectId since we don't have it here and Gate handles it
     }
 
     /**
@@ -56,7 +50,12 @@ class EstudianteTaskController extends Controller
             ->map(function ($task) {
                 $submission = TaskSubmission::with(['files', 'members.student'])
                     ->where('task_id', $task->id)
-                    ->where('student_id', Auth::id())
+                    ->where(function($q) {
+                        $q->where('student_id', Auth::id())
+                          ->orWhereHas('members', function($sq) {
+                              $sq->where('student_id', Auth::id());
+                          });
+                    })
                     ->first();
 
                 $submissionData = null;
@@ -99,6 +98,10 @@ class EstudianteTaskController extends Controller
                     'is_closed' => $task->isClosed(),
                     'attachments' => $task->attachments,
                     'submission' => $submissionData,
+                    'can' => [
+                        'submit' => auth()->user()->can('submit', $task),
+                        'view' => auth()->user()->can('view', $task),
+                    ],
                     'created_at' => $task->created_at,
                 ];
             });
@@ -117,8 +120,19 @@ class EstudianteTaskController extends Controller
 
         $submission = TaskSubmission::with(['files', 'members.student'])
             ->where('task_id', $task->id)
-            ->where('student_id', Auth::id())
+            ->where(function($q) {
+                $q->where('student_id', Auth::id())
+                  ->orWhereHas('members', function($sq) {
+                      $sq->where('student_id', Auth::id());
+                  });
+            })
             ->first();
+    
+        if ($submission) {
+            $this->authorize('view', $submission);
+        } else {
+            $this->authorize('view', $task);
+        }
 
         $submissionData = null;
         if ($submission) {
@@ -160,6 +174,10 @@ class EstudianteTaskController extends Controller
                 'is_past_due' => $task->isPastDue(),
                 'is_closed' => $task->isClosed(),
                 'attachments' => $task->attachments,
+                'can' => [
+                    'submit' => auth()->user()->can('submit', $task),
+                    'view' => auth()->user()->can('view', $task),
+                ],
             ],
             'submission' => $submissionData,
         ]);
@@ -248,10 +266,7 @@ class EstudianteTaskController extends Controller
                 ]);
 
             // Verificaciones comunes
-            if ($submission->student_id !== Auth::id()) {
-                DB::rollBack();
-                return response()->json(['message' => 'No autorizado'], 403);
-            }
+            $this->authorize('update', $submission);
 
             if ($submission->status === 'graded') {
                 DB::rollBack();
@@ -396,9 +411,7 @@ class EstudianteTaskController extends Controller
         $file = TaskSubmissionFile::findOrFail($fileId);
         $submission = $file->submission;
 
-        if ($submission->student_id !== Auth::id()) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
+        $this->authorize('update', $submission);
 
         if ($submission->status === 'graded') {
             return response()->json([
@@ -444,9 +457,7 @@ public function removeMember($memberId)
     $member = TaskSubmissionMember::findOrFail($memberId);
     $submission = $member->submission;
 
-    if ($submission->student_id !== Auth::id()) {
-        return response()->json(['message' => 'Solo el creador puede remover miembros'], 403);
-    }
+    $this->authorize('update', $submission);
 
     if ($submission->status === 'graded') {
         return response()->json([
@@ -509,9 +520,7 @@ public function removeMember($memberId)
     {
         $submission = TaskSubmission::findOrFail($submissionId);
 
-        if ($submission->student_id !== Auth::id()) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
+        $this->authorize('delete', $submission);
 
         if ($submission->status === 'graded') {
             return response()->json([

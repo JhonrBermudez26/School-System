@@ -12,23 +12,18 @@ use Illuminate\Support\Facades\Storage;
 use App\Events\NewPublicacion;
 use App\Events\PublicacionActualizada;
 use App\Events\PublicacionEliminada;
+use Illuminate\Support\Facades\Gate; 
 
 class PostController extends Controller
 {
     private function assertPostOwnership(Post $post): void
     {
-        abort_unless($post->user_id === Auth::id(), 403, 'No eres el autor de esta publicación');
+        $this->authorize('update', $post);
     }
 
     private function assertOwnership(int $subjectId, int $groupId): void
     {
-        $userId = Auth::id();
-        $exists = DB::table('subject_group')
-            ->where('user_id', $userId)
-            ->where('subject_id', $subjectId)
-            ->where('group_id', $groupId)
-            ->exists();
-        abort_unless($exists, 403);
+        Gate::authorize('access-class', [$subjectId, $groupId]);
     }
 
     public function index(Request $request)
@@ -46,7 +41,15 @@ class PostController extends Controller
             ->where('subject_id', $subjectId)
             ->where('group_id', $groupId)
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->map(function ($post) {
+                return array_merge($post->toArray(), [
+                    'can' => [
+                        'update' => auth()->user()->can('update', $post),
+                        'delete' => auth()->user()->can('delete', $post),
+                    ]
+                ]);
+            });
 
         return response()->json($posts);
     }
@@ -217,12 +220,11 @@ class PostController extends Controller
 
     public function destroy(Post $post)
     {
-        $this->assertPostOwnership($post);
-        $this->assertOwnership((int) $post->subject_id, (int) $post->group_id);
-
         $subjectId = $post->subject_id;
         $groupId = $post->group_id;
         $postId = $post->id;
+
+        $this->authorize('delete', $post);
         
         // Eliminar archivos físicos antes de eliminar el post
         foreach ($post->attachments as $attachment) {

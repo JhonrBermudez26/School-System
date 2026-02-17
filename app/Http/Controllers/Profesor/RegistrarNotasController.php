@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class RegistrarNotasController extends Controller
 {
@@ -71,16 +72,7 @@ class RegistrarNotasController extends Controller
             $subjectId = (int) $request->query('subject_id');
             $groupId = (int) $request->query('group_id');
             
-            // Verificar acceso
-            $exists = DB::table('subject_group')
-                ->where('user_id', $user->id)
-                ->where('subject_id', $subjectId)
-                ->where('group_id', $groupId)
-                ->exists();
-            
-            if (!$exists) {
-                abort(403, 'No tienes acceso a esta clase');
-            }
+            Gate::authorize('access-class', [$subjectId, $groupId]);
             
             // Info de la clase
             $classInfo = DB::table('subject_group as sg')
@@ -248,6 +240,13 @@ class RegistrarNotasController extends Controller
             'tasks' => $tasks,
             'manualGrades' => $manualGrades,
             'gradeMatrix' => $gradeMatrix,
+            'can' => [
+                'create_manual_grade' => $user->can('manual_grades.create'),
+                'update_manual_grade' => $user->can('manual_grades.update'),
+                'delete_manual_grade' => $user->can('manual_grades.delete'),
+                'update_grade' => $user->can('grades.update'),
+                'correct_grade' => $user->can('grades.correct'),
+            ]
         ]);
     }
     
@@ -287,16 +286,7 @@ class RegistrarNotasController extends Controller
             'max_score.max' => 'La puntuación máxima no puede ser mayor a 5.0',
         ]);
         
-        // Verificar acceso
-        $exists = DB::table('subject_group')
-            ->where('user_id', Auth::id())
-            ->where('subject_id', $validated['subject_id'])
-            ->where('group_id', $validated['group_id'])
-            ->exists();
-        
-        if (!$exists) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
+        Gate::authorize('access-class', [(int)$validated['subject_id'], (int)$validated['group_id']]);
         
         // Asignar periodo actual si no se especifica
         if (!isset($validated['academic_period_id'])) {
@@ -347,10 +337,9 @@ class RegistrarNotasController extends Controller
         
         $manualGrade = DB::table('manual_grades')
             ->where('id', $validated['manual_grade_id'])
-            ->where('teacher_id', Auth::id())
             ->first();
         
-        if (!$manualGrade) {
+        if (!$manualGrade || $manualGrade->teacher_id !== Auth::id()) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
         
@@ -395,10 +384,9 @@ class RegistrarNotasController extends Controller
     {
         $manualGrade = DB::table('manual_grades')
             ->where('id', $id)
-            ->where('teacher_id', Auth::id())
             ->first();
         
-        if (!$manualGrade) {
+        if (!$manualGrade || $manualGrade->teacher_id !== Auth::id()) {
             return response()->json(['message' => 'No autorizado'], 403);
         }
         

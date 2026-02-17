@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Gate;
 
 class AsistenciasController extends Controller
 {
@@ -35,49 +36,49 @@ class AsistenciasController extends Controller
             ]);
         }
         
-        // Obtener horario del profesor con días y franjas
-        $horario = DB::table('timetable_slots as ts')
-            ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
-            ->join('groups as g', 'g.id', '=', 'tt.group_id')
-            ->join('subjects as s', 's.id', '=', 'ts.subject_id')
-            ->join('time_slots as tsl', 'tsl.id', '=', 'ts.time_slot_id')
+        // Obtener asignaciones del profesor desde subject_group (fuente de verdad)
+        $asignacionesRaw = DB::table('subject_group as sg')
+            ->join('subjects as s', 'sg.subject_id', '=', 's.id')
+            ->join('groups as g', 'sg.group_id', '=', 'g.id')
+            ->where('sg.user_id', $user->id)
             ->select(
-                'ts.subject_id',
-                'ts.day',
-                'ts.time_slot_id',
-                'g.id as group_id',
-                'g.nombre as group_name',
+                'sg.subject_id',
                 's.name as subject_name',
                 's.code as subject_code',
-                'tsl.start_time',
-                'tsl.end_time'
+                'g.id as group_id',
+                'g.nombre as group_name'
             )
-            ->where('ts.user_id', $user->id)
             ->orderBy('s.name')
             ->orderBy('g.nombre')
             ->get();
-        
-        // Agrupar por materia-grupo (asignaciones únicas)
-        $asignaciones = $horario->groupBy(function($item) {
-            return $item->subject_id . '-' . $item->group_id;
-        })->map(function($items) {
-            $first = $items->first();
+
+        // Para cada asignación, buscar su horario si existe
+        $asignaciones = $asignacionesRaw->map(function($asig) use ($user) {
+            $slots = DB::table('timetable_slots as ts')
+                ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
+                ->join('time_slots as tsl', 'tsl.id', '=', 'ts.time_slot_id')
+                ->where('ts.user_id', $user->id)
+                ->where('ts.subject_id', $asig->subject_id)
+                ->where('tt.group_id', $asig->group_id)
+                ->select('ts.day', 'ts.time_slot_id', 'tsl.start_time', 'tsl.end_time')
+                ->get();
+
             return [
-                'subject_id' => $first->subject_id,
-                'group_id' => $first->group_id,
-                'subject_name' => $first->subject_name,
-                'subject_code' => $first->subject_code,
-                'group_name' => $first->group_name,
-                'schedules' => $items->map(function($item) {
+                'subject_id' => $asig->subject_id,
+                'group_id' => $asig->group_id,
+                'subject_name' => $asig->subject_name,
+                'subject_code' => $asig->subject_code,
+                'group_name' => $asig->group_name,
+                'schedules' => $slots->map(function($slot) {
                     return [
-                        'day' => $item->day,
-                        'time_slot_id' => $item->time_slot_id,
-                        'start_time' => $item->start_time,
-                        'end_time' => $item->end_time,
+                        'day' => $slot->day,
+                        'time_slot_id' => $slot->time_slot_id,
+                        'start_time' => $slot->start_time,
+                        'end_time' => $slot->end_time,
                     ];
                 })->values()
             ];
-        })->values();
+        });
         
         $subjectId = $request->integer('subject_id');
         $groupId = $request->integer('group_id');
@@ -88,19 +89,10 @@ class AsistenciasController extends Controller
         $classDates = collect();
         $attendanceHistory = collect();
         
-        if ($subjectId && $groupId) {
-            $hasAssignment = DB::table('timetable_slots as ts')
-                ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
-                ->where('ts.user_id', $user->id)
-                ->where('ts.subject_id', $subjectId)
-                ->where('tt.group_id', $groupId)
-                ->exists();
-            
-            if (!$hasAssignment) {
-                return back()->with('error', '❌ No tienes permiso para ver este grupo');
-            }
-            
-            $selectedClass = $asignaciones->first(function ($item) use ($subjectId, $groupId) {
+            if ($subjectId && $groupId) {
+                Gate::authorize('access-class', [$subjectId, $groupId]);
+                
+                $selectedClass = $asignaciones->first(function ($item) use ($subjectId, $groupId) {
                 return $item['subject_id'] == $subjectId && $item['group_id'] == $groupId;
             });
             
@@ -145,6 +137,11 @@ class AsistenciasController extends Controller
                 'date' => $request->input('date'),
                 'view' => $view,
             ],
+            'can' => [
+                'register' => $user->can('attendances.create'),
+                'view_all' => $user->can('attendance.view_all'),
+                'export' => $user->can('attendance.export'),
+            ]
         ]);
     }
     
@@ -485,17 +482,7 @@ class AsistenciasController extends Controller
             return back()->with('error', '❌ No puedes registrar asistencia en esta fecha. No tienes clase programada ese día.');
         }
         
-        // Verificar permiso del profesor
-        $hasAssignment = DB::table('timetable_slots as ts')
-            ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
-            ->where('ts.user_id', $userId)
-            ->where('ts.subject_id', $validated['subject_id'])
-            ->where('tt.group_id', $validated['group_id'])
-            ->exists();
-        
-        if (!$hasAssignment) {
-            return back()->with('error', '❌ No tienes permiso para registrar asistencia en este grupo');
-        }
+        Gate::authorize('access-class', [(int)$validated['subject_id'], (int)$validated['group_id']]);
         
         DB::beginTransaction();
         try {
@@ -531,9 +518,7 @@ class AsistenciasController extends Controller
         try {
             $attendance = Attendance::findOrFail($id);
             
-            if ($attendance->teacher_id !== Auth::id()) {
-                return back()->with('error', '❌ No tienes permiso para eliminar este registro');
-            }
+            $this->authorize('delete', $attendance);
             
             $attendance->delete();
             return back()->with('success', '✅ Registro eliminado correctamente');

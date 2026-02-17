@@ -1,3 +1,5 @@
+// resources/js/Pages/Profesor/Horario.jsx
+
 import { useMemo } from 'react';
 import { usePage } from '@inertiajs/react';
 import { BookOpen, Calendar, Clock, GraduationCap, Printer } from 'lucide-react';
@@ -9,10 +11,19 @@ export default function Horario() {
         teacher_timetable_slots = [],
         time_slots = [],
         teacher_name = '',
-        current_year = ''
+        current_year = '',
+        can = {} // ← AGREGAR ESTO
     } = props;
 
-    const days = useMemo(() => ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'], []);
+    const days = useMemo(() => ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'], []);
+
+    const dayLabels = {
+        Lunes: 'Lunes',
+        Martes: 'Martes',
+        Miercoles: 'Miércoles',
+        Jueves: 'Jueves',
+        Viernes: 'Viernes'
+    };
 
     // Construir grid del horario del profesor
     const teacherGrid = useMemo(() => {
@@ -97,18 +108,22 @@ export default function Horario() {
                                 <div>
                                     <h2 className="text-xl font-bold flex items-center gap-2">
                                         <Calendar className="h-6 w-6" />
-                                        {/* Título según el rol */}
+                                        Horario de {teacher_name}
                                     </h2>
-                                    <p className="mt-1 text-sm opacity-90">{/* Nombre */}</p>
+                                    <p className="mt-1 text-sm opacity-90">
+                                        Año académico {current_year}
+                                    </p>
                                 </div>
+
                                 <div className="flex items-center gap-3">
                                     <div className="bg-white/20 backdrop-blur-sm px-4 py-2 rounded-lg text-sm font-medium">
                                         Año {current_year || 'Actual'}
                                     </div>
+
                                     {/* ✅ Botón de impresión */}
                                     {can?.print && (
                                         <button
-                                            onClick={() => window.open(route('profesor.horario.print'), '_blank')} // o 'estudiante.horario.print'
+                                            onClick={() => window.open(route('profesor.horario.print'), '_blank')}
                                             className="bg-white/20 hover:bg-white/30 backdrop-blur-sm px-4 py-2 rounded-lg transition-all flex items-center gap-2"
                                             title="Imprimir mi horario"
                                         >
@@ -143,7 +158,7 @@ export default function Horario() {
                                             {daySlots.map(({ day, cell }) => (
                                                 <div key={day}>
                                                     <div className="text-xs font-medium text-gray-600 mb-1.5">
-                                                        {day}
+                                                        {dayLabels[day]}
                                                     </div>
                                                     {cell ? (
                                                         <div className="bg-blue-50 p-3 rounded-lg text-sm border border-blue-100 hover:bg-blue-100 transition-colors">
@@ -180,7 +195,6 @@ export default function Horario() {
                         </p>
                     </div>
                 )}
-
             </div>
         </Layout>
     );

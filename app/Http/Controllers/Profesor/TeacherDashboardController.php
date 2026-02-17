@@ -127,6 +127,12 @@ class TeacherDashboardController extends Controller
             ],
             'asignaciones' => $asignaciones,
             'proximasTareas' => $proximasTareas,
+            'can' => [
+                'view_schedules' => $user->can('schedules.view'),
+                'view_attendance' => $user->can('attendances.view'),
+                'view_grades' => $user->can('grades.view'),
+                'view_bulletins' => $user->can('bulletins.view'),
+            ]
         ]);
     }
 }

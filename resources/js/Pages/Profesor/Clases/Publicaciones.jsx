@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useForm, router } from '@inertiajs/react';
+import { useForm, router, usePage } from '@inertiajs/react';
 import {
   Plus, Bold, Italic, Underline, Paperclip, X, Edit, Trash2,
   Link as LinkIcon, MessageSquare, Clock, FileText, Download, Save,
@@ -8,6 +8,7 @@ import {
 
 export default function Publicaciones({ publicaciones = [], classInfo }) {
   const editorRef = useRef(null);
+  const { props } = usePage();
   const [editingId, setEditingId] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
 
@@ -297,14 +298,18 @@ export default function Publicaciones({ publicaciones = [], classInfo }) {
                     {new Date(p.created_at).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}
                   </p>
                 </div>
-                {p.is_owner && (
+                {(p.is_owner || p.can?.update || p.can?.delete) && (
                   <div className="flex items-center gap-2">
-                    <button onClick={() => startEdit(p)} className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all group" title="Editar publicación">
-                      <Edit className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                    </button>
-                    <button onClick={() => destroyPost(p.id)} className="p-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-all group" title="Eliminar publicación">
-                      <Trash2 className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                    </button>
+                    {(p.is_owner || p.can?.update) && (
+                      <button onClick={() => startEdit(p)} className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all group" title="Editar publicación">
+                        <Edit className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                      </button>
+                    )}
+                    {(p.is_owner || p.can?.delete) && (
+                      <button onClick={() => destroyPost(p.id)} className="p-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-all group" title="Eliminar publicación">
+                        <Trash2 className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -351,7 +356,7 @@ export default function Publicaciones({ publicaciones = [], classInfo }) {
       )}
 
       {/* Botón flotante crear */}
-      {!showCreate && !editingId && (
+      {props.can?.create_post && !showCreate && !editingId && (
         <button
           onClick={() => setShowCreate(true)}
           className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-50 flex items-center gap-3 px-6 sm:px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:shadow-3xl hover:scale-105 active:scale-95 transition-all duration-300 group"

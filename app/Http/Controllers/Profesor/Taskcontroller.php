@@ -16,18 +16,13 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Gate;
 
 class TaskController extends Controller
 {
     private function assertOwnership(int $subjectId, int $groupId): void
     {
-        $exists = DB::table('subject_group')
-            ->where('user_id', Auth::id())
-            ->where('subject_id', $subjectId)
-            ->where('group_id', $groupId)
-            ->exists();
-        
-        abort_unless($exists, 403, 'No tienes acceso a esta clase');
+        Gate::authorize('access-class', [$subjectId, $groupId]);
     }
 
     /**
@@ -107,6 +102,11 @@ class TaskController extends Controller
                         'submitted' => $submitted,
                         'graded' => $graded,
                         'pending' => $totalStudents - $submitted,
+                    ],
+                    'can' => [
+                        'update' => auth()->user()->can('update', $task),
+                        'delete' => auth()->user()->can('delete', $task),
+                        'grade' => auth()->user()->can('grade', $task),
                     ],
                     'created_at' => $task->created_at,
                 ];
@@ -234,11 +234,7 @@ class TaskController extends Controller
      */
     public function update(Request $request, Task $task)
     {
-        $this->assertOwnership((int) $task->subject_id, (int) $task->group_id);
-
-        if ($task->teacher_id !== auth()->id()) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
+        $this->authorize('update', $task);
 
         $validated = $request->validate([
             'title' => 'sometimes|string|max:255',
@@ -318,11 +314,7 @@ class TaskController extends Controller
 
     public function destroy(Task $task)
     {
-        $this->assertOwnership((int) $task->subject_id, (int) $task->group_id);
-
-        if ($task->teacher_id !== auth()->id()) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
+        $this->authorize('delete', $task);
 
         try {
             DB::beginTransaction();
@@ -368,9 +360,7 @@ class TaskController extends Controller
     {
         $task = Task::with(['attachments', 'academicPeriod'])->findOrFail($id);
         
-        if ($task->teacher_id !== Auth::id()) {
-            abort(403, 'No autorizado');
-        }
+        $this->authorize('view', $task);
         
         if ($task->work_type === 'individual') {
             $submissions = TaskSubmission::with(['student', 'files'])
@@ -439,6 +429,11 @@ class TaskController extends Controller
                 ] : null,
                 'submissions' => $submissions,
                 'stats' => $stats,
+                'can' => [
+                    'update' => auth()->user()->can('update', $task),
+                    'delete' => auth()->user()->can('delete', $task),
+                    'grade' => auth()->user()->can('grade', $task),
+                ],
             ]
         ]);
     }
@@ -457,11 +452,7 @@ class TaskController extends Controller
         $submission = TaskSubmission::with(['task', 'student', 'members.student'])->findOrFail($submissionId);
         $task = $submission->task;
 
-        $this->assertOwnership($task->subject_id, $task->group_id);
-
-        if ($task->teacher_id !== auth()->id()) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
+        $this->authorize('grade', $task);
 
         if ($validated['score'] > $task->max_score) {
             return response()->json([
@@ -548,11 +539,7 @@ class TaskController extends Controller
     public function deleteAttachment(TaskAttachment $attachment)
     {
         $task = $attachment->task;
-        $this->assertOwnership((int) $task->subject_id, (int) $task->group_id);
-
-        if ($task->teacher_id !== auth()->id()) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
+        $this->authorize('update', $task);
 
         try {
             if ($attachment->file_path && Storage::disk('public')->exists($attachment->file_path)) {

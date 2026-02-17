@@ -17,7 +17,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
   const [notification, setNotification] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editingSubmissionId, setEditingSubmissionId] = useState(null);
-  
+
   // Estado para gestión de grupos
   const [showMemberSelector, setShowMemberSelector] = useState(false);
   const [availableClassmates, setAvailableClassmates] = useState([]);
@@ -69,15 +69,15 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
   // ===== ESCUCHA DE EVENTOS EN TIEMPO REAL =====
   useEffect(() => {
     if (!classInfo.subject_id || !classInfo.group_id) return;
-    
+
     loadTasks();
     console.log(`📡 Estudiante escuchando tareas en grupo: ${classInfo.group_id}`);
-    
+
     const channel = window.Echo?.channel(`group.${classInfo.group_id}`);
-    
+
     if (channel) {
       console.log(`✅ Conectado al canal: group.${classInfo.group_id}`);
-      
+
       channel
         .listen('.task.created', (data) => {
           console.log("✅ Nueva tarea recibida:", data);
@@ -145,7 +145,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
         };
       }
     }
-    
+
     if (task.is_closed) {
       return {
         color: 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-700 border border-gray-300',
@@ -154,7 +154,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
         badge: '✕'
       };
     }
-    
+
     if (task.is_past_due) {
       return {
         color: 'bg-gradient-to-r from-red-100 to-red-200 text-red-700 border border-red-300',
@@ -163,7 +163,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
         badge: '!'
       };
     }
-    
+
     return {
       color: 'bg-gradient-to-r from-yellow-100 to-orange-200 text-orange-700 border border-orange-300',
       text: 'Pendiente',
@@ -214,10 +214,10 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
     setEditingSubmissionId(isEdit ? task.submission?.id : null);
     setSubmissionComment(task.submission?.comment || '');
     setFiles([]);
-    
+
     const currentMembers = task.submission?.members?.map(m => m.student_id) || [];
     setSelectedMembers(currentMembers);
-    
+
     if (task.work_type !== 'individual') {
       loadAvailableClassmates(task.id);
     }
@@ -241,7 +241,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
 
   const handleDeleteExistingFile = async (fileId) => {
     if (!confirm('¿Estás seguro de eliminar este archivo?')) return;
-    
+
     try {
       const response = await fetch(`/estudiante/tasks/files/${fileId}`, {
         method: 'DELETE',
@@ -250,7 +250,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
           'Accept': 'application/json',
         },
       });
-      
+
       if (response.ok) {
         showNotification('Archivo eliminado', 'success');
         loadTasks();
@@ -285,7 +285,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
 
   const handleSubmit = async () => {
     if (!selectedTask) return;
-    
+
     if (!submissionComment.trim() && files.length === 0 && (!isEditing || selectedTask.submission?.files?.length === 0)) {
       alert('Debes escribir un comentario o adjuntar archivos');
       return;
@@ -296,7 +296,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
       const formData = new FormData();
       formData.append('task_id', selectedTask.id);
       formData.append('comment', submissionComment);
-      
+
       if (isEditing && editingSubmissionId) {
         formData.append('submission_id', editingSubmissionId);
       }
@@ -344,7 +344,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
 
   const handleRemoveMember = async (memberId) => {
     if (!confirm('¿Estás seguro de remover este miembro?')) return;
-    
+
     try {
       const response = await fetch(`/estudiante/tasks/members/${memberId}`, {
         method: 'DELETE',
@@ -353,7 +353,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
           'Accept': 'application/json',
         },
       });
-      
+
       if (response.ok) {
         showNotification('Miembro removido', 'success');
         loadTasks();
@@ -392,7 +392,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
           {selectedMembers.length}/{selectedTask.work_type === 'pairs' ? 1 : (selectedTask.max_group_members - 1)} seleccionados
         </span>
       </h3>
-      
+
       {loadingClassmates ? (
         <div className="flex items-center justify-center py-8">
           <Loader2 className="h-6 w-6 sm:h-8 sm:w-8 animate-spin text-purple-600" />
@@ -408,19 +408,16 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
             <button
               key={classmate.id}
               onClick={() => toggleMemberSelection(classmate.id)}
-              className={`w-full flex items-center justify-between p-3 sm:p-4 rounded-xl transition-all ${
-                selectedMembers.includes(classmate.id)
+              className={`w-full flex items-center justify-between p-3 sm:p-4 rounded-xl transition-all ${selectedMembers.includes(classmate.id)
                   ? 'bg-purple-100 border-2 border-purple-400'
                   : 'bg-white border-2 border-gray-200 hover:border-purple-300'
-              }`}
+                }`}
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                  selectedMembers.includes(classmate.id) ? 'bg-purple-200' : 'bg-gray-200'
-                }`}>
-                  <Users className={`h-4 w-4 sm:h-5 sm:w-5 ${
-                    selectedMembers.includes(classmate.id) ? 'text-purple-700' : 'text-gray-600'
-                  }`} />
+                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center flex-shrink-0 ${selectedMembers.includes(classmate.id) ? 'bg-purple-200' : 'bg-gray-200'
+                  }`}>
+                  <Users className={`h-4 w-4 sm:h-5 sm:w-5 ${selectedMembers.includes(classmate.id) ? 'text-purple-700' : 'text-gray-600'
+                    }`} />
                 </div>
                 <div className="text-left min-w-0 flex-1">
                   <p className="font-semibold text-sm sm:text-base text-gray-900 truncate">{classmate.name}</p>
@@ -462,7 +459,8 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
     const StatusIcon = statusInfo.icon;
     const canEdit = selectedTask.submission?.is_creator &&
       selectedTask.submission?.status !== 'graded' &&
-      !selectedTask.is_closed;
+      !selectedTask.is_closed &&
+      selectedTask.can?.submit;
 
     return (
       <>
@@ -509,7 +507,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
                     <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">{getWorkTypeLabel(selectedTask.work_type)}</p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-orange-50 rounded-lg sm:rounded-xl border border-orange-100">
                   <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 flex-shrink-0" />
                   <div className="min-w-0">
@@ -525,7 +523,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
                     </p>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-green-50 rounded-lg sm:rounded-xl border border-green-100">
                   <Award className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
                   <div>
@@ -533,7 +531,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
                     <p className="text-xs sm:text-sm font-bold text-gray-900">{selectedTask.max_score}</p>
                   </div>
                 </div>
-                
+
                 {selectedTask.submission?.score !== null && selectedTask.submission?.score !== undefined && (
                   <div className="flex items-center gap-2 sm:gap-3 p-2.5 sm:p-3 bg-purple-50 rounded-lg sm:rounded-xl border border-purple-100 col-span-2 lg:col-span-1">
                     <Award className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 flex-shrink-0" />
@@ -687,8 +685,8 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
               >
                 Cerrar
               </button>
-              
-              {(!selectedTask.submission || selectedTask.submission.status === 'pending') && !selectedTask.is_closed && (
+
+              {selectedTask.can?.view && (!selectedTask.submission || selectedTask.submission.status === 'pending') && !selectedTask.is_closed && selectedTask.can?.submit && (
                 <button
                   onClick={() => handleShowSubmit(selectedTask, false)}
                   className="px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 text-sm sm:text-base"
@@ -697,7 +695,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
                   Entregar tarea
                 </button>
               )}
-              
+
               {selectedTask.submission?.is_creator &&
                 selectedTask.submission?.status !== 'graded' &&
                 !selectedTask.is_closed && (
@@ -805,7 +803,7 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
                   <Paperclip className="h-4 w-4 sm:h-4.5 sm:w-4.5 text-blue-600" />
                   {isEditing ? 'Agregar más archivos' : 'Archivos adjuntos'}
                 </label>
-                
+
                 <div className="flex items-center justify-center w-full mb-3 sm:mb-4">
                   <label className="w-full flex flex-col items-center px-4 sm:px-6 py-8 sm:py-10 bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-dashed border-blue-300 rounded-xl sm:rounded-2xl cursor-pointer hover:border-blue-400 hover:bg-blue-100/50 transition-all group">
                     <div className="w-12 h-12 sm:w-16 sm:h-16 bg-white rounded-xl sm:rounded-2xl flex items-center justify-center mb-3 sm:mb-4 group-hover:scale-110 transition-transform">

@@ -102,6 +102,12 @@ class BoletinController extends Controller
                 'grupo_id' => $grupoId,
                 'search' => $searchTerm,
             ],
+            'can' => [
+                'view' => auth()->user()->can('bulletins.view'),
+                'generate' => auth()->user()->can('bulletins.generate'),
+                'download' => auth()->user()->can('bulletins.download'),
+                'update_observations' => auth()->user()->can('bulletins.update_observations'),
+            ]
         ]);
     }
 

@@ -51,6 +51,7 @@ class ScheduleController extends Controller
         // ✅ OBTENER TODOS LOS SLOTS DE TODOS LOS GRUPOS (para verificar disponibilidad)
         $allTimetableSlots = DB::table('timetable_slots as ts')
             ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
+            ->join('groups as g', 'g.id', '=', 'tt.group_id') // Join with groups
             ->leftJoin('subjects as s', 's.id', '=', 'ts.subject_id')
             ->leftJoin('users as u', 'u.id', '=', 'ts.user_id')
             ->select(
@@ -61,7 +62,8 @@ class ScheduleController extends Controller
                 's.name as subject_name',
                 'u.name as teacher_name',
                 'u.last_name as teacher_last_name',
-                'tt.group_id'
+                'tt.group_id',
+                'g.nombre as group_name' // Select group_name
             )
             ->get();
 
@@ -764,7 +766,7 @@ class ScheduleController extends Controller
         $mode = $request->input('mode', 'group');
 
         $timeSlots = DB::table('time_slots')->orderBy('start_time')->get();
-        $days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+        $days = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
 
         if ($mode === 'group' && $groupId) {
             $group = Group::with(['grade', 'course'])->findOrFail($groupId);

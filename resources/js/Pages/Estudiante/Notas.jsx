@@ -1,10 +1,10 @@
 import { Head, router } from '@inertiajs/react';
 import { useState, useMemo } from 'react';
-import { 
-    BookOpen, 
-    TrendingUp, 
-    Award, 
-    FileText, 
+import {
+    BookOpen,
+    TrendingUp,
+    Award,
+    FileText,
     Calendar,
     CheckCircle,
     Clock,
@@ -17,12 +17,13 @@ import {
 } from 'lucide-react';
 import Layout from '@/Components/Layout/Layout';
 
-export default function Notas({ 
-    materias = [], 
-    promedioGeneral = 0, 
+export default function Notas({
+    materias = [],
+    promedioGeneral = 0,
     periodos = [],
     periodoActual = null,
-    estadisticas = {} 
+    estadisticas = {},
+    can = {}
 }) {
     const [expandedMateria, setExpandedMateria] = useState(null);
     const [selectedPeriodId, setSelectedPeriodId] = useState(periodoActual?.id || '');
@@ -30,7 +31,7 @@ export default function Notas({
     // Manejar cambio de periodo
     const handlePeriodChange = (periodId) => {
         setSelectedPeriodId(periodId);
-        
+
         if (periodId) {
             router.get(route('estudiante.notas'), { period_id: periodId }, {
                 preserveState: true,
@@ -103,7 +104,7 @@ export default function Notas({
     return (
         <Layout>
             <Head title="Mis Calificaciones" />
-            
+
             <div className="min-h-screen bg-gray-50 p-4 sm:p-6 lg:p-8">
                 {/* Header con Selector de Periodo */}
                 <div className="mb-6 sm:mb-8">
@@ -116,30 +117,66 @@ export default function Notas({
                                 Consulta tu rendimiento académico por periodo
                             </p>
                         </div>
-                        
-                        {/* Selector de Periodo */}
-                        <div className="relative w-full sm:w-auto">
-                            <label className="block text-xs font-medium text-gray-700 mb-2">
-                                Periodo Académico
-                            </label>
-                            <div className="relative">
-                                <select
-                                    value={selectedPeriodId}
-                                    onChange={(e) => handlePeriodChange(e.target.value)}
-                                    className="w-full sm:w-64 px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white"
-                                >
-                                    <option value="">Todos los periodos</option>
-                                    {periodos.map((periodo) => (
-                                        <option key={periodo.id} value={periodo.id}>
-                                            {periodo.nombre} {periodo.es_actual && '(Actual)'}
-                                        </option>
-                                    ))}
-                                </select>
-                                <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" />
+
+                        {/* Selector de Periodo y Acciones */}
+                        <div className="flex flex-wrap items-end gap-3 w-full sm:w-auto">
+                            <div className="relative flex-1 sm:flex-initial">
+                                <label className="block text-xs font-medium text-gray-700 mb-2">
+                                    Periodo Académico
+                                </label>
+                                <div className="relative">
+                                    <select
+                                        value={selectedPeriodId}
+                                        onChange={(e) => handlePeriodChange(e.target.value)}
+                                        className="w-full sm:w-64 px-4 py-2.5 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none bg-white text-sm"
+                                    >
+                                        <option value="">Todos los periodos</option>
+                                        {periodos.map((periodo) => (
+                                            <option key={periodo.id} value={periodo.id}>
+                                                {periodo.nombre} {periodo.es_actual && '(Actual)'}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                </div>
                             </div>
+
+                            {/* Acciones de Boletín */}
+                            {(can?.view_bulletins || can?.download_bulletins) && (
+                                <div className="flex gap-2">
+                                    {can?.view_bulletins && (
+                                        <button
+                                            onClick={() => window.open(route('estudiante.boletines'), '_blank')}
+                                            className="p-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2 text-sm font-medium"
+                                            title="Ver Boletines"
+                                        >
+                                            <FileText className="w-4 h-4 text-blue-600" />
+                                            <span className="hidden lg:inline">Ver Boletín</span>
+                                        </button>
+                                    )}
+                                    {can?.download_bulletins && (
+                                        <button
+                                            onClick={() => {
+                                                if (periodoActual?.id) {
+                                                    // Buscamos si hay un boletín generado para este estudiante y periodo
+                                                    // Por ahora redirigimos a la lista si no tenemos el ID específico del boletín
+                                                    window.open(route('estudiante.boletines'), '_blank');
+                                                } else {
+                                                    window.open(route('estudiante.boletines'), '_blank');
+                                                }
+                                            }}
+                                            className="p-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2 text-sm font-medium"
+                                            title="Descargar"
+                                        >
+                                            <TrendingUp className="w-4 h-4" />
+                                            <span className="hidden lg:inline">Mis Boletines</span>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
-                    
+
                     {/* Info del Periodo Seleccionado */}
                     {periodoActual && (
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
@@ -206,7 +243,7 @@ export default function Notas({
                                 <Target className="w-5 h-5 text-purple-600" />
                             </div>
                         </div>
-                        
+
                         <div className="space-y-3">
                             <div className="flex items-center justify-between">
                                 <span className="text-sm text-gray-600">Aprobadas</span>
@@ -273,8 +310,8 @@ export default function Notas({
                 <div className="space-y-4 sm:space-y-6">
                     {materias.length > 0 ? (
                         materias.map((materia) => (
-                            <div 
-                                key={materia.id} 
+                            <div
+                                key={materia.id}
                                 className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100 transition-all duration-200 hover:shadow-xl"
                             >
                                 {/* Header de la materia - Clickeable */}
@@ -301,7 +338,7 @@ export default function Notas({
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0 ml-2">
                                         <div className="text-right">
                                             <p className="text-xs sm:text-sm text-gray-600">Promedio</p>
@@ -413,11 +450,10 @@ export default function Notas({
                                                         </thead>
                                                         <tbody>
                                                             {materia.notas.map((nota, idx) => (
-                                                                <tr 
-                                                                    key={idx} 
-                                                                    className={`border-b border-gray-100 hover:bg-gray-50 transition ${
-                                                                        idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                                                                    }`}
+                                                                <tr
+                                                                    key={idx}
+                                                                    className={`border-b border-gray-100 hover:bg-gray-50 transition ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
+                                                                        }`}
                                                                 >
                                                                     <td className="py-3 px-4">
                                                                         <div className="flex items-center gap-2">
@@ -478,8 +514,8 @@ export default function Notas({
                                 No hay calificaciones disponibles
                             </h3>
                             <p className="text-sm sm:text-base text-gray-600">
-                                {selectedPeriodId 
-                                    ? 'No tienes calificaciones registradas para este periodo' 
+                                {selectedPeriodId
+                                    ? 'No tienes calificaciones registradas para este periodo'
                                     : 'Aún no tienes calificaciones registradas'}
                             </p>
                         </div>

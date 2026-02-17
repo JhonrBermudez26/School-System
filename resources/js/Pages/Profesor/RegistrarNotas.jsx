@@ -57,12 +57,10 @@ export default function RegistrarNotas() {
 
   const handleCreateManualGrade = async (e) => {
     e.preventDefault();
-    
     if (manualGradeForm.max_score < 0.1 || manualGradeForm.max_score > 5.0) {
       alert('La puntuación máxima debe estar entre 0.1 y 5.0');
       return;
     }
-    
     setSaving(true);
     try {
       const response = await fetch('/profesor/registrarNotas/manual/create', {
@@ -77,7 +75,6 @@ export default function RegistrarNotas() {
           ...manualGradeForm
         })
       });
-
       if (response.ok) {
         setShowManualGradeForm(false);
         setManualGradeForm({
@@ -100,11 +97,11 @@ export default function RegistrarNotas() {
     }
   };
 
+  // FIX: confirm y fetch con template literals correctos
   const handleDeleteManualGrade = async (manualGradeId, title) => {
     if (!confirm(`¿Estás seguro de eliminar "${title}"? Se perderán todas las calificaciones asociadas.`)) {
       return;
     }
-
     setDeleting(manualGradeId);
     try {
       const response = await fetch(`/profesor/registrarNotas/manual/${manualGradeId}`, {
@@ -114,7 +111,6 @@ export default function RegistrarNotas() {
           'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || ''
         }
       });
-
       if (response.ok) {
         loadGrades();
       } else {
@@ -143,7 +139,6 @@ export default function RegistrarNotas() {
           score: parseFloat(score)
         })
       });
-
       if (response.ok) {
         loadGrades();
       } else {
@@ -158,20 +153,19 @@ export default function RegistrarNotas() {
 
   const allGradeColumns = useMemo(() => {
     const combined = [
-      ...tasks.map(t => ({ 
-        ...t, 
-        type: 'task', 
+      ...tasks.map(t => ({
+        ...t,
+        type: 'task',
         key: `task_${t.id}`,
         sortDate: new Date(t.due_date)
       })),
-      ...manualGrades.map(m => ({ 
-        ...m, 
-        type: 'manual', 
+      ...manualGrades.map(m => ({
+        ...m,
+        type: 'manual',
         key: `manual_${m.id}`,
         sortDate: new Date(m.grade_date)
       }))
     ];
-    
     return combined.sort((a, b) => b.sortDate - a.sortDate);
   }, [tasks, manualGrades]);
 
@@ -180,7 +174,6 @@ export default function RegistrarNotas() {
       const fullName = student.student_name.toLowerCase();
       const docNumber = (student.document_number || '').toString().toLowerCase();
       const searchTerm = search.toLowerCase();
-      
       return fullName.includes(searchTerm) || docNumber.includes(searchTerm);
     });
 
@@ -211,7 +204,6 @@ export default function RegistrarNotas() {
     if (filteredGradeMatrix.length === 0) return null;
     const averages = filteredGradeMatrix.map(s => s.average).filter(a => a > 0);
     if (averages.length === 0) return null;
-
     return {
       classAverage: (averages.reduce((a, b) => a + b, 0) / averages.length).toFixed(1),
       highestAverage: Math.max(...averages).toFixed(1),
@@ -272,7 +264,6 @@ export default function RegistrarNotas() {
               </select>
               <ChevronDown className="absolute right-3 bottom-2 sm:bottom-2.5 w-4 h-4 sm:w-5 sm:h-5 text-gray-400 pointer-events-none" />
             </div>
-
             <div className="relative">
               <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1 sm:mb-2">
                 Grupo
@@ -290,7 +281,6 @@ export default function RegistrarNotas() {
               </select>
               <ChevronDown className="absolute right-3 bottom-2 sm:bottom-2.5 w-4 h-4 sm:w-5 sm:h-5 text-gray-400 pointer-events-none" />
             </div>
-
             <div className="flex items-end sm:col-span-2 lg:col-span-1">
               <button
                 onClick={loadGrades}
@@ -317,14 +307,15 @@ export default function RegistrarNotas() {
                     <p className="text-xs sm:text-sm text-gray-600">Grupo {classInfo.group_name}</p>
                   </div>
                 </div>
-
-                <button
-                  onClick={() => setShowManualGradeForm(true)}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg font-medium"
-                >
-                  <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
-                  Nueva Evaluación
-                </button>
+                {(props.can?.create_manual_grade || props.can?.create) && (
+                  <button
+                    onClick={() => setShowManualGradeForm(true)}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 sm:px-6 py-2 sm:py-2.5 text-sm sm:text-base bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-lg hover:from-blue-600 hover:to-indigo-700 transition-all shadow-lg font-medium"
+                  >
+                    <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
+                    Nueva Evaluación
+                  </button>
+                )}
               </div>
 
               {/* Estadísticas */}
@@ -370,7 +361,6 @@ export default function RegistrarNotas() {
                               <SortIcon field="nombre" />
                             </button>
                           </th>
-
                           <th className="w-[120px] px-3 py-4 text-left border-r border-white/20">
                             <button
                               onClick={() => toggleSort('documento')}
@@ -380,10 +370,9 @@ export default function RegistrarNotas() {
                               <SortIcon field="documento" />
                             </button>
                           </th>
-
                           {allGradeColumns.map((col) => (
-                            <th 
-                              key={col.key} 
+                            <th
+                              key={col.key}
                               className="px-2 py-4 text-center text-xs font-bold text-white border-r border-white/20"
                               style={{ width: `${Math.max(80, 400 / allGradeColumns.length)}px` }}
                             >
@@ -391,6 +380,7 @@ export default function RegistrarNotas() {
                                 <div className="font-bold truncate" title={col.title}>{col.title}</div>
                                 <div className="text-[10px] text-white/80">Max: {col.max_score.toFixed(1)}</div>
                                 <div className="flex flex-col items-center gap-1 text-[10px]">
+                                  {/* FIX: className con template literal correcto */}
                                   <span className={`px-2 py-0.5 rounded-full ${col.type === 'task' ? 'bg-blue-400/30' : 'bg-indigo-400/30'}`}>
                                     {col.type === 'task' ? 'Tarea' : 'Manual'}
                                   </span>
@@ -399,8 +389,7 @@ export default function RegistrarNotas() {
                                     {new Date(col.type === 'task' ? col.due_date : col.grade_date).toLocaleDateString('es-CO', { month: 'short', day: 'numeric' })}
                                   </span>
                                 </div>
-
-                                {col.type === 'manual' && (
+                                {col.type === 'manual' && (props.can?.delete_manual_grade || props.can?.update) && (
                                   <button
                                     onClick={() => handleDeleteManualGrade(col.id, col.title)}
                                     disabled={deleting === col.id}
@@ -417,7 +406,6 @@ export default function RegistrarNotas() {
                               </div>
                             </th>
                           ))}
-
                           <th className="w-[100px] px-3 py-4 text-center bg-gradient-to-r from-indigo-700 to-blue-700 border-l border-white/20">
                             <button
                               onClick={() => toggleSort('promedio')}
@@ -429,22 +417,20 @@ export default function RegistrarNotas() {
                           </th>
                         </tr>
                       </thead>
-
                       <tbody className="divide-y divide-gray-200">
                         {filteredGradeMatrix.map((student, idx) => (
+                          // FIX: className con template literal correcto
                           <tr key={student.student_id} className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-blue-50 transition-colors`}>
                             <td className="px-4 py-3 text-sm font-medium text-gray-900 border-r border-gray-200">
                               <div className="truncate" title={student.student_name}>
                                 {student.student_name}
                               </div>
                             </td>
-
                             <td className="px-3 py-3 text-xs text-gray-600 border-r border-gray-200">
                               <div className="truncate">
                                 {student.document_number || 'N/A'}
                               </div>
                             </td>
-
                             {allGradeColumns.map((col) => {
                               const gradeData = student.grades[col.key];
                               return (
@@ -466,13 +452,14 @@ export default function RegistrarNotas() {
                                       gradeData={gradeData}
                                       maxScore={col.max_score}
                                       onSave={(score) => handleSaveManualScore(col.id, student.student_id, score)}
+                                      disabled={!(props.can?.update_manual_grade || props.can?.update)}
                                     />
                                   )}
                                 </td>
                               );
                             })}
-
                             <td className="px-3 py-3 text-center bg-gradient-to-r from-indigo-50 to-blue-50 border-l border-gray-200">
+                              {/* FIX: className con template literal correcto */}
                               <div className={`text-lg font-bold ${student.average >= 3.0 ? 'text-green-600' : student.average > 0 ? 'text-orange-600' : 'text-gray-400'}`}>
                                 {student.average ? student.average.toFixed(1) : '-'}
                               </div>
@@ -494,6 +481,7 @@ export default function RegistrarNotas() {
                       onSaveManualScore={handleSaveManualScore}
                       onDeleteManualGrade={handleDeleteManualGrade}
                       deleting={deleting}
+                      can={props.can}
                     />
                   ))}
                 </div>
@@ -528,48 +516,45 @@ export default function RegistrarNotas() {
   );
 }
 
-// ✅ StatCard Component
+// ✅ StatCard Component - FIX: className con template literals correctos
 function StatCard({ icon: Icon, label, value, color, className = '' }) {
-  const colorClasses = {
-    blue: 'from-blue-50 to-blue-100 border-blue-200 text-blue-600 text-blue-900',
-    indigo: 'from-indigo-50 to-indigo-100 border-indigo-200 text-indigo-600 text-indigo-900',
-    green: 'from-green-50 to-green-100 border-green-200 text-green-600 text-green-900',
-    orange: 'from-orange-50 to-orange-100 border-orange-200 text-orange-600 text-orange-900',
-    purple: 'from-purple-50 to-purple-100 border-purple-200 text-purple-600 text-purple-900',
+  const colorMap = {
+    blue:   { gradient: 'from-blue-50 to-blue-100',     border: 'border-blue-200',   icon: 'text-blue-600',   text: 'text-blue-900' },
+    indigo: { gradient: 'from-indigo-50 to-indigo-100', border: 'border-indigo-200', icon: 'text-indigo-600', text: 'text-indigo-900' },
+    green:  { gradient: 'from-green-50 to-green-100',   border: 'border-green-200',  icon: 'text-green-600',  text: 'text-green-900' },
+    orange: { gradient: 'from-orange-50 to-orange-100', border: 'border-orange-200', icon: 'text-orange-600', text: 'text-orange-900' },
+    purple: { gradient: 'from-purple-50 to-purple-100', border: 'border-purple-200', icon: 'text-purple-600', text: 'text-purple-900' },
   };
-
-  const [gradientClass, borderClass, iconClass, textClass] = colorClasses[color].split(' ');
+  const c = colorMap[color] || colorMap.blue;
 
   return (
-    <div className={`bg-gradient-to-br ${gradientClass} rounded-lg sm:rounded-xl p-3 sm:p-4 border ${borderClass} ${className}`}>
+    <div className={`bg-gradient-to-br ${c.gradient} rounded-lg sm:rounded-xl p-3 sm:p-4 border ${c.border} ${className}`}>
       <div className="flex items-center gap-2 mb-2">
-        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${iconClass} flex-shrink-0`} />
-        <div className={`text-xs font-semibold ${textClass} truncate`}>{label}</div>
+        <Icon className={`w-4 h-4 sm:w-5 sm:h-5 ${c.icon} flex-shrink-0`} />
+        <div className={`text-xs font-semibold ${c.text} truncate`}>{label}</div>
       </div>
-      <div className={`text-xl sm:text-2xl font-bold ${textClass}`}>{value}</div>
+      <div className={`text-xl sm:text-2xl font-bold ${c.text}`}>{value}</div>
     </div>
   );
 }
 
-// ✅ GradeCell Component
-function GradeCell({ gradeData, maxScore, onSave }) {
+// ✅ GradeCell Component - FIX: disabled agregado como prop, alert con template literal correcto
+function GradeCell({ gradeData, maxScore, onSave, disabled = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [value, setValue] = useState(gradeData?.score ?? '');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
     const numValue = parseFloat(value);
-    
     if (value !== '' && (isNaN(numValue) || numValue < 0 || numValue > maxScore)) {
+      // FIX: alert con template literal correcto
       alert(`La nota debe estar entre 0.0 y ${maxScore.toFixed(1)}`);
       return;
     }
-    
     if (value !== '' && numValue > 5.0) {
       alert('La nota no puede ser mayor a 5.0');
       return;
     }
-
     setSaving(true);
     try {
       await onSave(value === '' ? null : numValue);
@@ -603,9 +588,9 @@ function GradeCell({ gradeData, maxScore, onSave }) {
           autoFocus
           disabled={saving}
         />
-        <button 
-          onClick={handleSave} 
-          disabled={saving} 
+        <button
+          onClick={handleSave}
+          disabled={saving}
           className="p-0.5 text-green-600 hover:bg-green-100 rounded transition-colors"
           title="Guardar (Enter)"
         >
@@ -627,26 +612,28 @@ function GradeCell({ gradeData, maxScore, onSave }) {
   }
 
   return (
+    // FIX: className con template literal correcto + disabled usado correctamente
     <button
-      onClick={() => setIsEditing(true)}
-      className="w-full flex flex-col items-center gap-1 hover:bg-blue-50 rounded-lg p-1 transition-colors group"
-      title="Clic para editar"
+      onClick={() => !disabled && setIsEditing(true)}
+      className={`w-full flex flex-col items-center gap-1 rounded-lg p-1 transition-colors group ${disabled ? 'cursor-default' : 'hover:bg-blue-50'}`}
+      title={disabled ? '' : 'Clic para editar'}
+      disabled={disabled}
     >
       {gradeData?.score !== null && gradeData?.score !== undefined ? (
-        <div className="text-base font-bold text-blue-600">
+        <div className={`text-base font-bold ${disabled ? 'text-gray-500' : 'text-blue-600'}`}>
           {gradeData.score.toFixed(1)}
         </div>
       ) : (
-        <div className="text-[10px] text-gray-400 italic group-hover:text-blue-600">
-          Calificar
+        <div className={`text-[10px] italic ${disabled ? 'text-gray-300' : 'text-gray-400 group-hover:text-blue-600'}`}>
+          {disabled ? 'Sin nota' : 'Calificar'}
         </div>
       )}
     </button>
   );
 }
 
-// ✅ StudentCard Component (Mobile)
-function StudentCard({ student, allGradeColumns, onSaveManualScore, onDeleteManualGrade, deleting }) {
+// ✅ StudentCard Component (Mobile) - FIX: className con template literals correctos + can prop
+function StudentCard({ student, allGradeColumns, onSaveManualScore, onDeleteManualGrade, deleting, can }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
@@ -657,15 +644,14 @@ function StudentCard({ student, allGradeColumns, onSaveManualScore, onDeleteManu
             <h3 className="text-white font-bold text-base sm:text-lg truncate">{student.student_name}</h3>
             <p className="text-white/80 text-xs sm:text-sm">Doc: {student.document_number || 'N/A'}</p>
           </div>
-
           <div className="text-right flex-shrink-0 ml-2">
             <div className="text-white/80 text-xs mb-1">Promedio</div>
+            {/* FIX: className con template literal correcto */}
             <div className={`text-xl sm:text-2xl font-bold ${student.average >= 3.0 ? 'text-green-300' : student.average > 0 ? 'text-orange-300' : 'text-white/50'}`}>
               {student.average ? student.average.toFixed(1) : '-'}
             </div>
           </div>
         </div>
-        
         <button
           onClick={() => setExpanded(!expanded)}
           className="w-full mt-2 px-3 sm:px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg text-white text-xs sm:text-sm font-medium flex items-center justify-center gap-2 transition-colors"
@@ -694,6 +680,7 @@ function StudentCard({ student, allGradeColumns, onSaveManualScore, onDeleteManu
                   <div className="flex-1 min-w-0">
                     <div className="font-semibold text-gray-900 text-sm truncate">{col.title}</div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      {/* FIX: className con template literal correcto */}
                       <span className={`text-xs px-2 py-0.5 rounded-full ${col.type === 'task' ? 'bg-blue-100 text-blue-700' : 'bg-indigo-100 text-indigo-700'}`}>
                         {col.type === 'task' ? 'Tarea' : 'Manual'}
                       </span>
@@ -701,7 +688,7 @@ function StudentCard({ student, allGradeColumns, onSaveManualScore, onDeleteManu
                         <Calendar className="w-3 h-3" />
                         {new Date(col.type === 'task' ? col.due_date : col.grade_date).toLocaleDateString('es-CO', { month: 'short', day: 'numeric', year: 'numeric' })}
                       </span>
-                      {col.type === 'manual' && (
+                      {col.type === 'manual' && (can?.delete_manual_grade || can?.update) && (
                         <button
                           onClick={() => onDeleteManualGrade(col.id, col.title)}
                           disabled={deleting === col.id}
@@ -713,7 +700,6 @@ function StudentCard({ student, allGradeColumns, onSaveManualScore, onDeleteManu
                     </div>
                     <div className="text-xs text-gray-500 mt-1">Máximo: {col.max_score.toFixed(1)}</div>
                   </div>
-                  
                   <div className="text-right flex-shrink-0">
                     {col.type === 'task' ? (
                       <div>
@@ -732,6 +718,7 @@ function StudentCard({ student, allGradeColumns, onSaveManualScore, onDeleteManu
                         gradeData={gradeData}
                         maxScore={col.max_score}
                         onSave={(score) => onSaveManualScore(col.id, student.student_id, score)}
+                        disabled={!(can?.update_manual_grade || can?.update)}
                       />
                     )}
                   </div>
@@ -780,8 +767,8 @@ function ManualGradeFormModal({ form, setForm, onClose, onSubmit, saving }) {
             </div>
             <h2 className="text-lg sm:text-xl font-bold text-white">Nueva Evaluación Manual</h2>
           </div>
-          <button 
-            onClick={onClose} 
+          <button
+            onClick={onClose}
             className="p-2 text-white/80 hover:text-white hover:bg-white/10 rounded-lg transition-all flex-shrink-0"
             title="Cerrar"
           >
@@ -833,7 +820,6 @@ function ManualGradeFormModal({ form, setForm, onClose, onSubmit, saving }) {
               />
               <p className="text-xs text-gray-500 mt-1">Rango: 0.1 - 5.0</p>
             </div>
-
             <div>
               <label className="block text-sm font-bold text-gray-800 mb-2">Fecha</label>
               <input

@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Support\Facades\Gate;
 
 class ScheduleTeacherController extends Controller
 {
@@ -18,6 +19,19 @@ class ScheduleTeacherController extends Controller
         $current_year = date('Y');
 
         $time_slots = DB::table('time_slots')->orderBy('start_time')->get();
+
+        $asignaciones = DB::table('subject_group as sg')
+            ->join('subjects as s', 'sg.subject_id', '=', 's.id')
+            ->join('groups as g', 'sg.group_id', '=', 'g.id')
+            ->where('sg.user_id', $teacher->id)
+            ->select(
+                'sg.subject_id',
+                's.name as subject_name',
+                's.code as subject_code',
+                'g.id as group_id',
+                'g.nombre as group_name'
+            )
+            ->get();
 
         $teacher_timetable_slots = DB::table('timetable_slots as ts')
             ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')
@@ -36,6 +50,7 @@ class ScheduleTeacherController extends Controller
             ->get();
 
         return Inertia::render('Profesor/Horario', [
+            'asignaciones' => $asignaciones, // Pasar asignaciones completas
             'teacher_timetable_slots' => $teacher_timetable_slots,
             'time_slots' => $time_slots,
             'teacher_name' => $teacher->name . ' ' . $teacher->last_name,
@@ -52,7 +67,7 @@ class ScheduleTeacherController extends Controller
 
         $teacher = Auth::user();
         $timeSlots = DB::table('time_slots')->orderBy('start_time')->get();
-        $days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+        $days = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
 
         $teacherSlots = DB::table('timetable_slots as ts')
             ->join('timetables as tt', 'tt.id', '=', 'ts.timetable_id')

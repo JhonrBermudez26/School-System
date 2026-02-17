@@ -14,8 +14,10 @@ import {
 import TaskForm from './TaskForm';
 import TaskDetail from './TaskDetail';
 import { fetchWithCsrf, deleteWithCsrf } from '@/Utils/csrf-utils';
+import { usePage } from '@inertiajs/react';
 
 export default function Tareas({ tasks: initialTasks = [], classInfo }) {
+  const { props: inertiaProps } = usePage();
   const [tasks, setTasks] = useState(initialTasks);
   const [showForm, setShowForm] = useState(false);
   const [selectedTask, setSelectedTask] = useState(null);
@@ -218,20 +220,22 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
               </p>
             </div>
 
-            <button
-              onClick={() => setShowForm(true)}
-              className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-4 rounded-2xl
-                bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold
-                hover:from-blue-700 hover:to-indigo-700 
-                transition-all shadow-xl hover:shadow-2xl
-                hover:scale-105 active:scale-95
-                group"
-            >
-              <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center group-hover:rotate-90 transition-transform duration-300">
-                <Plus className="h-5 w-5" strokeWidth={2.5} />
-              </div>
-              <span className="hidden sm:inline">Nueva Tarea</span>
-            </button>
+            {inertiaProps.can?.create_task && (
+              <button
+                onClick={() => setShowForm(true)}
+                className="inline-flex items-center justify-center gap-2 px-6 sm:px-8 py-4 rounded-2xl
+                  bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold
+                  hover:from-blue-700 hover:to-indigo-700 
+                  transition-all shadow-xl hover:shadow-2xl
+                  hover:scale-105 active:scale-95
+                  group"
+              >
+                <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center group-hover:rotate-90 transition-transform duration-300">
+                  <Plus className="h-5 w-5" strokeWidth={2.5} />
+                </div>
+                <span className="hidden sm:inline">Nueva Tarea</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -247,16 +251,18 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
             <p className="text-gray-500 mb-8 max-w-md mx-auto">
               Crea tu primera tarea para que tus estudiantes puedan comenzar a trabajar
             </p>
-            <button
-              onClick={() => setShowForm(true)}
-              className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl
-                bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold
-                hover:from-blue-700 hover:to-indigo-700 
-                transition-all shadow-lg hover:shadow-xl"
-            >
-              <Plus className="h-5 w-5" />
-              Crear Primera Tarea
-            </button>
+            {inertiaProps.can?.create_task && (
+              <button
+                onClick={() => setShowForm(true)}
+                className="inline-flex items-center gap-2 px-8 py-4 rounded-2xl
+                  bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold
+                  hover:from-blue-700 hover:to-indigo-700 
+                  transition-all shadow-lg hover:shadow-xl"
+              >
+                <Plus className="h-5 w-5" />
+                Crear Primera Tarea
+              </button>
+            )}
           </div>
         ) : (
           <div className="grid gap-5">
@@ -291,23 +297,27 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
                       >
                         <Eye className="h-5 w-5 group-hover:scale-110 transition-transform" />
                       </button>
-                      <button
-                        onClick={() => {
-                          setEditingTask(task);
-                          setShowForm(true);
-                        }}
-                        className="p-3 text-gray-600 hover:bg-gray-100 rounded-xl transition-all group"
-                        title="Editar"
-                      >
-                        <Edit className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTask(task.id)}
-                        className="p-3 text-red-600 hover:bg-red-50 rounded-xl transition-all group"
-                        title="Eliminar"
-                      >
-                        <Trash2 className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                      </button>
+                      {task.can?.update && (
+                        <button
+                          onClick={() => {
+                            setEditingTask(task);
+                            setShowForm(true);
+                          }}
+                          className="p-3 text-gray-600 hover:bg-gray-100 rounded-xl transition-all group"
+                          title="Editar"
+                        >
+                          <Edit className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                        </button>
+                      )}
+                      {task.can?.delete && (
+                        <button
+                          onClick={() => handleDeleteTask(task.id)}
+                          className="p-3 text-red-600 hover:bg-red-50 rounded-xl transition-all group"
+                          title="Eliminar"
+                        >
+                          <Trash2 className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                        </button>
+                      )}
                     </div>
                   </div>
 

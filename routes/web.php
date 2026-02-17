@@ -448,40 +448,40 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
             Route::get('/clases/detalle', [ClassController::class, 'show'])->name('profesor.clases.show');
             
             // Publicaciones (CRUD)
-            Route::get('/posts', [PostController::class, 'index'])->name('profesor.posts.index');
-        Route::post('/posts', [PostController::class, 'store'])->name('profesor.posts.store');
-        Route::put('/posts/{post}', [PostController::class, 'update'])->name('profesor.posts.update');
-        Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('profesor.posts.destroy');
+            Route::get('/posts', [PostController::class, 'index'])->name('profesor.posts.index')->middleware('permission:posts.view');
+            Route::post('/posts', [PostController::class, 'store'])->name('profesor.posts.store')->middleware('permission:posts.create');
+            Route::put('/posts/{post}', [PostController::class, 'update'])->name('profesor.posts.update')->middleware('can:update,post');
+            Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('profesor.posts.destroy')->middleware('can:delete,post');
             
             // Carpetas (CRUD)
-            Route::post('/clases/folders', [FolderController::class, 'store'])->name('profesor.folders.store');
-            Route::put('/clases/folders/{folder}', [FolderController::class, 'update'])->name('profesor.folders.update');
-            Route::delete('/clases/folders/{folder}', [FolderController::class, 'destroy'])->name('profesor.folders.destroy');
+            Route::post('/clases/folders', [FolderController::class, 'store'])->name('profesor.folders.store')->middleware('permission:posts.create');
+            Route::put('/clases/folders/{folder}', [FolderController::class, 'update'])->name('profesor.folders.update')->middleware('can:update,folder');
+            Route::delete('/clases/folders/{folder}', [FolderController::class, 'destroy'])->name('profesor.folders.destroy')->middleware('can:delete,folder');
             
             // Archivos (CRUD)
-            Route::post('/clases/files', [FileController::class, 'store'])->name('profesor.files.store');
-            Route::delete('/clases/files/{file}', [FileController::class, 'destroy'])->name('profesor.files.destroy');
+            Route::post('/clases/files', [FileController::class, 'store'])->name('profesor.files.store')->middleware('permission:posts.create');
+            Route::delete('/clases/files/{file}', [FileController::class, 'destroy'])->name('profesor.files.destroy')->middleware('can:delete,file');
             
             // Reuniones (CRUD)
-            Route::post('/clases/meetings', [MeetingController::class, 'store'])->name('profesor.meetings.store');
-            Route::delete('/clases/meetings/{meeting}', [MeetingController::class, 'destroy'])->name('profesor.meetings.destroy');
+            Route::post('/clases/meetings', [MeetingController::class, 'store'])->name('profesor.meetings.store')->middleware('permission:meetings.create');
+            Route::delete('/clases/meetings/{meeting}', [MeetingController::class, 'destroy'])->name('profesor.meetings.destroy')->middleware('can:end,meeting');
         
-            // TAREAS
+        // TAREAS
        Route::prefix('clases')->name('profesor.clases.')->group(function () {
         // Lista de tareas
-        Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index');
+        Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index')->middleware('permission:assignments.view');
         
         // Crear tarea
-        Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store');
+        Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store')->middleware('permission:assignments.create');
         
         // Ver detalle de tarea
-        Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
+        Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show')->middleware('can:view,task');
         
         // Actualizar tarea
-        Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update');
+        Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update')->middleware('can:update,task');
         
         // Eliminar tarea
-        Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy');
+        Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy')->middleware('can:delete,task');
         
         // Eliminar adjunto de tarea
         Route::delete('/tasks/attachments/{attachment}', [TaskController::class, 'deleteAttachment'])
@@ -489,36 +489,36 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
         
         // Calificar una entrega
         Route::post('/tasks/submissions/{submission}/grade', [TaskController::class, 'gradeSubmission'])
-            ->name('tasks.gradeSubmission');
+            ->name('tasks.gradeSubmission')->middleware('can:grade,task');
 
             //actualizar entrega
         Route::put('/tasks/submissions/{submission}/grade', [TaskController::class, 'gradeSubmission'])
-        ->name('tasks.updateGrade');
+        ->name('tasks.updateGrade')->middleware('can:grade,task');
     });
             
             //HORARIO
-           Route::get('/horario', [ScheduleTeacherController::class, 'index'])->name('profesor.horario');
-    Route::get('/horario/print', [ScheduleTeacherController::class, 'print'])->name('profesor.horario.print');
-
-            // ASISTENCIAS
-            Route::get('/asistencias', [AsistenciasController::class, 'index'])
-                ->name('profesor.asistencias');
-            Route::post('/asistencias/bulk', [AsistenciasController::class, 'bulkStore'])
-                ->name('profesor.asistencias.bulk');
-            Route::delete('/asistencias/{id}', [AsistenciasController::class, 'destroy'])
-                ->name('profesor.asistencias.destroy');
-
-
-            // REGISTRAR NOTAS - RUTAS COMPLETAS
-            Route::prefix('registrarNotas')->name('profesor.registrarNotas')->group(function () {
-                // Vista principal (GET /profesor/registrarNotas)
-                Route::get('/', [RegistrarNotasController::class, 'index'])->name('');
-
-                // Acciones de evaluaciones manuales
-                Route::post('/manual/create', [RegistrarNotasController::class, 'createManualGrade'])->name('manual.create');
-                Route::post('/manual/score', [RegistrarNotasController::class, 'saveManualGradeScore'])->name('manual.score');
-                Route::delete('/manual/{id}', [RegistrarNotasController::class, 'deleteManualGrade'])->name('manual.delete');
-            });
+            Route::get('/horario', [ScheduleTeacherController::class, 'index'])->name('profesor.horario')->middleware('permission:schedules.view');
+     Route::get('/horario/print', [ScheduleTeacherController::class, 'print'])->name('profesor.horario.print')->middleware('permission:schedules.print');
+ 
+             // ASISTENCIAS
+             Route::get('/asistencias', [AsistenciasController::class, 'index'])
+                 ->name('profesor.asistencias')->middleware('permission:attendances.view');
+             Route::post('/asistencias/bulk', [AsistenciasController::class, 'bulkStore'])
+                 ->name('profesor.asistencias.bulk')->middleware('permission:attendances.create');
+             Route::delete('/asistencias/{id}', [AsistenciasController::class, 'destroy'])
+                 ->name('profesor.asistencias.destroy')->middleware('permission:attendances.update');
+ 
+ 
+             // REGISTRAR NOTAS - RUTAS COMPLETAS
+             Route::prefix('registrarNotas')->name('profesor.registrarNotas')->group(function () {
+                 // Vista principal (GET /profesor/registrarNotas)
+                 Route::get('/', [RegistrarNotasController::class, 'index'])->name('')->middleware('permission:grades.view');
+ 
+                 // Acciones de evaluaciones manuales
+                 Route::post('/manual/create', [RegistrarNotasController::class, 'createManualGrade'])->name('manual.create')->middleware('permission:manual_grades.create');
+                 Route::post('/manual/score', [RegistrarNotasController::class, 'saveManualGradeScore'])->name('manual.score')->middleware('permission:manual_grades.update');
+                 Route::delete('/manual/{id}', [RegistrarNotasController::class, 'deleteManualGrade'])->name('manual.delete')->middleware('permission:manual_grades.update');
+             });
         });
 
 
@@ -534,26 +534,26 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
             Route::get('/clases/{subject_id}/{group_id}', [EstudianteClasesController::class, 'show'])->name('estudiante.clases.show');
                     
             // Publicaciones
-            Route::post('/posts', [EstudiantePostController::class, 'store'])->name('estudiante.posts.store');
-            Route::put('/posts/{post}', [EstudiantePostController::class, 'update'])->name('estudiante.posts.update');
-            Route::delete('/posts/{post}', [EstudiantePostController::class, 'destroy'])->name('estudiante.posts.destroy');
+            Route::post('/posts', [EstudiantePostController::class, 'store'])->name('estudiante.posts.store')->middleware('permission:posts.create');
+            Route::put('/posts/{post}', [EstudiantePostController::class, 'update'])->name('estudiante.posts.update')->middleware('can:update,post');
+            Route::delete('/posts/{post}', [EstudiantePostController::class, 'destroy'])->name('estudiante.posts.destroy')->middleware('can:delete,post');
                     
             // Tareas - Rutas existentes
 
 
             Route::prefix('tasks')->name('tasks.')->group(function () {
         // Lista de tareas
-        Route::get('/', [EstudianteTaskController::class, 'index'])->name('index');
+        Route::get('/', [EstudianteTaskController::class, 'index'])->name('index')->middleware('permission:assignments.view');
         
         // Ver detalle de tarea
-        Route::get('/{task}', [EstudianteTaskController::class, 'show'])->name('show');
+        Route::get('/{task}', [EstudianteTaskController::class, 'show'])->name('show')->middleware('can:view,task');
         
         // Enviar o editar entrega
-        Route::post('/submit', [EstudianteTaskController::class, 'submit'])->name('submit');
+        Route::post('/submit', [EstudianteTaskController::class, 'submit'])->name('submit')->middleware('permission:assignments.submit');
         
         // Obtener compañeros disponibles
         Route::get('/{task}/available-classmates', [EstudianteTaskController::class, 'getAvailableClassmates'])
-            ->name('available-classmates');
+            ->name('available-classmates')->middleware('can:view,task');
         
         // Eliminar archivo de entrega
         Route::delete('/files/{file}', [EstudianteTaskController::class, 'deleteFile'])
@@ -565,7 +565,7 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
         
         // Eliminar entrega completa
         Route::delete('/submissions/{submission}', [EstudianteTaskController::class, 'deleteSubmission'])
-            ->name('submissions.delete');
+            ->name('submissions.delete')->middleware('can:delete,submission');
     });
 
 
@@ -610,15 +610,15 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
         ->name('estudiante.chat.delete-conversation');
 
          //HORARIO
-        Route::get('/horario', [ScheduleEstudentController::class, 'index'])->name('estudiante.horario');
-    Route::get('/horario/print', [ScheduleEstudentController::class, 'print'])->name('estudiante.horario.print');
+        Route::get('/horario', [ScheduleEstudentController::class, 'index'])->name('estudiante.horario')->middleware('permission:schedules.view');
+    Route::get('/horario/print', [ScheduleEstudentController::class, 'print'])->name('estudiante.horario.print')->middleware('permission:schedules.print');
 
              // ASISTENCIAS
         Route::get('/asistencias', [AsistenciasEstudentController::class, 'index'])
-                ->name('profesor.asistencias');
+                ->name('profesor.asistencias')->middleware('permission:attendances.view');
 
             // Mis NOTAS
-        Route::get('/notas', [MisNotasController::class, 'index'])->name('estudiante.notas');
+        Route::get('/notas', [MisNotasController::class, 'index'])->name('estudiante.notas')->middleware('permission:grades.view');
 
 
         //boletin

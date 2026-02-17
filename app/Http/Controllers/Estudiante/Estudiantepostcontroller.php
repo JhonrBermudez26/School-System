@@ -20,12 +20,7 @@ class EstudiantePostController extends Controller
      */
     private function assertGroupMembership(int $groupId): void
     {
-        $userId = Auth::id();
-        $belongs = DB::table('group_user')
-            ->where('group_id', $groupId)
-            ->where('user_id', $userId)
-            ->exists();
-        abort_unless($belongs, 403, 'No tienes acceso a este grupo');
+        Gate::authorize('access-class', [0, $groupId]);
     }
 
     /**
@@ -33,7 +28,7 @@ class EstudiantePostController extends Controller
      */
     private function assertOwnership(Post $post): void
     {
-        abort_unless($post->user_id === Auth::id(), 403, 'No tienes permiso para editar esta publicación');
+        $this->authorize('update', $post);
     }
 
     /**
@@ -206,8 +201,7 @@ class EstudiantePostController extends Controller
      */
     public function destroy(Post $post)
     {
-        $this->assertOwnership($post);
-        $this->assertGroupMembership((int) $post->group_id);
+        $this->authorize('delete', $post);
 
         $subjectId = $post->subject_id;
         $groupId = $post->group_id;

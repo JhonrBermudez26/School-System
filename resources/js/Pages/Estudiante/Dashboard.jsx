@@ -5,7 +5,7 @@ import Layout from '@/Components/Layout/Layout';
 
 export default function Dashboard() {
     const { props } = usePage();
-    const { stats = {}, studentInfo = {}, materias = [], tareasPendientes = [], proximasEvaluaciones = [] } = props;
+    const { stats = {}, studentInfo = {}, materias = [], tareasPendientes = [], proximasEvaluaciones = [], can = {} } = props;
     const { promedio = 0, tareasPendientes: pendingCount = 0, asistencia = 0, materiasInscritas = 0 } = stats;
 
     // Función para navegar a Mis Notas
@@ -88,23 +88,24 @@ export default function Dashboard() {
 
                 {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-gray-600 mb-1">Promedio General</p>
-                                <p className="text-3xl font-bold text-gray-800">{promedio.toFixed(1)}</p>
-                                <p className={`text-xs font-medium mt-1 ${
-                                    promedio >= 4.0 ? 'text-blue-600' : 
-                                    promedio >= 3.5 ? 'text-yellow-600' : 'text-orange-600'
-                                }`}>
-                                    {promedio >= 4.0 ? 'Excelente rendimiento' : 
-                                     promedio >= 3.5 ? 'Buen desempeño' : 
-                                     promedio > 0 ? 'Puedes mejorar' : 'Sin calificaciones'}
-                                </p>
+                    {can.view_grades && (
+                        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-blue-500">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-gray-600 mb-1">Promedio General</p>
+                                    <p className="text-3xl font-bold text-gray-800">{promedio.toFixed(1)}</p>
+                                    <p className={`text-xs font-medium mt-1 ${promedio >= 4.0 ? 'text-blue-600' :
+                                        promedio >= 3.5 ? 'text-yellow-600' : 'text-orange-600'
+                                        }`}>
+                                        {promedio >= 4.0 ? 'Excelente rendimiento' :
+                                            promedio >= 3.5 ? 'Buen desempeño' :
+                                                promedio > 0 ? 'Puedes mejorar' : 'Sin calificaciones'}
+                                    </p>
+                                </div>
+                                <TrendingUp className="w-12 h-12 text-blue-500 opacity-20" />
                             </div>
-                            <TrendingUp className="w-12 h-12 text-blue-500 opacity-20" />
                         </div>
-                    </div>
+                    )}
 
                     <div className="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
                         <div className="flex items-center justify-between">
@@ -128,16 +129,18 @@ export default function Dashboard() {
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <p className="text-sm text-gray-600 mb-1">Asistencia</p>
-                                <p className="text-3xl font-bold text-gray-800">{asistencia}%</p>
-                                <p className="text-xs text-gray-500 mt-1">Este periodo</p>
+                    {can.view_attendance && (
+                        <div className="bg-white rounded-lg shadow p-6 border-l-4 border-purple-500">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-gray-600 mb-1">Asistencia</p>
+                                    <p className="text-3xl font-bold text-gray-800">{asistencia}%</p>
+                                    <p className="text-xs text-gray-500 mt-1">Este periodo</p>
+                                </div>
+                                <Award className="w-12 h-12 text-purple-500 opacity-20" />
                             </div>
-                            <Award className="w-12 h-12 text-purple-500 opacity-20" />
                         </div>
-                    </div>
+                    )}
                 </div>
 
                 {/* Quick Actions */}
@@ -146,18 +149,20 @@ export default function Dashboard() {
                         <h2 className="text-xl font-semibold text-gray-800">Accesos Rápidos</h2>
                     </div>
                     <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <button 
-                            onClick={handleVerNotas}
-                            className="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
-                        >
-                            <FileText className="w-10 h-10 text-blue-600 mr-4" />
-                            <div className="text-left">
-                                <p className="font-semibold text-gray-800">Mis Notas</p>
-                                <p className="text-sm text-gray-600">Ver calificaciones</p>
-                            </div>
-                        </button>
+                        {can.view_grades && (
+                            <button
+                                onClick={handleVerNotas}
+                                className="flex items-center p-4 bg-blue-50 hover:bg-blue-100 rounded-lg transition"
+                            >
+                                <FileText className="w-10 h-10 text-blue-600 mr-4" />
+                                <div className="text-left">
+                                    <p className="font-semibold text-gray-800">Mis Notas</p>
+                                    <p className="text-sm text-gray-600">Ver calificaciones</p>
+                                </div>
+                            </button>
+                        )}
 
-                        <button 
+                        <button
                             onClick={handleVerClases}
                             className="flex items-center p-4 bg-green-50 hover:bg-green-100 rounded-lg transition"
                         >
@@ -168,7 +173,33 @@ export default function Dashboard() {
                             </div>
                         </button>
 
-                        <button 
+                        {can.view_schedules && (
+                            <button
+                                onClick={() => router.visit(route('estudiante.horario'))}
+                                className="flex items-center p-4 bg-amber-50 hover:bg-amber-100 rounded-lg transition"
+                            >
+                                <Calendar className="w-10 h-10 text-amber-600 mr-4" />
+                                <div className="text-left">
+                                    <p className="font-semibold text-gray-800">Mi Horario</p>
+                                    <p className="text-sm text-gray-600">Ver agenda semanal</p>
+                                </div>
+                            </button>
+                        )}
+
+                        {can.view_bulletins && (
+                            <button
+                                onClick={() => router.visit(route('estudiante.boletines'))}
+                                className="flex items-center p-4 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition"
+                            >
+                                <FileText className="w-10 h-10 text-indigo-600 mr-4" />
+                                <div className="text-left">
+                                    <p className="font-semibold text-gray-800">Mis Boletines</p>
+                                    <p className="text-sm text-gray-600">Certificados académicos</p>
+                                </div>
+                            </button>
+                        )}
+
+                        <button
                             onClick={handleVerPerfil}
                             className="flex items-center p-4 bg-purple-50 hover:bg-purple-100 rounded-lg transition"
                         >
@@ -182,41 +213,43 @@ export default function Dashboard() {
                 </div>
 
                 {/* Grid de 2 columnas */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className={`grid grid-cols-1 ${can.view_grades ? 'lg:grid-cols-2' : ''} gap-6`}>
                     {/* Mis Notas por Materia */}
-                    <div className="bg-white rounded-lg shadow">
-                        <div className="px-6 py-4 border-b border-gray-200">
-                            <h2 className="text-xl font-semibold text-gray-800">Mis Notas por Materia</h2>
-                        </div>
-                        <div className="p-6">
-                            {(!materias || materias.length === 0) && (
-                                <p className="text-center text-gray-500 py-8">
-                                    No hay materias registradas.
-                                </p>
-                            )}
-                            {materias && materias.slice(0, 5).map((materia, idx) => (
-                                <div 
-                                    key={idx} 
-                                    className={`flex items-center justify-between p-4 rounded-lg mb-3 last:mb-0 border ${getGradeBgColor(materia.promedio)}`}
-                                >
-                                    <div className="flex items-center flex-1">
-                                        <div className="bg-white rounded-lg p-3 mr-4 shadow-sm">
-                                            <BookOpen className="w-6 h-6 text-blue-600" />
+                    {can.view_grades && (
+                        <div className="bg-white rounded-lg shadow">
+                            <div className="px-6 py-4 border-b border-gray-200">
+                                <h2 className="text-xl font-semibold text-gray-800">Mis Notas por Materia</h2>
+                            </div>
+                            <div className="p-6">
+                                {(!materias || materias.length === 0) && (
+                                    <p className="text-center text-gray-500 py-8">
+                                        No hay materias registradas.
+                                    </p>
+                                )}
+                                {materias && materias.slice(0, 5).map((materia, idx) => (
+                                    <div
+                                        key={idx}
+                                        className={`flex items-center justify-between p-4 rounded-lg mb-3 last:mb-0 border ${getGradeBgColor(materia.promedio)}`}
+                                    >
+                                        <div className="flex items-center flex-1">
+                                            <div className="bg-white rounded-lg p-3 mr-4 shadow-sm">
+                                                <BookOpen className="w-6 h-6 text-blue-600" />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-gray-800">{materia.subject_name}</p>
+                                                <p className="text-sm text-gray-600">{materia.teacher_name}</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <p className="font-semibold text-gray-800">{materia.subject_name}</p>
-                                            <p className="text-sm text-gray-600">{materia.teacher_name}</p>
+                                        <div className="text-right">
+                                            <p className={`text-2xl font-bold ${getGradeColor(materia.promedio)}`}>
+                                                {materia.promedio.toFixed(1)}
+                                            </p>
                                         </div>
                                     </div>
-                                    <div className="text-right">
-                                        <p className={`text-2xl font-bold ${getGradeColor(materia.promedio)}`}>
-                                            {materia.promedio.toFixed(1)}
-                                        </p>
-                                    </div>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
+                    )}
 
                     {/* Tareas Pendientes */}
                     <div className="bg-white rounded-lg shadow">
@@ -232,33 +265,31 @@ export default function Dashboard() {
                             {tareasPendientes && tareasPendientes.map((tarea, idx) => {
                                 const daysRemaining = getDaysRemaining(tarea.due_date);
                                 const colorClass = getDaysRemainingColor(daysRemaining);
-                                
+
                                 return (
-                                    <div 
-                                        key={idx} 
-                                        className={`p-4 rounded-lg mb-3 last:mb-0 border ${
-                                            daysRemaining < 0 ? 'bg-red-50 border-red-200' :
+                                    <div
+                                        key={idx}
+                                        className={`p-4 rounded-lg mb-3 last:mb-0 border ${daysRemaining < 0 ? 'bg-red-50 border-red-200' :
                                             daysRemaining === 0 ? 'bg-orange-50 border-orange-200' :
-                                            daysRemaining <= 3 ? 'bg-yellow-50 border-yellow-200' : 
-                                            'bg-green-50 border-green-200'
-                                        }`}
+                                                daysRemaining <= 3 ? 'bg-yellow-50 border-yellow-200' :
+                                                    'bg-green-50 border-green-200'
+                                            }`}
                                     >
                                         <div className="flex items-start justify-between mb-2">
                                             <div className="flex-1">
                                                 <h3 className="font-semibold text-gray-800">{tarea.title}</h3>
                                                 <p className="text-sm text-gray-600 mt-1">{tarea.subject_name}</p>
                                             </div>
-                                            <span className={`text-xs font-semibold px-2 py-1 rounded ${
-                                                daysRemaining < 0 ? 'bg-red-200 text-red-800' :
+                                            <span className={`text-xs font-semibold px-2 py-1 rounded ${daysRemaining < 0 ? 'bg-red-200 text-red-800' :
                                                 daysRemaining === 0 ? 'bg-orange-200 text-orange-800' :
-                                                daysRemaining <= 3 ? 'bg-yellow-200 text-yellow-800' : 
-                                                'bg-green-200 text-green-800'
-                                            }`}>
-                                                {daysRemaining < 0 
+                                                    daysRemaining <= 3 ? 'bg-yellow-200 text-yellow-800' :
+                                                        'bg-green-200 text-green-800'
+                                                }`}>
+                                                {daysRemaining < 0
                                                     ? 'Vencida'
-                                                    : daysRemaining === 0 
-                                                    ? 'Hoy'
-                                                    : `${daysRemaining}d`
+                                                    : daysRemaining === 0
+                                                        ? 'Hoy'
+                                                        : `${daysRemaining}d`
                                                 }
                                             </span>
                                         </div>
@@ -293,8 +324,8 @@ export default function Dashboard() {
                                 const colorClass = getDaysRemainingColor(daysRemaining);
 
                                 return (
-                                    <div 
-                                        key={idx} 
+                                    <div
+                                        key={idx}
                                         className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition"
                                     >
                                         <h3 className="font-semibold text-gray-800 mb-2">{evaluacion.title}</h3>
@@ -306,7 +337,7 @@ export default function Dashboard() {
                                             </div>
                                             <span className={`font-semibold ${colorClass}`}>
                                                 <Clock className="w-3 h-3 inline mr-1" />
-                                                {daysRemaining === 0 
+                                                {daysRemaining === 0
                                                     ? 'Hoy'
                                                     : `${daysRemaining} días`
                                                 }

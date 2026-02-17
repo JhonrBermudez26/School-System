@@ -75,7 +75,7 @@ class ScheduleEstudentController extends Controller
 
         $group = \App\Models\Group::with(['grade', 'course'])->findOrFail($studentGroup->group_id);
         $timeSlots = DB::table('time_slots')->orderBy('start_time')->get();
-        $days = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+        $days = ['Lunes', 'Martes', 'Miercoles', 'Jueves', 'Viernes'];
 
         $timetableId = DB::table('timetables')->where('group_id', $studentGroup->group_id)->value('id');
         $timetableSlots = collect();

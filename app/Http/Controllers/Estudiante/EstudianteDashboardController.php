@@ -106,6 +106,13 @@ class EstudianteDashboardController extends Controller
             'materias' => $materias,
             'tareasPendientes' => $tareasPendientesDetalle,
             'proximasEvaluaciones' => $proximasEvaluaciones,
+            'can' => [
+                'view_schedules' => $user->can('schedules.view'),
+                'view_attendance' => $user->can('attendances.view'),
+                'view_grades' => $user->can('grades.view'),
+                'view_bulletins' => $user->can('bulletins.view'),
+                'download_bulletins' => $user->can('bulletins.download'),
+            ]
         ]);
     }
 

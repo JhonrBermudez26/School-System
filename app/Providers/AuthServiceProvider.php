@@ -15,6 +15,11 @@ use App\Models\DisciplineRecord;
 use App\Models\ActivityLog;
 use App\Models\SchoolSetting;
 use App\Models\Boletin;
+use App\Models\Task;
+use App\Models\TaskSubmission;
+use App\Models\Post;
+use App\Models\Meeting;
+use Illuminate\Support\Facades\DB;
 use Spatie\Permission\Models\Role;
 use App\Policies\ManualGradePolicy;
 use App\Policies\Secretaria\SubjectPolicy;
@@ -28,6 +33,14 @@ use App\Policies\InstitutionPolicy;
 use App\Policies\RolePolicy;
 use App\Policies\UserPolicy;
 use App\Policies\BoletinPolicy;
+use App\Policies\TaskPolicy;
+use App\Policies\TaskSubmissionPolicy;
+use App\Policies\PostPolicy;
+use App\Policies\MeetingPolicy;
+use App\Policies\FolderPolicy;
+use App\Policies\ClassFilePolicy;
+use App\Models\Folder;
+use App\Models\ClassFile;
 
 
 class AuthServiceProvider extends ServiceProvider
@@ -50,6 +63,12 @@ class AuthServiceProvider extends ServiceProvider
         Role::class => RolePolicy::class,
         User::class => UserPolicy::class,
         Boletin::class => BoletinPolicy::class,
+        Task::class => TaskPolicy::class,
+        TaskSubmission::class => TaskSubmissionPolicy::class,
+        Post::class => PostPolicy::class,
+        Meeting::class => MeetingPolicy::class,
+        Folder::class => FolderPolicy::class,
+        ClassFile::class => ClassFilePolicy::class,
     ];
 
     /**
@@ -65,6 +84,39 @@ class AuthServiceProvider extends ServiceProvider
             if ($user->hasRole('rector')) {
                 return true;
             }
+        });
+
+
+        // Verificar si un usuario tiene acceso a una clase (sujeto + grupo)
+        Gate::define('access-class', function (User $user, int $subjectId, int $groupId) {
+            if ($user->hasRole('rector') || $user->hasRole('coordinadora')) {
+                return true;
+            }
+
+            if ($user->hasRole('profesor')) {
+                // Si subjectId es 0, solo validar grupo (usado en EstudianteTaskController para simplificar)
+                if ($subjectId === 0) {
+                    return DB::table('subject_group')
+                        ->where('user_id', $user->id)
+                        ->where('group_id', $groupId)
+                        ->exists();
+                }
+
+                return DB::table('subject_group')
+                    ->where('user_id', $user->id)
+                    ->where('subject_id', $subjectId)
+                    ->where('group_id', $groupId)
+                    ->exists();
+            }
+
+            if ($user->hasRole('estudiante')) {
+                return DB::table('group_user')
+                    ->where('group_id', $groupId)
+                    ->where('user_id', $user->id)
+                    ->exists();
+            }
+
+            return false;
         });
     }
 }

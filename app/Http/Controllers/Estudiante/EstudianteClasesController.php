@@ -47,6 +47,10 @@ class EstudianteClasesController extends Controller
         
         return Inertia::render('Estudiante/Clases/Index', [
             'asignaciones' => $asignaciones,
+            'can' => [
+                'view_assignments' => $user->can('assignments.view'),
+                'view_posts' => $user->can('posts.view'),
+            ]
         ]);
     }
     
@@ -57,15 +61,7 @@ class EstudianteClasesController extends Controller
     {
         $user = Auth::user();
         
-        // Verificar que el estudiante pertenece a este grupo
-        $belongsToGroup = DB::table('group_user')
-            ->where('group_id', $group_id)
-            ->where('user_id', $user->id)
-            ->exists();
-        
-        if (!$belongsToGroup) {
-            abort(403, 'No tienes acceso a esta clase');
-        }
+        Gate::authorize('access-class', [(int)$subject_id, (int)$group_id]);
         
         // Información de la clase
         $classInfo = DB::table('subject_group as sg')
@@ -112,6 +108,10 @@ class EstudianteClasesController extends Controller
                         : null,
                     'author_role' => $roleName,
                     'is_owner' => $post->user_id === auth()->id(),
+                    'can' => [
+                        'update' => auth()->user()->can('update', $post),
+                        'delete' => auth()->user()->can('delete', $post),
+                    ],
                     'attachments' => $post->attachments->map(function ($att) {
                         return [
                             'id' => $att->id,
@@ -160,6 +160,10 @@ class EstudianteClasesController extends Controller
                         'graded_at' => $submission->graded_at,
                         'attachments' => $submission->attachments,
                     ] : null,
+                    'can' => [
+                        'view' => auth()->user()->can('view', $task),
+                        'submit' => auth()->user()->can('submit', $task),
+                    ],
                 ];
             });
         
@@ -207,6 +211,12 @@ class EstudianteClasesController extends Controller
             'folders' => $folders,
             'files' => $files,
             'meeting' => $meeting,
+            'can' => [
+                'submit_assignments' => $user->can('assignments.submit'),
+                'view_posts' => $user->can('posts.view'),
+                'create_post' => $user->can('posts.create'),
+                'join_meetings' => $user->can('meetings.join'),
+            ]
         ]);
     }
 }

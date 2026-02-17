@@ -226,6 +226,10 @@ class MisNotasController extends Controller
             'evaluaciones_calificadas' => $totalEvaluacionesCalificadas,
             'evaluaciones_pendientes' => $totalEvaluacionesPendientes,
         ],
+        'can' => [
+            'view_bulletins' => $student->can('bulletins.view'),
+            'download_bulletins' => $student->can('bulletins.download'),
+        ]
     ]);
 }
    

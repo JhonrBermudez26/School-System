@@ -11,6 +11,7 @@ use App\Models\Folder;
 use App\Models\ClassFile;
 use App\Models\Meeting;
 use App\Models\Task;
+use Illuminate\Support\Facades\Gate; 
 
 class ClassController extends Controller
 {
@@ -59,6 +60,8 @@ class ClassController extends Controller
         $user = Auth::user();
         $subjectId = (int) $request->query('subject_id');
         $groupId = (int) $request->query('group_id');
+
+        Gate::authorize('access-class', [$subjectId, $groupId]);
 
         // Obtener información de la clase
         $class = DB::table('subject_group as sg')
@@ -126,6 +129,10 @@ class ClassController extends Controller
                             'created_at' => $att->created_at,
                         ];
                     }),
+                    'can' => [
+                        'update' => auth()->user()->can('update', $post),
+                        'delete' => auth()->user()->can('delete', $post),
+                    ]
                 ];
             });
 
@@ -134,19 +141,40 @@ class ClassController extends Controller
             ->where('group_id', $groupId)
             ->withCount('files')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function ($folder) {
+                return array_merge($folder->toArray(), [
+                    'can' => [
+                        'update' => auth()->user()->can('update', $folder),
+                        'delete' => auth()->user()->can('delete', $folder),
+                    ]
+                ]);
+            });
 
         // Archivos
         $files = ClassFile::where('subject_id', $subjectId)
             ->where('group_id', $groupId)
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->map(function ($file) {
+                return array_merge($file->toArray(), [
+                    'can' => [
+                        'delete' => auth()->user()->can('delete', $file),
+                    ]
+                ]);
+            });
 
         // Reunión activa
         $meeting = Meeting::where('subject_id', $subjectId)
             ->where('group_id', $groupId)
             ->where('is_active', true)
             ->first();
+
+        if ($meeting) {
+            $meetingData = $meeting->toArray();
+            $meetingData['can_end'] = auth()->user()->can('end', $meeting);
+            $meeting = $meetingData;
+        }
 
         // Tareas
         $tasks = Task::with('attachments')
@@ -196,6 +224,12 @@ class ClassController extends Controller
                         'graded' => $graded,
                         'pending' => $totalStudents - $submitted,
                     ],
+                    'can' => [
+                        'update' => auth()->user()->can('update', $task),
+                        'delete' => auth()->user()->can('delete', $task),
+                        'view' => auth()->user()->can('view', $task),
+                        'grade' => auth()->user()->can('grade', $task),
+                    ],
                     'created_at' => $task->created_at,
                 ];
             });
@@ -208,6 +242,13 @@ class ClassController extends Controller
             'files' => $files,
             'meeting' => $meeting,
             'tasks' => $tasks,
+            'can' => [
+                'create_task' => $user->can('assignments.create'),
+                'create_post' => $user->can('posts.create'),
+                'create_folder' => $user->can('folders.create'), // Note: might need to check if these permissions exist in seeder
+                'create_file' => $user->can('files.create'),
+                'start_meeting' => $user->can('meetings.create'),
+            ]
         ]);
     }
 }

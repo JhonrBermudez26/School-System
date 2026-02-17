@@ -242,32 +242,34 @@ export default function Reunion() {
           <Users className="h-4 w-4" />
           {studentsCount} estudiantes esperando
         </div>
-        <button
-          onClick={createMeeting}
-          disabled={isCreating}
-          className="inline-flex items-center px-8 py-4 rounded-2xl
-            bg-gradient-to-r from-blue-500 to-emerald-500
-            text-white text-lg font-bold
-            hover:from-blue-600 hover:to-emerald-700
-            disabled:opacity-50 disabled:cursor-not-allowed
-            transition-all shadow-xl hover:shadow-2xl
-            hover:scale-105 active:scale-95
-            group"
-        >
-          {isCreating ? (
-            <>
-              <Loader2 className="h-6 w-6 mr-3 animate-spin" />
-              Creando reunión...
-            </>
-          ) : (
-            <>
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
-                <Play className="h-6 w-6" />
-              </div>
-              Iniciar reunión virtual
-            </>
-          )}
-        </button>
+        {props.can?.start_meeting && (
+          <button
+            onClick={createMeeting}
+            disabled={isCreating}
+            className="inline-flex items-center px-8 py-4 rounded-2xl
+              bg-gradient-to-r from-blue-500 to-emerald-500
+              text-white text-lg font-bold
+              hover:from-blue-600 hover:to-emerald-700
+              disabled:opacity-50 disabled:cursor-not-allowed
+              transition-all shadow-xl hover:shadow-2xl
+              hover:scale-105 active:scale-95
+              group"
+          >
+            {isCreating ? (
+              <>
+                <Loader2 className="h-6 w-6 mr-3 animate-spin" />
+                Creando reunión...
+              </>
+            ) : (
+              <>
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
+                  <Play className="h-6 w-6" />
+                </div>
+                Iniciar reunión virtual
+              </>
+            )}
+          </button>
+        )}
       </div>
     );
   }
@@ -311,17 +313,19 @@ export default function Reunion() {
               </div>
             </div>
           </div>
-          <button
-            onClick={endMeeting}
-            className="inline-flex items-center justify-center px-5 py-3 rounded-xl 
-              bg-gradient-to-r from-red-500 to-red-600 text-white font-bold
-              hover:from-red-600 hover:to-red-700 
-              transition-all shadow-lg hover:shadow-xl
-              group whitespace-nowrap"
-          >
-            <VideoOff className="h-5 w-5 mr-2 group-hover:scale-110 transition-transform" />
-            Finalizar reunión
-          </button>
+          {meeting.can_end && (
+            <button
+              onClick={endMeeting}
+              className="inline-flex items-center justify-center px-5 py-3 rounded-xl 
+                bg-gradient-to-r from-red-500 to-red-600 text-white font-bold
+                hover:from-red-600 hover:to-red-700 
+                transition-all shadow-lg hover:shadow-xl
+                group whitespace-nowrap"
+            >
+              <VideoOff className="h-5 w-5 mr-2 group-hover:scale-110 transition-transform" />
+              Finalizar reunión
+            </button>
+          )}
         </div>
 
         {/* Enlace para compartir */}

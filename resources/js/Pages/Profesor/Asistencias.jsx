@@ -1,11 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { usePage, router } from '@inertiajs/react';
-import { 
-    Calendar, 
-    Users, 
-    CheckCircle, 
-    XCircle, 
-    Clock, 
+import {
+    Calendar,
+    Users,
+    CheckCircle,
+    XCircle,
+    Clock,
     AlertCircle,
     Save,
     History,
@@ -18,15 +18,15 @@ import Layout from '@/Components/Layout/Layout';
 
 export default function Asistencias() {
     const { props } = usePage();
-    const { 
-        asignaciones = [], 
-        estudiantes = [], 
+    const {
+        asignaciones = [],
+        estudiantes = [],
         selectedClass = null,
         classDates = [],
         attendanceHistory = [],
         currentPeriod = null,
         filters,
-        error 
+        error
     } = props;
 
     const [selectedSubject, setSelectedSubject] = useState(filters?.subject_id || '');
@@ -58,7 +58,7 @@ export default function Asistencias() {
     // Calcular estadísticas
     const stats = useMemo(() => {
         if (estudiantes.length === 0) return null;
-        
+
         const statusCounts = estudiantes.reduce((acc, est) => {
             const status = attendanceData[est.id]?.status || est.status || 'absent';
             acc[status] = (acc[status] || 0) + 1;
@@ -343,18 +343,16 @@ export default function Asistencias() {
                         <div className="inline-flex rounded-full bg-gray-100 p-1 shadow-inner w-full sm:w-auto">
                             <button
                                 onClick={() => handleViewChange('register')}
-                                className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 flex items-center justify-center gap-1 sm:gap-2 ${
-                                    currentView === 'register' ? 'bg-white shadow-md text-blue-700' : 'text-gray-600 hover:text-gray-800'
-                                }`}
+                                className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 flex items-center justify-center gap-1 sm:gap-2 ${currentView === 'register' ? 'bg-white shadow-md text-blue-700' : 'text-gray-600 hover:text-gray-800'
+                                    }`}
                             >
                                 <FileText className="h-3 w-3 sm:h-4 sm:w-4" />
                                 <span>Registrar</span>
                             </button>
                             <button
                                 onClick={() => handleViewChange('history')}
-                                className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 flex items-center justify-center gap-1 sm:gap-2 ${
-                                    currentView === 'history' ? 'bg-white shadow-md text-indigo-700' : 'text-gray-600 hover:text-gray-800'
-                                }`}
+                                className={`flex-1 sm:flex-none px-4 sm:px-6 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-medium transition-all duration-300 flex items-center justify-center gap-1 sm:gap-2 ${currentView === 'history' ? 'bg-white shadow-md text-indigo-700' : 'text-gray-600 hover:text-gray-800'
+                                    }`}
                             >
                                 <History className="h-3 w-3 sm:h-4 sm:w-4" />
                                 <span>Historial</span>
@@ -416,7 +414,7 @@ export default function Asistencias() {
                                 <Calendar className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600" />
                                 <span className="truncate">Clases de {selectedClass.subject_name} - {selectedClass.group_name}</span>
                             </h3>
-                            
+
                             {classDates.length > 0 ? (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
                                     {classDates.map((dateInfo) => (
@@ -424,17 +422,16 @@ export default function Asistencias() {
                                             key={dateInfo.date}
                                             onClick={() => loadAttendanceForDate(dateInfo.date)}
                                             disabled={dateInfo.is_future}
-                                            className={`group relative rounded-lg sm:rounded-xl shadow-md transition-all duration-300 cursor-pointer hover:shadow-lg hover:-translate-y-1 p-3 sm:p-4 text-left ${
-                                                selectedDate === dateInfo.date
+                                            className={`group relative rounded-lg sm:rounded-xl shadow-md transition-all duration-300 cursor-pointer hover:shadow-lg hover:-translate-y-1 p-3 sm:p-4 text-left ${selectedDate === dateInfo.date
                                                     ? 'ring-2 ring-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-300 scale-105'
                                                     : dateInfo.is_today
-                                                    ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-400'
-                                                    : dateInfo.is_future
-                                                    ? 'bg-gray-50 border border-gray-200 opacity-50 cursor-not-allowed'
-                                                    : dateInfo.has_attendance
-                                                    ? 'bg-gradient-to-br from-blue-50 to-emerald-50 border border-blue-200'
-                                                    : 'bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200'
-                                            }`}
+                                                        ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-2 border-blue-400'
+                                                        : dateInfo.is_future
+                                                            ? 'bg-gray-50 border border-gray-200 opacity-50 cursor-not-allowed'
+                                                            : dateInfo.has_attendance
+                                                                ? 'bg-gradient-to-br from-blue-50 to-emerald-50 border border-blue-200'
+                                                                : 'bg-gradient-to-br from-orange-50 to-amber-50 border border-orange-200'
+                                                }`}
                                         >
                                             {/* Badge de Estado */}
                                             <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
@@ -586,7 +583,7 @@ export default function Asistencias() {
                                         <tbody className="bg-white divide-y divide-gray-200">
                                             {estudiantes.map((estudiante, index) => {
                                                 const currentStatus = attendanceData[estudiante.id]?.status || 'absent';
-                                                
+
                                                 return (
                                                     <tr key={estudiante.id} className="hover:bg-gray-50 transition-colors">
                                                         <td className="px-6 py-4 text-sm text-gray-500">{index + 1}</td>
@@ -604,11 +601,10 @@ export default function Asistencias() {
                                                                     <button
                                                                         key={status}
                                                                         onClick={() => toggleAttendance(estudiante.id, status)}
-                                                                        className={`p-2 rounded-lg border-2 transition-all ${
-                                                                            currentStatus === status
+                                                                        className={`p-2 rounded-lg border-2 transition-all ${currentStatus === status
                                                                                 ? getStatusColor(status) + ' scale-110 shadow-md'
                                                                                 : 'bg-white border-gray-200 text-gray-400 hover:border-gray-300'
-                                                                        }`}
+                                                                            }`}
                                                                         title={getStatusLabel(status)}
                                                                     >
                                                                         {getStatusIcon(status)}
@@ -636,7 +632,7 @@ export default function Asistencias() {
                                 <div className="lg:hidden divide-y divide-gray-200">
                                     {estudiantes.map((estudiante, index) => {
                                         const currentStatus = attendanceData[estudiante.id]?.status || 'absent';
-                                        
+
                                         return (
                                             <div key={estudiante.id} className="p-3 sm:p-4 space-y-3">
                                                 {/* Header del estudiante */}
@@ -660,11 +656,10 @@ export default function Asistencias() {
                                                         <button
                                                             key={status}
                                                             onClick={() => toggleAttendance(estudiante.id, status)}
-                                                            className={`flex flex-col items-center justify-center gap-1 p-2 sm:p-3 rounded-lg border-2 transition-all ${
-                                                                currentStatus === status
+                                                            className={`flex flex-col items-center justify-center gap-1 p-2 sm:p-3 rounded-lg border-2 transition-all ${currentStatus === status
                                                                     ? getStatusColor(status) + ' scale-105 shadow-md'
                                                                     : 'bg-white border-gray-200 text-gray-400 active:scale-95'
-                                                            }`}
+                                                                }`}
                                                         >
                                                             {getStatusIcon(status)}
                                                             <span className="text-[10px] sm:text-xs font-medium leading-tight text-center">
@@ -692,17 +687,18 @@ export default function Asistencias() {
                                     })}
                                 </div>
 
-                                {/* Footer con botón guardar */}
-                                <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-t border-gray-200">
-                                    <button
-                                        onClick={saveAttendances}
-                                        disabled={isSaving}
-                                        className="w-full px-4 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 font-medium"
-                                    >
-                                        <Save className="h-4 w-4 sm:h-5 sm:w-5" />
-                                        {isSaving ? 'Guardando...' : 'Guardar Asistencias'}
-                                    </button>
-                                </div>
+                                {props.can?.register && (
+                                    <div className="bg-gray-50 px-3 sm:px-6 py-3 sm:py-4 border-t border-gray-200">
+                                        <button
+                                            onClick={saveAttendances}
+                                            disabled={isSaving}
+                                            className="w-full px-4 sm:px-8 py-2.5 sm:py-3 text-sm sm:text-base bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl flex items-center justify-center gap-2 font-medium"
+                                        >
+                                            <Save className="h-4 w-4 sm:h-5 sm:w-5" />
+                                            {isSaving ? 'Guardando...' : 'Guardar Asistencias'}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </>
@@ -739,7 +735,7 @@ export default function Asistencias() {
                                                 </div>
                                             </div>
                                         </div>
-                                        {expandedDates[record.date] ? 
+                                        {expandedDates[record.date] ?
                                             <ChevronUp className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 flex-shrink-0" /> :
                                             <ChevronDown className="h-4 w-4 sm:h-5 sm:w-5 text-gray-400 flex-shrink-0" />
                                         }

@@ -162,6 +162,9 @@ class AsistenciasEstudentController extends Controller
                 'formatted_range' => $currentPeriod->start_date->locale('es')->isoFormat('D MMM YYYY') . ' - ' . 
                                     $currentPeriod->end_date->locale('es')->isoFormat('D MMM YYYY'),
             ],
+            'can' => [
+                'view_attendance' => auth()->user()->can('attendances.view'),
+            ]
         ]);
     }
     

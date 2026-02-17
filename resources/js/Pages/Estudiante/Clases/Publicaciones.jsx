@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useForm, router } from '@inertiajs/react';
+import { useForm, router, usePage } from '@inertiajs/react';
 import {
   Plus, Bold, Italic, Underline, Paperclip, X, Edit, Trash2,
   Link as LinkIcon, MessageSquare, Clock, FileText, Download, Save,
@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 
 export default function Publicaciones({ publicaciones = [], classInfo }) {
+  const { props: inertiaProps } = usePage();
   const editorRef = useRef(null);
   const [editingId, setEditingId] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
@@ -271,9 +272,8 @@ export default function Publicaciones({ publicaciones = [], classInfo }) {
             {existingFiles.map(att => (
               <div
                 key={att.id}
-                className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
-                  filesToRemove.includes(att.id) ? 'bg-red-50 border-red-300 opacity-50' : 'bg-blue-50 border-blue-200'
-                }`}
+                className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${filesToRemove.includes(att.id) ? 'bg-red-50 border-red-300 opacity-50' : 'bg-blue-50 border-blue-200'
+                  }`}
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <FileText className="h-5 w-5 text-blue-600 flex-shrink-0" />
@@ -300,9 +300,8 @@ export default function Publicaciones({ publicaciones = [], classInfo }) {
             {existingLinks.map(att => (
               <div
                 key={att.id}
-                className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${
-                  linksToRemove.includes(att.id) ? 'bg-red-50 border-red-300 opacity-50' : 'bg-gray-50 border-gray-200'
-                }`}
+                className={`flex items-center justify-between p-4 rounded-xl border-2 transition-all ${linksToRemove.includes(att.id) ? 'bg-red-50 border-red-300 opacity-50' : 'bg-gray-50 border-gray-200'
+                  }`}
               >
                 <a href={att.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-sm truncate flex-1 font-medium">{att.url}</a>
                 <button
@@ -365,14 +364,18 @@ export default function Publicaciones({ publicaciones = [], classInfo }) {
                     {new Date(p.created_at).toLocaleString('es-CO', { dateStyle: 'medium', timeStyle: 'short' })}
                   </p>
                 </div>
-                {p.is_owner && (
+                {(p.is_owner || p.can?.update || p.can?.delete) && (
                   <div className="flex items-center gap-2">
-                    <button onClick={() => startEdit(p)} className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 group" title="Editar publicación">
-                      <Edit className="h-5 w-5 group-hover:scale-110 transition-transform" strokeWidth={2} />
-                    </button>
-                    <button onClick={() => destroyPost(p.id)} className="p-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 group" title="Eliminar publicación">
-                      <Trash2 className="h-5 w-5 group-hover:scale-110 transition-transform" strokeWidth={2} />
-                    </button>
+                    {(p.is_owner || p.can?.update) && (
+                      <button onClick={() => startEdit(p)} className="p-2.5 text-blue-600 hover:bg-blue-50 rounded-xl transition-all duration-200 group" title="Editar publicación">
+                        <Edit className="h-5 w-5 group-hover:scale-110 transition-transform" strokeWidth={2} />
+                      </button>
+                    )}
+                    {(p.is_owner || p.can?.delete) && (
+                      <button onClick={() => destroyPost(p.id)} className="p-2.5 text-red-600 hover:bg-red-50 rounded-xl transition-all duration-200 group" title="Eliminar publicación">
+                        <Trash2 className="h-5 w-5 group-hover:scale-110 transition-transform" strokeWidth={2} />
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -417,7 +420,7 @@ export default function Publicaciones({ publicaciones = [], classInfo }) {
       )}
 
       {/* Botón flotante crear */}
-      {!showCreate && !editingId && (
+      {inertiaProps.can?.create_post && !showCreate && !editingId && (
         <button
           onClick={() => setShowCreate(true)}
           className="fixed bottom-6 right-6 sm:bottom-8 sm:right-8 z-50 flex items-center gap-3 px-6 sm:px-8 py-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xl hover:shadow-3xl hover:scale-105 active:scale-95 transition-all duration-300 group"

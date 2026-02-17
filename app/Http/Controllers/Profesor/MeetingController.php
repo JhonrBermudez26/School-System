@@ -9,19 +9,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Gate;
 
 class MeetingController extends Controller
 {
     private function assertOwnership(int $subjectId, int $groupId): void
     {
-        $userId = Auth::id();
-        $exists = DB::table('subject_group')
-            ->where('user_id', $userId)
-            ->where('subject_id', $subjectId)
-            ->where('group_id', $groupId)
-            ->exists();
-        
-        abort_unless($exists, 403);
+        Gate::authorize('access-class', [$subjectId, $groupId]);
     }
 
     public function store(Request $request)
@@ -71,7 +65,7 @@ class MeetingController extends Controller
 
     public function destroy(Meeting $meeting)
     {
-        $this->assertOwnership((int) $meeting->subject_id, (int) $meeting->group_id);
+        $this->authorize('end', $meeting);
 
         $meeting->update([
             'is_active' => false,

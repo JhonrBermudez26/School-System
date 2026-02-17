@@ -51,6 +51,7 @@ class RolePermissionSeeder extends Seeder
             
             // Tareas
             'assignments.view', 'assignments.create', 'assignments.update', 'assignments.delete', 'assignments.grade',
+            'assignments.submit',
             
             // Publicaciones
             'posts.view', 'posts.create', 'posts.update', 'posts.delete',
@@ -258,12 +259,14 @@ class RolePermissionSeeder extends Seeder
             'schedules.print',
             
             // Publicaciones
+            'posts.view',
             'posts.create',
             'posts.update',
             'posts.delete',
             
             // Reuniones
             'meetings.create',
+            'meetings.join',
             'meetings.end',
             
             // Chat
@@ -283,8 +286,9 @@ class RolePermissionSeeder extends Seeder
             // Asistencias (solo ver)
             'attendances.view',
             
-            // Tareas (solo ver)
+            // Tareas (ver y entregar)
             'assignments.view',
+            'assignments.submit',
             
             // ✅ HORARIOS - Solo ver e imprimir su propio horario
             'schedules.view',
