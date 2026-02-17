@@ -224,10 +224,21 @@ export default function AuditLog({ logs, stats, filters }) {
                 {/* Pagination */}
                 <div className="p-8 bg-gray-50/30 flex justify-between items-center border-t border-gray-50">
                     <div className="text-xs font-bold text-gray-400 uppercase tracking-widest">
-                        Registros {logs.from} al {logs.to} • Total {logs.total}
+                        Registros {logs.from || 0} al {logs.to || 0} • Total {logs.total || 0}
                     </div>
                     <div className="flex gap-2">
-                        {/* Custom pagination buttons would go here */}
+                        {logs.links?.map((link, index) => (
+                            <button
+                                key={index}
+                                onClick={() => router.get(link.url)}
+                                disabled={!link.url}
+                                className={`px-4 py-2 rounded-xl font-bold text-sm transition ${link.active
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-white text-gray-600 hover:bg-gray-100'
+                                    } ${!link.url && 'opacity-50 cursor-not-allowed'}`}
+                                dangerouslySetInnerHTML={{ __html: link.label }}
+                            />
+                        ))}
                     </div>
                 </div>
             </div>

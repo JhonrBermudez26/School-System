@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Policies;
 
 use App\Models\ActivityLog;
@@ -12,7 +11,9 @@ class ActivityLogPolicy
      */
     public function viewAny(User $user): bool
     {
-        return $user->hasAnyPermission(['audit.view', 'audit_logs.view', 'system.logs']);
+        // Solo rector puede ver logs
+        return $user->hasRole('rector') || 
+               $user->hasPermissionTo('audit.view');
     }
 
     /**
@@ -20,14 +21,25 @@ class ActivityLogPolicy
      */
     public function view(User $user, ActivityLog $log): bool
     {
-        return $user->hasAnyPermission(['audit.view', 'audit_logs.view', 'system.logs']);
+        return $user->hasRole('rector') || 
+               $user->hasPermissionTo('audit.view');
     }
 
     /**
-     * Determine if the user can filter/search activity logs.
+     * Nadie puede crear, editar o eliminar logs manualmente
      */
-    public function filter(User $user): bool
+    public function create(User $user): bool
     {
-        return $user->hasPermissionTo('audit.view');
+        return false;
+    }
+
+    public function update(User $user, ActivityLog $log): bool
+    {
+        return false;
+    }
+
+    public function delete(User $user, ActivityLog $log): bool
+    {
+        return false;
     }
 }
