@@ -15,7 +15,8 @@ import {
   ShieldAlert,
   History,
   TrendingUp,
-  Scale
+  Scale,
+  Shield,
 } from "lucide-react";
 
 export default function SidebarMenu({ role }) {
@@ -26,7 +27,8 @@ export default function SidebarMenu({ role }) {
   const sections = {
     rector: [
       { icon: GraduationCap, label: "Dashboard", path: "/rector/dashboard" },
-      { icon: ShieldAlert, label: "Roles y Permisos", path: "/rector/roles" },
+      { icon: UserCog, label: "Gestión de usuarios", path: "/rector/usuarios" },
+      { icon: Shield, label: "Roles y Permisos", path: "/rector/roles" },
       { icon: History, label: "Auditoría", path: "/rector/auditoria" },
       { icon: TrendingUp, label: "Rendimiento", path: "/rector/performance" },
       { icon: Settings, label: "Configuración", path: "/rector/configuracion" },

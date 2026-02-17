@@ -3,6 +3,7 @@
 namespace App\Policies;
 
 use App\Models\User;
+use Illuminate\Auth\Access\Response;
 
 class UserPolicy
 {
@@ -19,7 +20,8 @@ class UserPolicy
      */
     public function view(User $user, User $model): bool
     {
-        return $user->hasPermissionTo('users.view');
+        return $user->hasPermissionTo('users.view') || 
+               $user->hasPermissionTo('users.view_history');
     }
 
     /**
@@ -33,27 +35,44 @@ class UserPolicy
     /**
      * Determine if the user can update the user.
      */
-    public function update(User $user, User $model): bool
+    public function update(User $user, User $model): Response
     {
-        // No se puede modificar el Rector
-        if ($model->hasRole('rector')) {
-            return $user->hasRole('rector');
+        // No se puede modificar el Rector (excepto por otro Rector)
+        if ($model->hasRole('rector') && !$user->hasRole('rector')) {
+            return Response::deny('No puedes modificar al Rector.');
         }
 
-        return $user->hasPermissionTo('users.update');
+        // No se puede modificar a sí mismo en ciertos aspectos
+        if ($model->id === $user->id) {
+            return Response::deny('No puedes modificar tu propio perfil desde aquí.');
+        }
+
+        return $user->hasPermissionTo('users.update') || $user->hasPermissionTo('users.change_role')
+            ? Response::allow()
+            : Response::deny('No tienes permiso para modificar usuarios.');
     }
 
     /**
      * Determine if the user can delete the user.
      */
-    public function delete(User $user, User $model): bool
+    public function delete(User $user, User $model): Response
     {
-        // No se puede eliminar el Rector ni a sí mismo
-        if ($model->hasRole('rector') || $model->id === $user->id) {
-            return false;
+        // No se puede eliminar el Rector
+        if ($model->hasRole('rector')) {
+            return Response::deny('No puedes eliminar al Rector.');
         }
 
-        return $user->hasPermissionTo('users.delete');
+        // No se puede eliminar a sí mismo
+        if ($model->id === $user->id) {
+            return Response::deny('No puedes eliminarte a ti mismo.');
+        }
+
+        // Verificar si tiene historial académico
+        // TODO: Implementar lógica para verificar registros académicos
+        
+        return $user->hasPermissionTo('users.delete')
+            ? Response::allow()
+            : Response::deny('No tienes permiso para eliminar usuarios.');
     }
 
     /**
@@ -67,14 +86,21 @@ class UserPolicy
     /**
      * Determine if the user can suspend users.
      */
-    public function suspend(User $user, User $model): bool
+    public function suspend(User $user, User $model): Response
     {
-        // No se puede suspender el Rector ni a sí mismo
-        if ($model->hasRole('rector') || $model->id === $user->id) {
-            return false;
+        // No se puede suspender el Rector
+        if ($model->hasRole('rector')) {
+            return Response::deny('No puedes suspender al Rector.');
         }
 
-        return $user->hasPermissionTo('users.suspend');
+        // No se puede suspender a sí mismo
+        if ($model->id === $user->id) {
+            return Response::deny('No puedes suspenderte a ti mismo.');
+        }
+
+        return $user->hasPermissionTo('users.suspend')
+            ? Response::allow()
+            : Response::deny('No tienes permiso para suspender usuarios.');
     }
 
     /**
@@ -83,25 +109,5 @@ class UserPolicy
     public function managePermissions(User $user): bool
     {
         return $user->hasPermissionTo('permissions.manage');
-    }
-
-    /**
-     * Cambiar estado activo/inactivo (Old Secretaria logic merged)
-     */
-    public function toggle(User $user, User $model): \Illuminate\Auth\Access\Response
-    {
-        // No se puede desactivar al rector
-        if ($model->hasRole('rector')) {
-            return \Illuminate\Auth\Access\Response::deny('No puedes desactivar al rector.');
-        }
-
-        // No se puede desactivar a sí mismo
-        if ($user->id === $model->id) {
-            return \Illuminate\Auth\Access\Response::deny('No puedes desactivarte a ti mismo.');
-        }
-
-        return $user->hasPermissionTo('users.update')
-            ? \Illuminate\Auth\Access\Response::allow()
-            : \Illuminate\Auth\Access\Response::deny('No tienes permiso para cambiar el estado de usuarios.');
     }
 }

@@ -91,12 +91,33 @@
 
             // GESTIÓN DE USUARIOS (ACTIVAR/SUSPENDER)
             Route::middleware(['permission:users.view'])->group(function () {
-                Route::get('/usuarios', [UserManagementController::class, 'index'])->name('rector.usuarios');
-                Route::post('/usuarios/{id}/activate', [UserManagementController::class, 'activate'])->name('rector.usuarios.activate');
-                Route::post('/usuarios/{id}/suspend', [UserManagementController::class, 'suspend'])->name('rector.usuarios.suspend');
-                Route::post('/usuarios/{id}/role', [UserManagementController::class, 'assignRole'])->name('rector.usuarios.role');
-                Route::get('/usuarios/{id}/history', [UserManagementController::class, 'history'])->name('rector.usuarios.history');
+        Route::get('/usuarios', [UserManagementController::class, 'index'])
+            ->name('rector.usuarios');
+        Route::get('/usuarios/{id}/history', [UserManagementController::class, 'history'])
+            ->name('rector.usuarios.history');
             });
+
+        Route::middleware(['permission:users.activate'])->group(function () {
+            Route::post('/usuarios/{id}/activate', [UserManagementController::class, 'activate'])
+                ->name('rector.usuarios.activate');
+        });
+
+        Route::middleware(['permission:users.suspend'])->group(function () {
+            Route::post('/usuarios/{id}/suspend', [UserManagementController::class, 'suspend'])
+                ->name('rector.usuarios.suspend');
+            Route::post('/usuarios/{id}/force-logout', [UserManagementController::class, 'forceLogout'])
+                ->name('rector.usuarios.force-logout');
+        });
+
+        Route::middleware(['permission:users.change_role'])->group(function () {
+            Route::patch('/usuarios/{id}/role', [UserManagementController::class, 'assignRole'])
+                ->name('rector.usuarios.role');
+        });
+
+        Route::middleware(['permission:users.reset_password'])->group(function () {
+            Route::post('/usuarios/{id}/reset-password', [UserManagementController::class, 'resetPassword'])
+                ->name('rector.usuarios.reset-password');
+        });
 
             // AUDITORÍA Y LOGS
             Route::middleware(['permission:audit.view'])->group(function () {

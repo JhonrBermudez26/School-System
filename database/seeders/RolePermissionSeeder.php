@@ -20,7 +20,8 @@ class RolePermissionSeeder extends Seeder
         $permissions = [
             // Usuarios
             'users.view', 'users.create', 'users.update', 'users.delete',
-            'users.activate', 'users.suspend',
+            'users.activate', 'users.suspend', 'users.change_role', 'users.view_history',
+            'users.force_logout', 'users.reset_password',
             
             // Estudiantes
             'students.view', 'students.create', 'students.update', 'students.delete',
@@ -86,6 +87,8 @@ class RolePermissionSeeder extends Seeder
             
             // Roles y permisos
             'roles.manage', 'permissions.manage',
+
+
         ];
 
         foreach ($permissions as $permission) {
