@@ -5,6 +5,8 @@ use Illuminate\Support\ServiceProvider;
 use Inertia\Inertia;
 use App\Models\SchoolSetting;
 use Illuminate\Support\Facades\Schema;
+use App\Models\AcademicPeriod;
+use App\Observers\AcademicPeriodObserver;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,7 +26,7 @@ class AppServiceProvider extends ServiceProvider
 
         date_default_timezone_set('America/Bogota');
         \Carbon\Carbon::setLocale('es');
-
+        AcademicPeriod::observe(AcademicPeriodObserver::class);
         $settings = null;
         if (Schema::hasTable('school_settings')) {
             $settings = SchoolSetting::first();

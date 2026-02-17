@@ -6,7 +6,7 @@ use App\Models\User;
 use App\Models\ManualGrade;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
-class GradePolicy
+class ManualGradePolicy
 {
     use HandlesAuthorization;
 
@@ -73,6 +73,7 @@ class GradePolicy
     {
         // ✅ VALIDACIÓN: No se puede modificar si el periodo está cerrado
         $period = $grade->academicPeriod;
+        
         if ($period && $period->isClosed()) {
             return false;
         }
@@ -110,6 +111,7 @@ class GradePolicy
     {
         // ✅ VALIDACIÓN: No se puede eliminar si el periodo está cerrado
         $period = $grade->academicPeriod;
+        
         if ($period && ($period->isClosed() || $period->isArchived())) {
             return false;
         }

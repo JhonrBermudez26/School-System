@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Coordinadora;
 
 use App\Http\Controllers\Controller;
 use App\Models\ManualGrade;
+use App\Models\ManualGradeScore;
 use App\Models\Group;
 use App\Models\Subject;
 use App\Models\AcademicPeriod;
@@ -11,39 +12,51 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class SupervisionController extends Controller
 {
     /**
-     * Vista principal de supervisión académica
+     * Vista principal
      */
     public function index(Request $request)
     {
-        $this->authorize('viewAll', ManualGrade::class);
+        if (!auth()->user()->hasPermissionTo('grades.view_all')) {
+            abort(403);
+        }
 
         $periodId = $request->get('period_id');
         $groupId = $request->get('group_id');
         $subjectId = $request->get('subject_id');
 
-        // Obtener periodos para el selector
         $periods = AcademicPeriod::notArchived()->ordenado()->get();
-        $groups = Group::with('grade')->get();
+        
+        $groups = Group::with(['grade', 'course'])->get()->map(function($group) {
+            return [
+                'id' => $group->id,
+                'nombre' => $group->nombre,
+                'name' => $group->nombre,
+                'grade' => $group->grade ? [
+                    'id' => $group->grade->id,
+                    'nombre' => $group->grade->nombre ?? 'N/A',
+                    'name' => $group->grade->nombre ?? 'N/A',
+                ] : null,
+            ];
+        });
+        
         $subjects = Subject::all();
 
-        // Periodo activo por defecto
         $selectedPeriod = $periodId 
             ? AcademicPeriod::find($periodId)
             : AcademicPeriod::getPeriodoActivo();
 
-        // Estadísticas institucionales
         $totalStudents = User::role('estudiante')->count();
-        $overallAverage = \App\Models\ManualGrade::avg('score') ?? 0;
+        $overallAverage = ManualGradeScore::avg('score') ?? 0;
         
-        // Estudiantes en riesgo (promedio < 3.0)
         $riskStudents = User::role('estudiante')
             ->get()
             ->map(function($student) {
-                $avg = \App\Models\ManualGrade::where('user_id', $student->id)->avg('score') ?? 0;
+                $avg = ManualGradeScore::where('student_id', $student->id)->avg('score') ?? 0;
                 return ['student' => $student, 'average' => $avg];
             })
             ->filter(fn($s) => $s['average'] < 3.0 && $s['average'] > 0);
@@ -57,14 +70,18 @@ class SupervisionController extends Controller
                 'totalStudents' => $totalStudents,
                 'overallAverage' => (float)$overallAverage,
                 'atRiskStudents' => $riskStudents->count(),
-                'riskStudentsList' => $riskStudents->map(fn($s) => [
-                    'name' => $s['student']->name,
-                    'group_name' => $s['student']->groups->first()->name ?? 'N/A',
-                    'average' => $s['average'],
-                    'failedCount' => \App\Models\ManualGrade::where('user_id', $s['student']->id)
-                        ->where('score', '<', 3.0)
-                        ->count()
-                ])->values(),
+                'riskStudentsList' => $riskStudents->map(function($s) {
+                    $group = $s['student']->groups()->first();
+                    
+                    return [
+                        'name' => $s['student']->name,
+                        'group_name' => $group ? $group->nombre : 'N/A',
+                        'average' => $s['average'],
+                        'failedCount' => ManualGradeScore::where('student_id', $s['student']->id)
+                            ->where('score', '<', 3.0)
+                            ->count()
+                    ];
+                })->values(),
             ],
             'filters' => [
                 'period_id' => $periodId,
@@ -75,87 +92,142 @@ class SupervisionController extends Controller
     }
 
     /**
-     * Obtener resumen académico por grupo
+     * ✅ Obtener resumen académico por grupo (CON DEBUG)
      */
     public function academicByGroup(Request $request)
     {
-        $this->authorize('viewAll', ManualGrade::class);
-
-        $groupId = $request->get('group_id');
-        $periodId = $request->get('period_id');
-
-        if (!$groupId || !$periodId) {
-            return response()->json(['error' => 'Grupo y periodo requeridos'], 400);
-        }
-
-        $group = Group::with(['students', 'subjects'])->findOrFail($groupId);
-        $period = AcademicPeriod::findOrFail($periodId);
-
-        // Obtener notas por estudiante y asignatura
-        $academicData = [];
-
-        foreach ($group->students as $student) {
-            $studentData = [
-                'student_id' => $student->id,
-                'student_name' => $student->name,
-                'subjects' => [],
-                'average' => 0,
-            ];
-
-            $totalGrades = 0;
-            $gradeCount = 0;
-
-            foreach ($group->subjects as $subject) {
-                $grades = ManualGrade::where('subject_group_id', function($query) use ($subject, $group) {
-                    $query->select('id')
-                        ->from('subject_group')
-                        ->where('subject_id', $subject->id)
-                        ->where('group_id', $group->id)
-                        ->limit(1);
-                })
-                ->where('academic_period_id', $periodId)
-                ->get();
-
-                $score = $grades->where('user_id', $student->id)->first();
-
-                $studentData['subjects'][] = [
-                    'subject_name' => $subject->name,
-                    'score' => $score ? $score->score : null,
-                ];
-
-                if ($score && $score->score) {
-                    $totalGrades += $score->score;
-                    $gradeCount++;
-                }
+        try {
+            if (!auth()->user()->hasPermissionTo('grades.view_all')) {
+                abort(403);
             }
 
-            $studentData['average'] = $gradeCount > 0 ? round($totalGrades / $gradeCount, 2) : 0;
-            $academicData[] = [
-                'name' => $student->name,
-                'average' => $studentData['average']
-            ];
-        }
+            $groupId = $request->get('group_id');
+            $periodId = $request->get('period_id');
 
-        // Promedio por asignatura en el grupo
-        $subjectStats = $group->subjects->map(function($subject) use ($groupId, $periodId) {
-            $avg = ManualGrade::whereHas('subjectGroup', function($q) use ($subject, $groupId) {
-                    $q->where('subject_id', $subject->id)->where('group_id', $groupId);
-                })
-                ->where('academic_period_id', $periodId)
-                ->avg('score') ?? 0;
+            Log::info('academicByGroup called', [
+                'group_id' => $groupId,
+                'period_id' => $periodId,
+            ]);
+
+            if (!$groupId) {
+                return response()->json(['error' => 'group_id es requerido'], 400);
+            }
+
+            // ✅ Si no hay periodo, usar el activo
+            if (!$periodId) {
+                $activePeriod = AcademicPeriod::getPeriodoActivo();
+                $periodId = $activePeriod ? $activePeriod->id : null;
+            }
+
+            Log::info('Using period_id: ' . $periodId);
+
+            $group = Group::with(['students', 'subjects', 'grade'])->findOrFail($groupId);
             
-            return [
-                'name' => $subject->name,
-                'average' => (float)$avg
-            ];
-        });
+            Log::info('Group found', [
+                'id' => $group->id,
+                'nombre' => $group->nombre,
+                'students_count' => $group->students->count(),
+                'subjects_count' => $group->subjects->count(),
+            ]);
 
-        return response()->json([
-            'group' => $group,
-            'period' => $period,
-            'students' => $academicData,
-            'subjects' => $subjectStats
-        ]);
+            // ✅ Verificar si hay calificaciones
+            $totalScores = ManualGradeScore::count();
+            Log::info('Total scores in system: ' . $totalScores);
+
+            $academicData = [];
+            
+            if ($group->students->isEmpty()) {
+                Log::warning('No students found in group ' . $groupId);
+            }
+
+            foreach ($group->students as $student) {
+                // Buscar calificaciones del estudiante
+                $scoresQuery = ManualGradeScore::where('student_id', $student->id);
+                
+                if ($periodId) {
+                    $scoresQuery->whereHas('manualGrade', function($q) use ($groupId, $periodId) {
+                        $q->where('group_id', $groupId)
+                          ->where('academic_period_id', $periodId);
+                    });
+                }
+                
+                $scores = $scoresQuery->get();
+                $average = $scores->avg('score') ?? 0;
+
+                Log::info('Student scores', [
+                    'student' => $student->name,
+                    'scores_count' => $scores->count(),
+                    'average' => $average,
+                ]);
+
+                $academicData[] = [
+                    'name' => $student->name,
+                    'average' => round($average, 2)
+                ];
+            }
+
+            // Promedio por asignatura
+            $subjectStats = [];
+            
+            if ($group->subjects->isEmpty()) {
+                Log::warning('No subjects found in group ' . $groupId);
+            }
+
+            foreach ($group->subjects as $subject) {
+                $avgQuery = ManualGradeScore::whereHas('manualGrade', function($q) use ($subject, $groupId, $periodId) {
+                    $q->where('subject_id', $subject->id)
+                      ->where('group_id', $groupId);
+                    
+                    if ($periodId) {
+                        $q->where('academic_period_id', $periodId);
+                    }
+                });
+                
+                $avg = $avgQuery->avg('score') ?? 0;
+                
+                Log::info('Subject average', [
+                    'subject' => $subject->name,
+                    'average' => $avg,
+                ]);
+                
+                $subjectStats[] = [
+                    'name' => $subject->name,
+                    'average' => (float)round($avg, 2)
+                ];
+            }
+
+            $response = [
+                'group' => [
+                    'id' => $group->id,
+                    'name' => $group->nombre,
+                    'grade' => $group->grade ? ($group->grade->nombre ?? 'N/A') : 'N/A',
+                ],
+                'period' => $periodId ? AcademicPeriod::find($periodId) : null,
+                'students' => $academicData,
+                'subjects' => $subjectStats
+            ];
+
+            Log::info('Response prepared', [
+                'students_count' => count($academicData),
+                'subjects_count' => count($subjectStats),
+            ]);
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            Log::error('Error in academicByGroup', [
+                'message' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => $e->getFile(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            return response()->json([
+                'error' => $e->getMessage(),
+                'line' => $e->getLine(),
+                'file' => basename($e->getFile()),
+            ], 500);
+        }
     }
 
     /**
@@ -163,7 +235,9 @@ class SupervisionController extends Controller
      */
     public function academicBySubject(Request $request)
     {
-        $this->authorize('viewAll', ManualGrade::class);
+        if (!auth()->user()->hasPermissionTo('grades.view_all')) {
+            abort(403);
+        }
 
         $subjectId = $request->get('subject_id');
         $periodId = $request->get('period_id');
@@ -176,11 +250,10 @@ class SupervisionController extends Controller
         $period = AcademicPeriod::findOrFail($periodId);
 
         $subjectData = [];
-
         foreach ($subject->groups as $group) {
             $groupData = [
                 'group_id' => $group->id,
-                'group_name' => $group->name,
+                'group_name' => $group->nombre,
                 'students' => [],
                 'average' => 0,
             ];
@@ -189,22 +262,19 @@ class SupervisionController extends Controller
             $gradeCount = 0;
 
             foreach ($group->students as $student) {
-                $score = ManualGrade::where('subject_group_id', function($query) use ($subject, $group) {
-                    $query->select('id')
-                        ->from('subject_group')
-                        ->where('subject_id', $subject->id)
-                        ->where('group_id', $group->id)
-                        ->limit(1);
-                })
-                ->where('academic_period_id', $periodId)
-                ->where('user_id', $student->id)
-                ->first();
+                $scores = ManualGradeScore::whereHas('manualGrade', function($query) use ($subject, $group, $periodId) {
+                        $query->where('subject_id', $subject->id)
+                              ->where('group_id', $group->id)
+                              ->where('academic_period_id', $periodId);
+                    })
+                    ->where('student_id', $student->id)
+                    ->get();
 
-                $scoreValue = $score ? $score->score : null;
+                $scoreValue = $scores->avg('score') ?? null;
 
                 $groupData['students'][] = [
                     'student_name' => $student->name,
-                    'score' => $scoreValue,
+                    'score' => $scoreValue ? round($scoreValue, 2) : null,
                 ];
 
                 if ($scoreValue) {
@@ -229,39 +299,40 @@ class SupervisionController extends Controller
      */
     public function lowPerformanceStudents(Request $request)
     {
-        $this->authorize('viewAll', ManualGrade::class);
+        if (!auth()->user()->hasPermissionTo('grades.view_all')) {
+            abort(403);
+        }
 
         $periodId = $request->get('period_id');
-        $threshold = $request->get('threshold', 3.0); // Nota mínima por defecto
+        $threshold = $request->get('threshold', 3.0);
 
         if (!$periodId) {
             return response()->json(['error' => 'Periodo requerido'], 400);
         }
 
-        // Obtener estudiantes con promedio bajo
         $lowPerformance = User::role('estudiante')
             ->with(['groups'])
             ->get()
             ->map(function ($student) use ($periodId, $threshold) {
-                $grades = ManualGrade::where('user_id', $student->id)
-                    ->where('academic_period_id', $periodId)
+                $scores = ManualGradeScore::whereHas('manualGrade', function($q) use ($periodId) {
+                        $q->where('academic_period_id', $periodId);
+                    })
+                    ->where('student_id', $student->id)
                     ->get();
 
-                $average = $grades->avg('score') ?? 0;
+                $average = $scores->avg('score') ?? 0;
 
                 return [
                     'student_id' => $student->id,
                     'student_name' => $student->name,
                     'student_email' => $student->email,
-                    'groups' => $student->groups->pluck('name'),
+                    'groups' => $student->groups->pluck('nombre'),
                     'average' => round($average, 2),
-                    'grade_count' => $grades->count(),
+                    'grade_count' => $scores->count(),
                     'below_threshold' => $average < $threshold && $average > 0,
                 ];
             })
-            ->filter(function ($student) {
-                return $student['below_threshold'];
-            })
+            ->filter(fn($student) => $student['below_threshold'])
             ->sortBy('average')
             ->values();
 
@@ -273,11 +344,13 @@ class SupervisionController extends Controller
     }
 
     /**
-     * Reporte de rendimiento general por periodo
+     * Reporte de rendimiento general
      */
     public function performanceReport(Request $request)
     {
-        $this->authorize('viewAll', ManualGrade::class);
+        if (!auth()->user()->hasPermissionTo('grades.view_all')) {
+            abort(403);
+        }
 
         $periodId = $request->get('period_id');
 
@@ -287,22 +360,24 @@ class SupervisionController extends Controller
 
         $period = AcademicPeriod::findOrFail($periodId);
 
-        // Promedio institucional
-        $institutionalAverage = ManualGrade::where('academic_period_id', $periodId)
+        $institutionalAverage = ManualGradeScore::whereHas('manualGrade', function($q) use ($periodId) {
+                $q->where('academic_period_id', $periodId);
+            })
             ->avg('score') ?? 0;
 
-        // Ranking de grupos
         $groupRankings = Group::with('grade')
             ->get()
             ->map(function ($group) use ($periodId) {
-                $average = ManualGrade::whereIn('user_id', $group->students->pluck('id'))
-                    ->where('academic_period_id', $periodId)
+                $average = ManualGradeScore::whereIn('student_id', $group->students->pluck('id'))
+                    ->whereHas('manualGrade', function($q) use ($periodId) {
+                        $q->where('academic_period_id', $periodId);
+                    })
                     ->avg('score') ?? 0;
 
                 return [
                     'group_id' => $group->id,
-                    'group_name' => $group->name,
-                    'grade_name' => $group->grade->name ?? 'N/A',
+                    'group_name' => $group->nombre,
+                    'grade_name' => $group->grade->nombre ?? 'N/A',
                     'average' => round($average, 2),
                     'student_count' => $group->students->count(),
                 ];
@@ -310,14 +385,13 @@ class SupervisionController extends Controller
             ->sortByDesc('average')
             ->values();
 
-        // Ranking de asignaturas
         $subjectRankings = Subject::all()
             ->map(function ($subject) use ($periodId) {
-                $average = ManualGrade::whereHas('subjectGroup', function($q) use ($subject) {
-                    $q->where('subject_id', $subject->id);
-                })
-                ->where('academic_period_id', $periodId)
-                ->avg('score') ?? 0;
+                $average = ManualGradeScore::whereHas('manualGrade', function($q) use ($subject, $periodId) {
+                        $q->where('subject_id', $subject->id)
+                          ->where('academic_period_id', $periodId);
+                    })
+                    ->avg('score') ?? 0;
 
                 return [
                     'subject_id' => $subject->id,

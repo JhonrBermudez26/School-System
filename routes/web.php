@@ -38,6 +38,7 @@
     use App\Http\Controllers\Coordinadora\SupervisionController;
     use App\Http\Controllers\Coordinadora\AttendanceSupervisionController;
     use App\Http\Controllers\Coordinadora\DisciplineRecordController;
+    use App\Http\Controllers\Coordinadora\BoletinController;
 
     use App\Http\Controllers\Rector\RectorDashboardController;
     use App\Http\Controllers\Rector\InstitutionController;
@@ -210,11 +211,34 @@
 
             // BOLETINES
             Route::middleware(['permission:bulletins.view'])->group(function () {
-                Route::get('/boletines', function () {
-                    return Inertia::render('Coordinadora/Boletines');
-                })->name('coordinadora.boletines');
+                // Lista de boletines
+                Route::get('/boletines', [BoletinController::class, 'index'])
+                    ->name('coordinadora.boletines');
+                
+                // Vista previa de un boletín
+                Route::get('/boletines/{id}/vista-previa', [BoletinController::class, 'vistaPrevia'])
+                    ->name('coordinadora.boletines.vista-previa');
             });
-
+            
+            Route::middleware(['permission:bulletins.generate'])->group(function () {
+                // Generar todos los boletines pendientes de un periodo
+                Route::post('/boletines/generar-todos', [BoletinController::class, 'generarTodos'])
+                    ->name('coordinadora.boletines.generar-todos');
+                
+                // Generar boletín individual
+                Route::post('/boletines/{id}/generar', [BoletinController::class, 'generarIndividual'])
+                    ->name('coordinadora.boletines.generar-individual');
+                
+                // Actualizar observaciones
+                Route::put('/boletines/{id}/observaciones', [BoletinController::class, 'actualizarObservaciones'])
+                    ->name('coordinadora.boletines.actualizar-observaciones');
+            });
+            
+            Route::middleware(['permission:bulletins.download'])->group(function () {
+                // Descargar documento DOCX
+                Route::get('/boletines/{id}/documento', [BoletinController::class, 'generarDocumento'])
+                    ->name('coordinadora.boletines.documento');
+            });
         });
 
         //SECRETARIA
@@ -322,6 +346,20 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
     Route::middleware(['permission:schedules.print'])->group(function () {
         Route::get('/horarios/print', [\App\Http\Controllers\Coordinadora\ScheduleController::class, 'print'])
             ->name('secretaria.horarios.print');
+    });
+
+    //boletines
+     Route::middleware(['permission:bulletins.view'])->group(function () {
+        Route::get('/boletines', [BoletinController::class, 'index'])
+            ->name('secretaria.boletines');
+        
+        Route::get('/boletines/{id}/vista-previa', [BoletinController::class, 'vistaPrevia'])
+            ->name('secretaria.boletines.vista-previa');
+    });
+    
+    Route::middleware(['permission:bulletins.download'])->group(function () {
+        Route::get('/boletines/{id}/documento', [BoletinController::class, 'generarDocumento'])
+            ->name('secretaria.boletines.documento');
     });
    
 });
@@ -551,6 +589,22 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
 
             // Mis NOTAS
         Route::get('/notas', [MisNotasController::class, 'index'])->name('estudiante.notas');
+
+
+        //boletin
+        Route::middleware(['permission:bulletins.view'])->group(function () {
+        // Ver boletines propios
+        Route::get('/boletines', [BoletinController::class, 'index'])
+            ->name('estudiante.boletines');
+        
+        Route::get('/boletines/{id}/vista-previa', [BoletinController::class, 'vistaPrevia'])
+            ->name('estudiante.boletines.vista-previa');
+    });
+    
+    Route::middleware(['permission:bulletins.download'])->group(function () {
+        Route::get('/boletines/{id}/documento', [BoletinController::class, 'generarDocumento'])
+            ->name('estudiante.boletines.documento');
+    });
         });
 
         //GET EDITAR
