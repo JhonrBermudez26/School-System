@@ -17,8 +17,6 @@ export default function Dashboard({ kpis, performance, attendance, discipline, r
 
     return (
         <Layout title="Dashboard - Rector">
-            <Head title="Rector - Panel Educativo" />
-
             <div className="max-w-7xl mx-auto space-y-8 pb-12">
                 {/* Header Section */}
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-indigo-900 to-indigo-800 p-8 rounded-3xl text-white shadow-xl shadow-indigo-100">
@@ -35,7 +33,7 @@ export default function Dashboard({ kpis, performance, attendance, discipline, r
                             <Shield className="h-6 w-6" />
                         </Link>
                         <Link
-                            href={route('rector.institucion')}
+                            href={route('rector.configuracion')}
                             className="bg-white/10 hover:bg-white/20 p-3 rounded-xl transition backdrop-blur-sm"
                             title="Configuración Global"
                         >
@@ -88,7 +86,7 @@ export default function Dashboard({ kpis, performance, attendance, discipline, r
                     <div className="lg:col-span-2 bg-white rounded-3xl shadow-xl border border-gray-50 overflow-hidden">
                         <div className="p-6 border-b border-gray-50 flex justify-between items-center">
                             <h3 className="text-xl font-black text-gray-800">Desempeño Institucional</h3>
-                            <Link href={route('rector.dashboard.performance')} className="text-indigo-600 text-xs font-bold uppercase hover:underline">Ver Detalle</Link>
+                            <Link href={route('rector.performance')} className="text-indigo-600 text-xs font-bold uppercase hover:underline">Ver Detalle</Link>
                         </div>
                         <div className="p-6">
                             <div className="space-y-6">
@@ -174,8 +172,8 @@ export default function Dashboard({ kpis, performance, attendance, discipline, r
                         {recentActivity?.map((act, i) => (
                             <div key={i} className="px-6 py-4 flex items-center group hover:bg-indigo-50/30 transition">
                                 <div className={`p-2 rounded-xl mr-4 ${act.action === 'login' ? 'bg-blue-100 text-blue-600' :
-                                        act.action === 'delete' ? 'bg-red-100 text-red-600' :
-                                            'bg-indigo-100 text-indigo-600'
+                                    act.action === 'delete' ? 'bg-red-100 text-red-600' :
+                                        'bg-indigo-100 text-indigo-600'
                                     }`}>
                                     <FileText className="h-4 w-4" />
                                 </div>

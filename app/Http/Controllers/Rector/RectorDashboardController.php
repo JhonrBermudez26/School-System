@@ -2,17 +2,19 @@
 
 namespace App\Http\Controllers\Rector;
 
-use App\Http\Controllers\Controller;
+use App\Models\ActivityLog;
 use App\Models\User;
 use App\Models\Group;
 use App\Models\Subject;
 use App\Models\ManualGrade;
+use App\Models\ManualGradeScore;
 use App\Models\Attendance;
 use App\Models\AcademicPeriod;
 use App\Models\DisciplineRecord;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Controller;
 
 class RectorDashboardController extends Controller
 {
@@ -30,96 +32,133 @@ class RectorDashboardController extends Controller
         // Periodo actual
         $currentPeriod = AcademicPeriod::getPeriodoActivo();
 
-        $stats = [
-            'users' => [
-                'students' => $totalStudents,
-                'teachers' => $totalTeachers,
-                'total' => User::count(),
-            ],
-            'academic' => [
-                'groups' => $totalGroups,
-                'subjects' => $totalSubjects,
-                'current_period' => $currentPeriod?->name ?? 'No definido',
-                'period_status' => $currentPeriod?->status ?? null,
-            ],
-        ];
+        // Inicializar valores por defecto
+        $institutionalAverage = 0;
+        $attendanceRate = 0;
 
         // Rendimiento académico (periodo actual)
         if ($currentPeriod) {
-            $institutionalAverage = ManualGrade::where('academic_period_id', $currentPeriod->id)
-                ->avg('score') ?? 0;
-
-            $stats['performance'] = [
-                'institutional_average' => round($institutionalAverage, 2),
-                'total_grades' => ManualGrade::where('academic_period_id', $currentPeriod->id)->count(),
-            ];
+            $institutionalAverage = ManualGradeScore::whereHas('manualGrade', function($q) use ($currentPeriod) {
+                $q->where('academic_period_id', $currentPeriod->id);
+            })->avg('score') ?? 0;
 
             // Tasa de asistencia
-            $attendanceCount = Attendance::whereHas('subjectGroup.academicPeriod', function($q) use ($currentPeriod) {
-                $q->where('id', $currentPeriod->id);
-            })->count();
+            $attendanceCount = Attendance::whereBetween('date', [
+                $currentPeriod->start_date,
+                $currentPeriod->end_date
+            ])->count();
 
-            $presentCount = Attendance::whereHas('subjectGroup.academicPeriod', function($q) use ($currentPeriod) {
-                $q->where('id', $currentPeriod->id);
-            })->where('status', 'present')->count();
+            $presentCount = Attendance::whereBetween('date', [
+                $currentPeriod->start_date,
+                $currentPeriod->end_date
+            ])->where('status', 'present')->count();
 
             $attendanceRate = $attendanceCount > 0 
                 ? round(($presentCount / $attendanceCount) * 100, 2)
                 : 0;
-
-            $stats['attendance'] = [
-                'total_records' => $attendanceCount,
-                'attendance_rate' => $attendanceRate,
-            ];
         }
 
         // Registros disciplinarios (último mes)
-        $disciplineRecords = DisciplineRecord::where('date', '>=', now()->subMonth())
-            ->count();
-
         $openDisciplineRecords = DisciplineRecord::where('date', '>=', now()->subMonth())
-            ->open()
+            ->where('status', 'open')
             ->count();
 
-        $stats['discipline'] = [
-            'total_last_month' => $disciplineRecords,
-            'open_records' => $openDisciplineRecords,
-        ];
-
-        // Tendencias (últimos 6 meses)
-        $monthlyGrades = ManualGrade::select(
-                DB::raw('YEAR(created_at) as year'),
-                DB::raw('MONTH(created_at) as month'),
-                DB::raw('AVG(score) as average')
-            )
-            ->where('created_at', '>=', now()->subMonths(6))
-            ->groupBy('year', 'month')
-            ->orderBy('year', 'asc')
-            ->orderBy('month', 'asc')
-            ->get();
-
-        $monthlyAttendance = Attendance::select(
-                DB::raw('YEAR(date) as year'),
-                DB::raw('MONTH(date) as month'),
-                DB::raw('COUNT(*) as total'),
-                DB::raw('SUM(CASE WHEN status = "present" THEN 1 ELSE 0 END) as present')
-            )
-            ->where('date', '>=', now()->subMonths(6))
-            ->groupBy('year', 'month')
-            ->orderBy('year', 'asc')
-            ->orderBy('month', 'asc')
+        // Registros disciplinarios recientes (últimos 5)
+        $recentDiscipline = DisciplineRecord::with('student')
+            ->where('date', '>=', now()->subMonth())
+            ->orderBy('created_at', 'desc')
+            ->limit(5)
             ->get()
-            ->map(function($item) {
-                $item->rate = $item->total > 0 ? round(($item->present / $item->total) * 100, 2) : 0;
-                return $item;
+            ->map(function($record) {
+                return [
+                    'student' => [
+                        'name' => $record->student->name ?? 'N/A'
+                    ],
+                    'severity_label' => ucfirst($record->severity ?? 'Leve'),
+                    'time_ago' => $record->created_at->diffForHumans()
+                ];
+            });
+
+        // Promedio por grado (último periodo)
+        $performanceByGrade = [];
+        if ($currentPeriod) {
+            // Obtener todos los grados
+            $grades = DB::table('grades')->get();
+            
+            foreach ($grades as $grade) {
+                // Obtener grupos de este grado
+                $groupIds = DB::table('groups')
+                    ->where('grade_id', $grade->id)
+                    ->pluck('id');
+                
+                if ($groupIds->isEmpty()) {
+                    continue;
+                }
+                
+                // Obtener estudiantes de estos grupos
+                $studentIds = DB::table('group_user')
+                    ->whereIn('group_id', $groupIds)
+                    ->pluck('user_id');
+                
+                if ($studentIds->isEmpty()) {
+                    $performanceByGrade[] = [
+                        'name' => $grade->nombre, // ✅ CORREGIDO: usar 'nombre'
+                        'average' => 0
+                    ];
+                    continue;
+                }
+                
+                // Calcular promedio de calificaciones
+                $average = ManualGradeScore::whereIn('student_id', $studentIds)
+                    ->whereHas('manualGrade', function($q) use ($currentPeriod) {
+                        $q->where('academic_period_id', $currentPeriod->id);
+                    })
+                    ->avg('score') ?? 0;
+                
+                $performanceByGrade[] = [
+                    'name' => $grade->nombre, // ✅ CORREGIDO: usar 'nombre'
+                    'average' => round($average, 2)
+                ];
+            }
+        }
+
+        // Actividad reciente del sistema (últimos 10 registros de auditoría)
+        $recentActivity = ActivityLog::with('user')
+            ->recent()
+            ->limit(10)
+            ->get()
+            ->map(function($activity) {
+                return [
+                    'description' => $activity->getActionDescription(),
+                    'user' => [
+                        'name' => $activity->user?->name ?? 'Sistema'
+                    ],
+                    'created_at_human' => $activity->created_at->diffForHumans(),
+                    'ip_address' => $activity->ip_address ?? 'N/A',
+                    'action' => $activity->action
+                ];
             });
 
         return Inertia::render('Rector/Dashboard', [
-            'stats' => $stats,
-            'trends' => [
-                'grades' => $monthlyGrades,
-                'attendance' => $monthlyAttendance,
+            'kpis' => [
+                'totalStudents' => $totalStudents,
+                'overallAverage' => round($institutionalAverage, 2),
+                'attendanceRate' => $attendanceRate,
+                'openDisciplineRecords' => $openDisciplineRecords,
+                'studentsTrend' => null,
+                'performanceTrend' => null,
+                'attendanceTrend' => null,
             ],
+            'performance' => [
+                'byGrade' => $performanceByGrade
+            ],
+            'attendance' => [
+                'rate' => $attendanceRate
+            ],
+            'discipline' => [
+                'recentCracks' => $recentDiscipline
+            ],
+            'recentActivity' => $recentActivity
         ]);
     }
 

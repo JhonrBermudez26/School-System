@@ -26,7 +26,6 @@ export default function SidebarMenu({ role }) {
   const sections = {
     rector: [
       { icon: GraduationCap, label: "Dashboard", path: "/rector/dashboard" },
-      { icon: Users, label: "Gestión de usuarios", path: "/rector/usuarios" },
       { icon: ShieldAlert, label: "Roles y Permisos", path: "/rector/roles" },
       { icon: History, label: "Auditoría", path: "/rector/auditoria" },
       { icon: TrendingUp, label: "Rendimiento", path: "/rector/performance" },
