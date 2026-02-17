@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Rector;
 
 use App\Http\Controllers\Controller;
@@ -27,9 +26,7 @@ class RoleManagementController extends Controller
         $this->authorize('viewAny', Role::class);
 
         $roles = Role::with('permissions')->get();
-        $permissions = Permission::all()->groupBy(function($permission) {
-            return explode('.', $permission->name)[0];
-        });
+        $permissions = Permission::all(); // ✅ CORREGIDO: Array plano
 
         return Inertia::render('Rector/RoleManagement', [
             'roles' => $roles,
@@ -80,6 +77,12 @@ class RoleManagementController extends Controller
         $role = Role::findOrFail($id);
         $this->authorize('delete', $role);
 
+        // ✅ VERIFICAR: No eliminar si tiene usuarios asignados
+        if ($role->users()->count() > 0) {
+            return redirect()->route('rector.roles')
+                ->with('error', 'No se puede eliminar un rol que tiene usuarios asignados');
+        }
+
         $oldValues = $role->toArray();
         $role->delete();
 
@@ -95,7 +98,7 @@ class RoleManagementController extends Controller
     public function assignPermissions(Request $request, $id)
     {
         $role = Role::findOrFail($id);
-        $this->authorize('assignPermissions', $role);
+        $this->authorize('assignPermissions', $role); // ✅ CORREGIDO: Pasa $role
 
         $validated = $request->validate([
             'permissions' => 'required|array',

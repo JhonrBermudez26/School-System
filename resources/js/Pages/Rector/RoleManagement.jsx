@@ -1,4 +1,4 @@
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, router } from '@inertiajs/react';
 import { Shield, Plus, Lock, CheckCircle, Trash2, Edit, AlertCircle, Info, Key } from 'lucide-react';
 import { useState } from 'react';
 import Layout from '@/Components/Layout/Layout';
@@ -8,6 +8,7 @@ export default function RoleManagement({ roles, permissions }) {
     const [editingRole, setEditingRole] = useState(null);
     const [showPermissionsModal, setShowPermissionsModal] = useState(false);
     const [selectedRole, setSelectedRole] = useState(null);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(null); // ✅ NUEVO
 
     const roleForm = useForm({
         name: '',
@@ -40,10 +41,19 @@ export default function RoleManagement({ roles, permissions }) {
 
     const handleAssignPermissions = (e) => {
         e.preventDefault();
-        permissionsForm.post(route('rector.roles.permissions', selectedRole.id), {
+        permissionsForm.post(route('rector.roles.assign', selectedRole.id), { // ✅ CORREGIDO
             onSuccess: () => {
                 setShowPermissionsModal(false);
                 setSelectedRole(null);
+            }
+        });
+    };
+
+    // ✅ NUEVO: Función para eliminar rol
+    const handleDeleteRole = (role) => {
+        router.delete(route('rector.roles.destroy', role.id), {
+            onSuccess: () => {
+                setShowDeleteConfirm(null);
             }
         });
     };
@@ -61,6 +71,11 @@ export default function RoleManagement({ roles, permissions }) {
         } else {
             permissionsForm.setData('permissions', [...current, permName]);
         }
+    };
+
+    // ✅ Verificar si el rol está protegido
+    const isProtectedRole = (roleName) => {
+        return ['rector', 'coordinadora', 'secretaria', 'profesor', 'estudiante'].includes(roleName);
     };
 
     return (
@@ -90,29 +105,43 @@ export default function RoleManagement({ roles, permissions }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                 {roles.map((role) => (
-                    <div key={role.id} className="bg-white rounded-[2.5rem] p-8 shadow-xl shadow-gray-100 border border-gray-50 flex flex-col h-full group hover:border-indigo-200 transition-all duration-500">
+                    <div key={role.id} className={`bg-white rounded-[2.5rem] p-8 shadow-xl shadow-gray-100 border flex flex-col h-full group hover:border-indigo-200 transition-all duration-500 ${isProtectedRole(role.name) ? 'border-amber-200 bg-amber-50/30' : 'border-gray-50'}`}>
                         <div className="flex justify-between items-start mb-6">
                             <div className="p-4 bg-indigo-50 rounded-3xl group-hover:scale-110 transition duration-500">
                                 <Shield className="h-8 w-8 text-indigo-600" />
                             </div>
                             <div className="flex space-x-1">
+                                {/* ✅ Deshabilitar edición de rol rector */}
                                 <button
                                     onClick={() => {
                                         setEditingRole(role);
                                         roleForm.setData('name', role.name);
                                         setShowRoleModal(true);
                                     }}
-                                    className="p-2 text-gray-400 hover:text-indigo-600 transition"
+                                    disabled={role.name === 'rector'}
+                                    className={`p-2 transition ${role.name === 'rector' ? 'text-gray-300 cursor-not-allowed' : 'text-gray-400 hover:text-indigo-600'}`}
                                 >
                                     <Edit className="h-5 w-5" />
                                 </button>
-                                {role.name !== 'rector' && (
-                                    <button className="p-2 text-gray-400 hover:text-red-600 transition">
+                                {/* ✅ Implementar eliminación con confirmación */}
+                                {!isProtectedRole(role.name) && (
+                                    <button 
+                                        onClick={() => setShowDeleteConfirm(role)}
+                                        className="p-2 text-gray-400 hover:text-red-600 transition"
+                                    >
                                         <Trash2 className="h-5 w-5" />
                                     </button>
                                 )}
                             </div>
                         </div>
+
+                        {/* ✅ Badge de rol protegido */}
+                        {isProtectedRole(role.name) && (
+                            <div className="mb-4 px-3 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-lg flex items-center w-fit">
+                                <Lock className="h-3 w-3 mr-1" />
+                                Rol del Sistema
+                            </div>
+                        )}
 
                         <h3 className="text-2xl font-black text-gray-800 capitalize mb-2">{role.name}</h3>
                         <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-6">Nivel de Acceso: {role.guard_name}</p>
@@ -131,7 +160,12 @@ export default function RoleManagement({ roles, permissions }) {
 
                         <button
                             onClick={() => openPermissionsModal(role)}
-                            className="w-full mt-8 bg-gray-900 text-white font-black py-4 rounded-2xl hover:bg-gray-800 transition shadow-xl flex items-center justify-center space-x-2"
+                            disabled={role.name === 'rector'} // ✅ Deshabilitar para rector
+                            className={`w-full mt-8 font-black py-4 rounded-2xl transition shadow-xl flex items-center justify-center space-x-2 ${
+                                role.name === 'rector' 
+                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                                    : 'bg-gray-900 text-white hover:bg-gray-800'
+                            }`}
                         >
                             <Key className="h-5 w-5 text-indigo-400" />
                             <span>Gestionar Permisos</span>
@@ -140,12 +174,42 @@ export default function RoleManagement({ roles, permissions }) {
                 ))}
             </div>
 
+            {/* ✅ NUEVO: Modal de confirmación de eliminación */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8">
+                        <div className="flex items-center justify-center w-16 h-16 bg-red-100 rounded-full mx-auto mb-4">
+                            <AlertCircle className="h-8 w-8 text-red-600" />
+                        </div>
+                        <h3 className="text-2xl font-black text-gray-900 text-center mb-2">¿Eliminar Rol?</h3>
+                        <p className="text-gray-600 text-center mb-6">
+                            Estás a punto de eliminar el rol <strong>{showDeleteConfirm.name}</strong>. Esta acción no se puede deshacer.
+                        </p>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowDeleteConfirm(null)}
+                                className="flex-1 px-6 py-3 bg-gray-100 text-gray-700 font-bold rounded-xl hover:bg-gray-200 transition"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={() => handleDeleteRole(showDeleteConfirm)}
+                                className="flex-1 px-6 py-3 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition"
+                            >
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Role Modal */}
             {showRoleModal && (
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-[3rem] shadow-2xl max-w-lg w-full p-10 animate-in zoom-in-95 duration-300">
                         <form onSubmit={handleRoleSubmit}>
                             <h2 className="text-3xl font-black text-gray-900 mb-8">{editingRole ? 'Editar Rol' : 'Crear Nuevo Rol'}</h2>
+
                             <div className="space-y-6">
                                 <div>
                                     <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Nombre del Rol</label>
@@ -156,10 +220,13 @@ export default function RoleManagement({ roles, permissions }) {
                                         className="w-full bg-gray-50 border-0 rounded-2xl py-4 px-6 focus:ring-2 focus:ring-indigo-500 font-bold text-gray-800"
                                         placeholder="Ej: coordinador_academico"
                                         required
+                                        disabled={editingRole?.name === 'rector'} // ✅ Deshabilitar para rector
                                     />
                                     {roleForm.errors.name && <p className="text-red-500 text-xs mt-2 font-bold">{roleForm.errors.name}</p>}
+                                    <p className="text-xs text-gray-500 mt-2">Solo minúsculas y guiones bajos (_)</p>
                                 </div>
                             </div>
+
                             <div className="flex justify-end space-x-4 mt-10">
                                 <button type="button" onClick={() => setShowRoleModal(false)} className="px-8 py-4 text-gray-500 font-bold hover:text-gray-700 transition">Cancelar</button>
                                 <button type="submit" disabled={roleForm.processing} className="bg-indigo-600 text-white font-black px-10 py-4 rounded-2xl hover:bg-indigo-700 transition shadow-xl shadow-indigo-100">
@@ -189,6 +256,7 @@ export default function RoleManagement({ roles, permissions }) {
 
                         <div className="p-10 overflow-y-auto flex-1 bg-gray-50/30">
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {/* ✅ CORREGIDO: Agrupar permisos manualmente */}
                                 {Object.entries(
                                     permissions.reduce((acc, p) => {
                                         const group = p.name.split('.')[0];
