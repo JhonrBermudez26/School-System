@@ -63,7 +63,10 @@ export default function Chat() {
   // FIX: template literals en Echo corregidos
   useEffect(() => {
     if (!selectedConversation?.id || !window.Echo) return;
+
     const channel = window.Echo.channel(`conversation.${selectedConversation.id}`);
+
+    // ── Mensaje nuevo ──────────────────────────────────────────
     channel.listen('.message.sent', (data) => {
       if (data.message.user_id !== user.id) {
         setMessages(prev => {
@@ -71,19 +74,50 @@ export default function Chat() {
           if (exists) return prev;
           return [...prev, data.message];
         });
+
         if (data.message.type === 'call') {
           if (window.Notification && Notification.permission === 'granted') {
             new Notification('Llamada entrante', {
               body: `${data.message.user.name} inició una llamada`,
               icon: '/favicon.ico',
-              tag: 'call'
+              tag: 'call',
             });
           }
         }
+
         markAsRead(selectedConversation.id);
       }
     });
-    return () => window.Echo.leave(`conversation.${selectedConversation.id}`);
+
+    // ── Mensaje editado ────────────────────────────────────────
+    channel.listen('.message.edited', (data) => {
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === data.message.id
+            ? { ...m, body: data.message.body, edited: data.message.edited }
+            : m
+        )
+      );
+    });
+
+    // ── Mensaje eliminado ──────────────────────────────────────
+    channel.listen('.message.deleted', (data) => {
+      if (data.delete_for === 'everyone') {
+        // Marcar como eliminado visualmente para todos
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === data.message_id
+              ? { ...m, body: 'Este mensaje fue eliminado', deleted: true, attachment: null }
+              : m
+          )
+        );
+      }
+      // Si delete_for === 'me' no llega broadcast, solo afecta al autor
+    });
+
+    return () => {
+      window.Echo.leave(`conversation.${selectedConversation.id}`);
+    };
   }, [selectedConversation?.id, user.id]);
 
   useEffect(() => {
@@ -663,10 +697,10 @@ export default function Chat() {
                                   <p className={`text-sm truncate ${hasUnread ? 'text-slate-900 font-medium' : 'text-slate-500'}`}>
                                     {conv.messages[0].type === 'text' ? conv.messages[0].body
                                       : conv.messages[0].type === 'audio' ? '🎤 Audio'
-                                      : conv.messages[0].type === 'file' ? '📎 Archivo'
-                                      : conv.messages[0].type === 'call' ? '📞 Llamada'
-                                      : conv.messages[0].type === 'system' ? conv.messages[0].body
-                                      : 'Mensaje'}
+                                        : conv.messages[0].type === 'file' ? '📎 Archivo'
+                                          : conv.messages[0].type === 'call' ? '📞 Llamada'
+                                            : conv.messages[0].type === 'system' ? conv.messages[0].body
+                                              : 'Mensaje'}
                                   </p>
                                 </>
                               )}
@@ -720,7 +754,7 @@ export default function Chat() {
                         {selectedConversation.type === 'group'
                           ? selectedConversation.name
                           : selectedConversation.participants.find(p => p.user_id !== user.id)?.user.name + ' ' +
-                            selectedConversation.participants.find(p => p.user_id !== user.id)?.user.last_name}
+                          selectedConversation.participants.find(p => p.user_id !== user.id)?.user.last_name}
                       </h2>
                       <p className="text-xs text-slate-500">
                         {selectedConversation.type === 'group'

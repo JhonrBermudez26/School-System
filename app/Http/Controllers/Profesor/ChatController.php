@@ -1,7 +1,5 @@
 <?php
-
 namespace App\Http\Controllers\Profesor;
-
 use App\Http\Controllers\Controller;
 use App\Models\Conversation;
 use App\Models\Message;
@@ -14,6 +12,8 @@ use Inertia\Inertia;
 use App\Events\MessageSent;
 use App\Events\ChatNotification;
 use App\Events\UserAddedToGroup;
+use App\Events\MessageEdited;
+use App\Events\MessageDeleted;
 
 class ChatController extends Controller
 {
@@ -52,21 +52,18 @@ class ChatController extends Controller
     }])
     ->orderByDesc('last_message_at')
     ->get();
-
     $availableUsers = User::whereHas('roles', function ($q) {
         $q->whereIn('name', ['estudiante', 'profesor']);
     })
     ->where('id', '!=', $user->id)
     ->select('id', 'name', 'last_name', 'email', 'photo')
     ->get();
-
     return Inertia::render('Profesor/Chat', [
         'conversations' => $conversations,
         'availableUsers' => $availableUsers,
         'users' => [],
     ]);
 }
-
     // ChatController.php
 public function conversationsJson()
 {
@@ -101,8 +98,6 @@ public function conversationsJson()
     ->orderByDesc('last_message_at')
     ->get();
 }
-
-
     private function getMessagePreview($message)
 {
     switch ($message->type) {
@@ -120,14 +115,12 @@ public function conversationsJson()
             return 'Nuevo mensaje';
     }
 }
-
     private function normalize($string)
 {
     return mb_strtolower(
         iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $string)
     );
 }
-
     
     /**
      * Buscar usuarios para iniciar conversación
@@ -181,12 +174,10 @@ public function conversationsJson()
         'users' => $users,
     ]);
 }
-
-
-
-
     /**
-     * Crear una nueva conversación (personal o grupal)
+     * ✅ CAMBIO 1: createConversation
+     * Cuando ya existe la conversación y el usuario la había eliminado,
+     * limpiar hidden_at para que vea todo el historial al abrirla manualmente.
      */
 public function createConversation(Request $request)
 {
@@ -196,7 +187,6 @@ public function createConversation(Request $request)
         'participants' => 'required|array|min:1',
         'participants.*' => 'integer|exists:users,id',
     ]);
-
     DB::beginTransaction();
     try {
         // Verificar si ya existe una conversación personal
@@ -209,8 +199,13 @@ public function createConversation(Request $request)
                     $q->where('user_id', Auth::id());
                 })
                 ->first();
-
             if ($existingConv) {
+                // ✅ Si la había eliminado, limpiar hidden_at para ver todo el historial
+                DB::table('participants')
+                    ->where('conversation_id', $existingConv->id)
+                    ->where('user_id', Auth::id())
+                    ->update(['hidden_at' => null]);
+
                 DB::commit();
                 
                 if ($request->expectsJson() || $request->ajax()) {
@@ -224,17 +219,14 @@ public function createConversation(Request $request)
                 return redirect()->route('profesor.chat.show', $existingConv->id);
             }
         }
-
         // Crear nueva conversación
         $conversation = Conversation::create([
             'type' => $data['type'],
             'name' => $data['type'] === 'group' ? $data['name'] : null,
             'created_by' => Auth::id(),
         ]);
-
         // Agregar creador
         $conversation->addParticipant(Auth::id());
-
         // Mensaje de sistema para creación del grupo
         if ($data['type'] === 'group') {
             $creatorName = Auth::user()->name . ' ' . Auth::user()->last_name;
@@ -248,7 +240,6 @@ public function createConversation(Request $request)
             
             $conversation->updateLastMessage();
         }
-
         // Agregar participantes
         $addedUsers = [];
         foreach ($data['participants'] as $userId) {
@@ -279,7 +270,6 @@ public function createConversation(Request $request)
                 }
             }
         }
-
         // Mensaje de sistema para usuarios agregados
         if ($data['type'] === 'group' && !empty($addedUsers)) {
             $creatorName = Auth::user()->name . ' ' . Auth::user()->last_name;
@@ -302,13 +292,10 @@ public function createConversation(Request $request)
             
             $conversation->updateLastMessage();
         }
-
         if ($data['type'] === 'group' && count($data['participants']) < 2) {
             throw new \Exception('Los grupos deben tener al menos 2 participantes además del creador');
         }
-
         DB::commit();
-
         if ($request->expectsJson() || $request->ajax()) {
             return response()->json([
                 'success' => true,
@@ -316,7 +303,6 @@ public function createConversation(Request $request)
                 'exists' => false
             ]);
         }
-
         return redirect()->route('profesor.chat.show', $conversation->id);
         
     } catch (\Exception $e) {
@@ -332,116 +318,101 @@ public function createConversation(Request $request)
         return redirect()->back()->withErrors(['error' => $e->getMessage()]);
     }
 }
-
     /**
-     * Obtener una conversación específica con sus mensajes
+     * ✅ CAMBIO 2: getConversation
+     * - Lee hidden_at antes de todo
+     * - Filtra mensajes con hidden_at en ambas cargas
+     * - NO limpia hidden_at (es permanente)
      */
     public function getConversation($id)
     {
         $user = Auth::user();
-        
-        \Log::info('🔍 Cargando conversación', ['conversation_id' => $id, 'user_id' => $user->id]);
-        
 
-$participant = DB::table('participants')
-        ->where('conversation_id', $id)
-        ->where('user_id', $user->id)
-        ->first();
-    
-    $hiddenDate = $participant?->hidden_at;
+        // Leer hidden_at ANTES — NO se limpia nunca aquí
+        $participantRow = DB::table('participants')
+            ->where('conversation_id', $id)
+            ->where('user_id', $user->id)
+            ->first();
+        $hiddenAt = $participantRow?->hidden_at;
 
         $conversation = Conversation::with([
-        'participants.user' => function ($q) {
-            $q->select('id', 'name', 'last_name', 'email', 'photo');
-        },
-        'messages' => function ($q) use ($user, $hiddenDate) {
-            $q->where(function ($q2) use ($user) {
-                $q2->whereJsonDoesntContain('hidden_by', $user->id)
-                   ->orWhereNull('hidden_by');
-            });
-            
-            // ✅ NUEVO: Si el chat estaba oculto, solo mostrar mensajes posteriores
-            if ($hiddenDate) {
-                $q->where('created_at', '>', $hiddenDate);
+            'participants.user' => function ($q) {
+                $q->select('id', 'name', 'last_name', 'email', 'photo');
+            },
+            'messages' => function ($q) use ($user, $hiddenAt) {
+                $q->where(function ($q2) use ($user) {
+                    $q2->whereJsonDoesntContain('hidden_by', $user->id)
+                       ->orWhereNull('hidden_by');
+                });
+                // Solo mensajes posteriores a cuando eliminó el chat
+                if ($hiddenAt) {
+                    $q->where('created_at', '>', $hiddenAt);
+                }
+                $q->orderBy('created_at', 'asc');
+            },
+            'messages.user' => function ($q) {
+                $q->select('id', 'name', 'last_name', 'photo');
             }
-            
-            $q->orderBy('created_at', 'asc');
-        },
-        'messages.user' => function ($q) {
-            $q->select('id', 'name', 'last_name', 'photo');
-        }
-    ])
-    ->findOrFail($id);
+        ])->findOrFail($id);
 
-        // Verificar que el usuario pertenece al chat
         if (!$conversation->participants()->where('user_id', $user->id)->exists()) {
-            \Log::warning('❌ Usuario no tiene acceso a conversación', ['conversation_id' => $id, 'user_id' => $user->id]);
             abort(403, 'No tienes acceso a esta conversación');
         }
 
-        \Log::info('📊 Conversación encontrada', [
-            'conversation_id' => $id,
-            'messages_count' => $conversation->messages->count(),
-            'participants_count' => $conversation->participants->count()
-        ]);
-
         // Marcar mensajes como leídos
-        $markedCount = 0;
         foreach ($conversation->messages as $message) {
             if ($message->user_id !== $user->id && !$message->isReadBy($user->id)) {
                 $message->markAsRead($user->id);
-                $markedCount++;
             }
         }
-        
-        \Log::info('✓ Mensajes marcados como leídos', ['count' => $markedCount]);
 
-        // Recargar mensajes para obtener el read_by actualizado
+        // Recargar con el mismo filtro
         $conversation->load([
-    'messages' => function ($q) use ($user) {
-        // ✅ NUEVO: Filtrar mensajes ocultos
-        $q->where(function ($q2) use ($user) {
-            $q2->whereJsonDoesntContain('hidden_by', $user->id)
-               ->orWhereNull('hidden_by');
-        })
-        ->orderBy('created_at', 'asc');
-    },
+            'messages' => function ($q) use ($user, $hiddenAt) {
+                $q->where(function ($q2) use ($user) {
+                    $q2->whereJsonDoesntContain('hidden_by', $user->id)
+                       ->orWhereNull('hidden_by');
+                });
+                if ($hiddenAt) {
+                    $q->where('created_at', '>', $hiddenAt);
+                }
+                $q->orderBy('created_at', 'asc');
+            },
             'messages.user' => function ($q) {
                 $q->select('id', 'name', 'last_name', 'photo');
             }
         ]);
 
-        // Obtener todas las conversaciones actualizadas
+        // ✅ hidden_at NO se limpia — el filtro es permanente
+
+        // Conversaciones actualizadas para el sidebar
         $conversations = Conversation::whereHas('participants', function ($q) use ($user) {
-    $q->where('user_id', $user->id)
-      ->whereNull('hidden_at'); 
+            $q->where('user_id', $user->id)->whereNull('hidden_at');
         })
         ->with([
-    'participants.user' => function ($q) {
-        $q->select('id', 'name', 'last_name', 'email', 'photo');
-    },
-    'messages' => function ($q) use ($user) {
-        // ✅ NUEVO: Filtrar mensajes ocultos
-        $q->where(function ($q2) use ($user) {
-            $q2->whereJsonDoesntContain('hidden_by', $user->id)
-               ->orWhereNull('hidden_by');
-        })
-        ->latest()
-        ->limit(1);
-    },
+            'participants.user' => function ($q) {
+                $q->select('id', 'name', 'last_name', 'email', 'photo');
+            },
+            'messages' => function ($q) use ($user) {
+                $q->where(function ($q2) use ($user) {
+                    $q2->whereJsonDoesntContain('hidden_by', $user->id)
+                       ->orWhereNull('hidden_by');
+                })
+                ->latest()
+                ->limit(1);
+            },
             'messages.user' => function ($q) {
                 $q->select('id', 'name', 'last_name', 'photo');
             }
         ])
         ->withCount(['messages as unread_count' => function ($q) use ($user) {
-    $q->where('user_id', '!=', $user->id)
-      ->whereJsonDoesntContain('read_by', $user->id)
-      // ✅ NUEVO: No contar mensajes ocultos
-      ->where(function ($q2) use ($user) {
-          $q2->whereJsonDoesntContain('hidden_by', $user->id)
-             ->orWhereNull('hidden_by');
-      });
-}])
+            $q->where('user_id', '!=', $user->id)
+              ->whereJsonDoesntContain('read_by', $user->id)
+              ->where(function ($q2) use ($user) {
+                  $q2->whereJsonDoesntContain('hidden_by', $user->id)
+                     ->orWhereNull('hidden_by');
+              });
+        }])
         ->orderByDesc('last_message_at')
         ->get();
 
@@ -452,119 +423,101 @@ $participant = DB::table('participants')
         ->select('id', 'name', 'last_name', 'email', 'photo')
         ->get();
 
-        // ✅ NUEVO: Si la conversación estaba oculta, "des-ocultarla" al abrirla de nuevo
-        $participant = $conversation->participants()->where('user_id', $user->id)->first();
-        if ($participant && $participant->hidden_at) {
-        DB::table('participants')
-            ->where('conversation_id', $id)
-            ->where('user_id', $user->id)
-            ->update(['hidden_at' => null]);
-    }
-
-        \Log::info('✅ Devolviendo vista con conversación', [
-            'conversation_id' => $conversation->id,
-            'messages_count' => $conversation->messages->count()
-        ]);
-
         if (request()->wantsJson()) {
-            return response()->json([
-                'conversation' => $conversation
-            ]);
+            return response()->json(['conversation' => $conversation]);
         }
-        
 
         return Inertia::render('Profesor/Chat', [
             'conversation' => $conversation,
             'users' => [],
         ]);
     }
-
     /**
-     * Enviar un mensaje en una conversación
+     * ✅ CAMBIO 3: sendMessage
+     * - NO limpiar hidden_at de nadie
+     * - Cuando el receptor tiene hidden_at, mover su hidden_at a 1 segundo ANTES
+     *   del nuevo mensaje para que vea solo ese mensaje al abrir el chat
      */
-     public function sendMessage(Request $request, $conversationId)
-{
-    $conversation = Conversation::findOrFail($conversationId);
-    
-    if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
-        abort(403);
-    }
-    
-    $data = $request->validate([
-        'body' => 'nullable|string',
-        'file' => 'nullable|file|max:10240',
-        'type' => 'required|in:text,file,call,audio',
-    ]);
-    
-    $attachment = null;
-    $messageType = $data['type'];
-    
-    if ($request->hasFile('file')) {
-        if ($messageType === 'audio') {
-            $attachment = $request->file('file')->store('chat_audios', 'public');
-        } else {
-            $attachment = $request->file('file')->store('chat_files', 'public');
-            $messageType = 'file';
-        }
-    }
-    
-    if ($messageType === 'call') {
-        $data['body'] = 'Iniciando llamada...';
-        $roomName = "chat-{$conversationId}-" . time();
-        $attachment = "https://meet.jit.si/{$roomName}";
-    }
-    
-    $message = $conversation->messages()->create([
-        'user_id' => Auth::id(),
-        'body' => $data['body'] ?? null,
-        'type' => $messageType,
-        'attachment' => $attachment,
-        'read_by' => [Auth::id()],
-    ]);
-    
-    $conversation->updateLastMessage();
-    $message->load('user:id,name,last_name,photo');
-    
-    // ✅ NUEVO: Des-ocultar la conversación para TODOS los participantes
-    // cuando se envía un mensaje nuevo
-    $conversation->participants()->update(['hidden_at' => null]);
-    
-    // Broadcast del mensaje
-    try {
-        broadcast(new MessageSent($message))->toOthers();
+    public function sendMessage(Request $request, $conversationId)
+    {
+        $conversation = Conversation::findOrFail($conversationId);
         
-        $participants = $conversation->participants()
-            ->where('user_id', '!=', Auth::id())
-            ->with('user')
-            ->get();
-        
-        foreach ($participants as $participant) {
-            broadcast(new ChatNotification(
-                $participant->user_id,
-                $conversationId,
-                Auth::user()->name . ' ' . Auth::user()->last_name,
-                $this->getMessagePreview($message)
-            ))->toOthers();
+        if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
+            abort(403);
         }
         
-        \Log::info('📤 Mensaje enviado con notificaciones', [
-            'conversation_id' => $conversationId,
-            'message_id' => $message->id,
+        $data = $request->validate([
+            'body' => 'nullable|string',
+            'file' => 'nullable|file|max:10240',
+            'type' => 'required|in:text,file,call,audio',
+        ]);
+        
+        $attachment = null;
+        $messageType = $data['type'];
+        
+        if ($request->hasFile('file')) {
+            if ($messageType === 'audio') {
+                $attachment = $request->file('file')->store('chat_audios', 'public');
+            } else {
+                $attachment = $request->file('file')->store('chat_files', 'public');
+                $messageType = 'file';
+            }
+        }
+        
+        if ($messageType === 'call') {
+            $data['body'] = 'Iniciando llamada...';
+            $roomName = "chat-{$conversationId}-" . time();
+            $attachment = "https://meet.jit.si/{$roomName}";
+        }
+        
+        $message = $conversation->messages()->create([
             'user_id' => Auth::id(),
-            'participants_notified' => $participants->count()
+            'body' => $data['body'] ?? null,
+            'type' => $messageType,
+            'attachment' => $attachment,
+            'read_by' => [Auth::id()],
         ]);
-    } catch (\Exception $e) {
-        \Log::error('❌ Error broadcasting message:', [
-            'error' => $e->getMessage(),
-            'conversation_id' => $conversationId
-        ]);
-    }
-    
-    return response()->json([
-        'message' => $message
-    ]);
-}
+        
+        $conversation->updateLastMessage();
+        $message->load('user:id,name,last_name,photo');
 
+        // ✅ Para receptores que eliminaron el chat: mover su hidden_at a 1 segundo
+        // antes de este mensaje para que solo vean este mensaje nuevo (no el historial)
+        $conversation->participants()
+            ->where('user_id', '!=', Auth::id())
+            ->whereNotNull('hidden_at')
+            ->get()
+            ->each(function ($participant) use ($message) {
+                DB::table('participants')
+                    ->where('id', $participant->id)
+                    ->update(['hidden_at' => $message->created_at->subSecond()]);
+            });
+
+        try {
+            broadcast(new MessageSent($message))->toOthers();
+            
+            $participants = $conversation->participants()
+                ->where('user_id', '!=', Auth::id())
+                ->with('user')
+                ->get();
+            
+            foreach ($participants as $participant) {
+                broadcast(new ChatNotification(
+                    $participant->user_id,
+                    $conversationId,
+                    Auth::user()->name . ' ' . Auth::user()->last_name,
+                    $this->getMessagePreview($message)
+                ))->toOthers();
+            }
+        } catch (\Exception $e) {
+            \Log::error('❌ Error broadcasting message:', [
+                'error' => $e->getMessage(),
+                'conversation_id' => $conversationId
+            ]);
+        }
+        
+        return response()->json(['message' => $message]);
+    }
     /**
      * Marcar mensajes como leídos
      */
@@ -586,86 +539,69 @@ $participant = DB::table('participants')
         // ✅ CORRECCIÓN: Devolver JSON para Inertia con preserveState
         return response()->json(['success' => true]);
     }
-
-
-
-
-
 /**
  * Eliminar conversación completa (ocultar para el usuario actual)
  * ESTILO WHATSAPP: Solo oculta la conversación, no los mensajes individuales
  */
 public function deleteConversation($conversationId)
-{
-    $conversation = Conversation::findOrFail($conversationId);
-    
-    if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
-        abort(403, 'No tienes acceso a esta conversación');
+    {
+        $conversation = Conversation::findOrFail($conversationId);
+        
+        if (!$conversation->participants()->where('user_id', Auth::id())->exists()) {
+            abort(403, 'No tienes acceso a esta conversación');
+        }
+        
+        // ✅ Guardar timestamp exacto — los mensajes anteriores a esto no se mostrarán
+        DB::table('participants')
+            ->where('conversation_id', $conversationId)
+            ->where('user_id', Auth::id())
+            ->update(['hidden_at' => now()]);
+        
+        return response()->json(['success' => true]);
     }
-    
-    // ✅ SOLO marcar la conversación como oculta para este usuario
-    $participant = $conversation->participants()
-        ->where('user_id', Auth::id())
-        ->first();
-    
-    if ($participant) {
-        $participant->update(['hidden_at' => now()]);
-    }
-    
-    \Log::info('✅ Chat ocultado para usuario', [
-        'conversation_id' => $conversationId,
-        'user_id' => Auth::id()
-    ]);
-    
-    return response()->json(['success' => true]);
-}
-
-
     /**
- * Eliminar mensaje
- */
-/**
  * Eliminar mensaje
  */
 public function deleteMessage(Request $request, $messageId)
 {
     $message = Message::findOrFail($messageId);
-
     if ($message->user_id !== Auth::id()) {
         abort(403, 'No tienes permiso para eliminar este mensaje');
     }
-
     $data = $request->validate([
         'delete_for' => 'required|in:me,everyone'
     ]);
 
+     $conversationId = $message->conversation_id;
     if ($data['delete_for'] === 'everyone') {
         // Eliminar para todos: marcar como deleted=true
         if ($message->attachment && in_array($message->type, ['file', 'audio'])) {
             Storage::disk('public')->delete($message->attachment);
         }
-
         $message->body       = 'Este mensaje fue eliminado';
         $message->deleted    = true;  // ← booleano, no string
         $message->attachment = null;
         $message->edited     = false;
         $message->save();
 
+         // ✅ Broadcast "eliminado para todos" en tiempo real
+        try {
+            broadcast(new MessageDeleted($message->id, $conversationId, 'everyone'))->toOthers();
+        } catch (\Exception $e) {
+            \Log::error('Error broadcasting MessageDeleted:', ['error' => $e->getMessage()]);
+        }
+
     } else {
-        // Eliminar solo para mí: agregar user_id a hidden_by
-        // FIX: compatible con MySQL 5.7+
+        // Eliminar solo para mí — solo afecta al usuario actual, NO se emite broadcast
         $hiddenBy = $message->hidden_by ?? [];
         if (!in_array(Auth::id(), $hiddenBy)) {
-            $hiddenBy[] = (int) Auth::id();
-            // Usar update directo con JSON_ARRAYAPPEND o simplemente setear el array
+            $hiddenBy[]         = (int) Auth::id();
             $message->hidden_by = $hiddenBy;
             $message->save();
         }
     }
-
     return response()->json(['success' => true]);
 }
-
     /**
      * Salir de un grupo
      */
@@ -741,7 +677,6 @@ public function deleteMessage(Request $request, $messageId)
         'message' => 'Has salido del grupo exitosamente'
     ]);
 }
-
     /**
      * Agregar participante a un grupo
      */
@@ -824,8 +759,6 @@ public function deleteMessage(Request $request, $messageId)
         'message' => 'Participante agregado exitosamente'
     ]);
 }
-
-
 /**
  * Editar mensaje
  */
@@ -849,10 +782,15 @@ public function editMessage(Request $request, $messageId)
         'body' => $data['body'],
         'edited' => true
     ]);
+    // ✅ Broadcast en tiempo real para todos los participantes
+    try {
+        broadcast(new MessageEdited($message))->toOthers();
+    } catch (\Exception $e) {
+        \Log::error('Error broadcasting MessageEdited:', ['error' => $e->getMessage()]);
+    }
     
     return response()->json(['success' => true, 'message' => $message]);
 }
-
     /**
      * Actualizar información del grupo
      */
@@ -894,6 +832,5 @@ public function editMessage(Request $request, $messageId)
     
     return redirect()->back();
 }
-
     
 }

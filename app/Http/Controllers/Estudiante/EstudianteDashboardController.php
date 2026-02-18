@@ -10,6 +10,8 @@ use App\Models\TaskSubmission;
 use App\Models\AcademicPeriod;
 use Inertia\Inertia;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Gate; 
+
 
 class EstudianteDashboardController extends Controller
 {

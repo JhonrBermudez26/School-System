@@ -489,11 +489,11 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
         
         // Calificar una entrega
         Route::post('/tasks/submissions/{submission}/grade', [TaskController::class, 'gradeSubmission'])
-            ->name('tasks.gradeSubmission')->middleware('can:grade,task');
+            ->name('tasks.gradeSubmission');
 
             //actualizar entrega
         Route::put('/tasks/submissions/{submission}/grade', [TaskController::class, 'gradeSubmission'])
-        ->name('tasks.updateGrade')->middleware('can:grade,task');
+        ->name('tasks.updateGrade');
     });
             
             //HORARIO

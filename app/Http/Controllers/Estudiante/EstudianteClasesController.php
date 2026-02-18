@@ -9,6 +9,7 @@ use App\Models\Task;
 use App\Models\TaskSubmission;
 use App\Models\Meeting;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate; 
 
 class EstudianteClasesController extends Controller
 {

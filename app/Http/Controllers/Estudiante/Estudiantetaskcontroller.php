@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Gate; 
+
 
 class EstudianteTaskController extends Controller
 {
@@ -381,7 +383,7 @@ class EstudianteTaskController extends Controller
 
             $submission->load(['files', 'members.student']);
 
-            broadcast(new SubmissionUpdated($submission))->toOthers();
+            broadcast(new SubmissionUpdated($submission));
 
             return response()->json([
                 'message'    => $submission_id 
@@ -494,7 +496,7 @@ public function removeMember($memberId)
 
         // Opcional: recargar y broadcast la entrega actualizada
         $submission->load(['files', 'members.student']);
-        broadcast(new SubmissionUpdated($submission))->toOthers();
+        broadcast(new SubmissionUpdated($submission));
 
         return response()->json([
             'message' => 'Miembro removido exitosamente y su entrega revertida a pendiente'

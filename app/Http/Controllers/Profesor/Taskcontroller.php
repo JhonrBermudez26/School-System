@@ -356,19 +356,19 @@ class TaskController extends Controller
         }
     }
 
-    public function show($id)
-    {        
+    public function show(Task $task)
+    {
         $this->authorize('view', $task);
     
         $task->load(['attachments', 'academicPeriod']);
         
         if ($task->work_type === 'individual') {
             $submissions = TaskSubmission::with(['student', 'files'])
-                ->where('task_id', $id)
+                ->where('task_id', $task->id)
                 ->get();
         } else {
             $submissions = TaskSubmission::with(['student', 'files', 'members.student'])
-                ->where('task_id', $id)
+                ->where('task_id', $task->id)
                 ->whereNotExists(function($query) {
                     $query->select(DB::raw(1))
                         ->from('task_submission_members')

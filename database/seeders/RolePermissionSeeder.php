@@ -294,8 +294,11 @@ class RolePermissionSeeder extends Seeder
             'schedules.view',
             'schedules.print',
             
-            // Publicaciones (solo ver)
+            // Publicaciones
             'posts.view',
+            'posts.create',
+            'posts.update',
+            'posts.delete',
             
             // Reuniones (solo unirse)
             'meetings.join',

@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Events\NewPublicacion;
 use App\Events\PublicacionActualizada;
 use App\Events\PublicacionEliminada;
+use Illuminate\Support\Facades\Gate; 
 
 class EstudiantePostController extends Controller
 {

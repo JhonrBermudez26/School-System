@@ -71,47 +71,48 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
     if (!classInfo.subject_id || !classInfo.group_id) return;
 
     loadTasks();
-    console.log(`📡 Estudiante escuchando tareas en grupo: ${classInfo.group_id}`);
 
     const channel = window.Echo?.channel(`group.${classInfo.group_id}`);
-
     if (channel) {
-      console.log(`✅ Conectado al canal: group.${classInfo.group_id}`);
-
       channel
         .listen('.task.created', (data) => {
-          console.log("✅ Nueva tarea recibida:", data);
           showNotification(`📚 Nueva tarea: ${data.title}`, 'success');
           loadTasks();
         })
         .listen('.task.updated', (data) => {
-          console.log("🔄 Tarea actualizada:", data);
           showNotification(`📝 Tarea actualizada: ${data.title}`, 'info');
           loadTasks();
         })
         .listen('.task.deleted', (data) => {
-          console.log("🗑️ Tarea eliminada:", data);
           showNotification(`🗑️ ${data.message}`, 'warning');
           loadTasks();
         })
         .listen('.submission.graded', (data) => {
-          console.log("⭐ Entrega calificada:", data);
-          if (data.affected_students.includes(window.userId)) {
+          if (data.affected_students?.includes(window.userId)) {
             showNotification(`⭐ ${data.message}`, 'success');
             loadTasks();
           }
+        })
+        // ✅ AGREGAR ESTOS DOS:
+        .listen('.submission.updated', (data) => {
+          console.log("🔄 Entrega actualizada:", data);
+          loadTasks();
+        })
+        .listen('.submission.created', (data) => {
+          console.log("📥 Entrega creada:", data);
+          loadTasks();
         });
-    } else {
-      console.error('❌ Echo no está disponible');
     }
 
     return () => {
       if (channel) {
-        console.log(`🔌 Desconectando canal: group.${classInfo.group_id}`);
-        channel.stopListening('.task.created')
+        channel
+          .stopListening('.task.created')
           .stopListening('.task.updated')
           .stopListening('.task.deleted')
-          .stopListening('.submission.graded');
+          .stopListening('.submission.graded')
+          .stopListening('.submission.updated')  // ✅
+          .stopListening('.submission.created'); // ✅
       }
     };
   }, [classInfo.subject_id, classInfo.group_id]);
@@ -328,8 +329,9 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
         setSelectedMembers([]);
         setIsEditing(false);
         setEditingSubmissionId(null);
-        loadTasks();
         showNotification(isEditing ? '✅ Entrega actualizada' : '✅ Tarea entregada exitosamente', 'success');
+        await loadTasks(); // ✅ esperar que cargue antes de cerrar
+        setSelectedTask(null); // ✅ mover al final para que no quede estado viejo
       } else {
         const errorData = await response.json();
         alert(errorData.message || 'Error al enviar la tarea');
@@ -409,8 +411,8 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
               key={classmate.id}
               onClick={() => toggleMemberSelection(classmate.id)}
               className={`w-full flex items-center justify-between p-3 sm:p-4 rounded-xl transition-all ${selectedMembers.includes(classmate.id)
-                  ? 'bg-purple-100 border-2 border-purple-400'
-                  : 'bg-white border-2 border-gray-200 hover:border-purple-300'
+                ? 'bg-purple-100 border-2 border-purple-400'
+                : 'bg-white border-2 border-gray-200 hover:border-purple-300'
                 }`}
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">

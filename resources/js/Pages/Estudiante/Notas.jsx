@@ -140,40 +140,6 @@ export default function Notas({
                                     <Filter className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
                                 </div>
                             </div>
-
-                            {/* Acciones de Boletín */}
-                            {(can?.view_bulletins || can?.download_bulletins) && (
-                                <div className="flex gap-2">
-                                    {can?.view_bulletins && (
-                                        <button
-                                            onClick={() => window.open(route('estudiante.boletines'), '_blank')}
-                                            className="p-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2 text-sm font-medium"
-                                            title="Ver Boletines"
-                                        >
-                                            <FileText className="w-4 h-4 text-blue-600" />
-                                            <span className="hidden lg:inline">Ver Boletín</span>
-                                        </button>
-                                    )}
-                                    {can?.download_bulletins && (
-                                        <button
-                                            onClick={() => {
-                                                if (periodoActual?.id) {
-                                                    // Buscamos si hay un boletín generado para este estudiante y periodo
-                                                    // Por ahora redirigimos a la lista si no tenemos el ID específico del boletín
-                                                    window.open(route('estudiante.boletines'), '_blank');
-                                                } else {
-                                                    window.open(route('estudiante.boletines'), '_blank');
-                                                }
-                                            }}
-                                            className="p-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm flex items-center gap-2 text-sm font-medium"
-                                            title="Descargar"
-                                        >
-                                            <TrendingUp className="w-4 h-4" />
-                                            <span className="hidden lg:inline">Mis Boletines</span>
-                                        </button>
-                                    )}
-                                </div>
-                            )}
                         </div>
                     </div>
 
