@@ -357,10 +357,10 @@ class TaskController extends Controller
     }
 
     public function show($id)
-    {
-        $task = Task::with(['attachments', 'academicPeriod'])->findOrFail($id);
-        
+    {        
         $this->authorize('view', $task);
+    
+        $task->load(['attachments', 'academicPeriod']);
         
         if ($task->work_type === 'individual') {
             $submissions = TaskSubmission::with(['student', 'files'])

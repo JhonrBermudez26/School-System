@@ -16,12 +16,12 @@ class TaskPolicy
      */
     public function view(User $user, Task $task): bool
     {
+         if ($user->hasRole('profesor')) {
+            return $task->teacher_id === $user->id;
+        }
+        
         if ($user->hasRole('rector') || $user->hasRole('coordinadora')) {
             return true;
-        }
-
-        if ($user->hasRole('profesor')) {
-            return $task->teacher_id === $user->id;
         }
 
         if ($user->hasRole('estudiante')) {

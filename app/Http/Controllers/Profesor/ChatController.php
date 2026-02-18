@@ -630,43 +630,39 @@ public function deleteConversation($conversationId)
 public function deleteMessage(Request $request, $messageId)
 {
     $message = Message::findOrFail($messageId);
-    
+
     if ($message->user_id !== Auth::id()) {
         abort(403, 'No tienes permiso para eliminar este mensaje');
     }
-    
+
     $data = $request->validate([
         'delete_for' => 'required|in:me,everyone'
     ]);
-    
+
     if ($data['delete_for'] === 'everyone') {
-        // Eliminar para todos
-        if ($message->type === 'text') {
-            // Para texto: mostrar mensaje de eliminado
-            $message->update([
-                'body' => 'Este mensaje fue eliminado',
-                'deleted' => true
-            ]);
-        } else {
-            // Para audio/archivo: eliminar archivo físico y marcar como eliminado
-            if ($message->attachment && in_array($message->type, ['file', 'audio'])) {
-                Storage::disk('public')->delete($message->attachment);
-            }
-            $message->update([
-                'body' => $message->type === 'audio' ? '🎤 Audio eliminado' : '📎 Archivo eliminado',
-                'attachment' => null,
-                'deleted' => true
-            ]);
+        // Eliminar para todos: marcar como deleted=true
+        if ($message->attachment && in_array($message->type, ['file', 'audio'])) {
+            Storage::disk('public')->delete($message->attachment);
         }
+
+        $message->body       = 'Este mensaje fue eliminado';
+        $message->deleted    = true;  // ← booleano, no string
+        $message->attachment = null;
+        $message->edited     = false;
+        $message->save();
+
     } else {
-        // Eliminar solo para el usuario actual
+        // Eliminar solo para mí: agregar user_id a hidden_by
+        // FIX: compatible con MySQL 5.7+
         $hiddenBy = $message->hidden_by ?? [];
         if (!in_array(Auth::id(), $hiddenBy)) {
-            $hiddenBy[] = Auth::id();
-            $message->update(['hidden_by' => $hiddenBy]);
+            $hiddenBy[] = (int) Auth::id();
+            // Usar update directo con JSON_ARRAYAPPEND o simplemente setear el array
+            $message->hidden_by = $hiddenBy;
+            $message->save();
         }
     }
-    
+
     return response()->json(['success' => true]);
 }
 

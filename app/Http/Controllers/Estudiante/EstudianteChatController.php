@@ -564,43 +564,43 @@ class EstudianteChatController extends Controller
     }
 
     public function deleteMessage(Request $request, $messageId)
-    {
-        $message = Message::findOrFail($messageId);
-        
-        if ($message->user_id !== Auth::id()) {
-            abort(403, 'No tienes permiso para eliminar este mensaje');
-        }
-        
-        $data = $request->validate([
-            'delete_for' => 'required|in:me,everyone'
-        ]);
-        
-        if ($data['delete_for'] === 'everyone') {
-            if ($message->type === 'text') {
-                $message->update([
-                    'body' => 'Este mensaje fue eliminado',
-                    'deleted' => true
-                ]);
-            } else {
-                if ($message->attachment && in_array($message->type, ['file', 'audio'])) {
-                    Storage::disk('public')->delete($message->attachment);
-                }
-                $message->update([
-                    'body' => $message->type === 'audio' ? '🎤 Audio eliminado' : '📎 Archivo eliminado',
-                    'attachment' => null,
-                    'deleted' => true
-                ]);
-            }
-        } else {
-            $hiddenBy = $message->hidden_by ?? [];
-            if (!in_array(Auth::id(), $hiddenBy)) {
-                $hiddenBy[] = Auth::id();
-                $message->update(['hidden_by' => $hiddenBy]);
-            }
-        }
-        
-        return response()->json(['success' => true]);
+{
+    $message = Message::findOrFail($messageId);
+
+    if ($message->user_id !== Auth::id()) {
+        abort(403, 'No tienes permiso para eliminar este mensaje');
     }
+
+    $data = $request->validate([
+        'delete_for' => 'required|in:me,everyone'
+    ]);
+
+    if ($data['delete_for'] === 'everyone') {
+        // Eliminar para todos: marcar como deleted=true
+        if ($message->attachment && in_array($message->type, ['file', 'audio'])) {
+            Storage::disk('public')->delete($message->attachment);
+        }
+
+        $message->body       = 'Este mensaje fue eliminado';
+        $message->deleted    = true;  // ← booleano, no string
+        $message->attachment = null;
+        $message->edited     = false;
+        $message->save();
+
+    } else {
+        // Eliminar solo para mí: agregar user_id a hidden_by
+        // FIX: compatible con MySQL 5.7+
+        $hiddenBy = $message->hidden_by ?? [];
+        if (!in_array(Auth::id(), $hiddenBy)) {
+            $hiddenBy[] = (int) Auth::id();
+            // Usar update directo con JSON_ARRAYAPPEND o simplemente setear el array
+            $message->hidden_by = $hiddenBy;
+            $message->save();
+        }
+    }
+
+    return response()->json(['success' => true]);
+}
 
     public function leaveGroup($conversationId)
     {

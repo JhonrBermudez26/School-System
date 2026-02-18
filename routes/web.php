@@ -46,9 +46,9 @@
     use App\Http\Controllers\Rector\UserManagementController;
     use App\Http\Controllers\Rector\AuditController;
 
-    Route::get('/sanctum/csrf-cookie', function () {
-        return response()->noContent();
-    });
+    // Al inicio, antes del grupo auth
+    Route::get('/sanctum/csrf-cookie', [\Laravel\Sanctum\Http\Controllers\CsrfCookieController::class, 'show'])
+        ->name('sanctum.csrf-cookie');
 
     // Página principal (pública)
     Route::get('/', function () {
