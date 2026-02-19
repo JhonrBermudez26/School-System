@@ -231,7 +231,7 @@ cosas hacer a futuro:
 pueda ver sus registro disciplinario para en caso de citas y vainas el pueda verlo 
 
 
-estoy haciendo una pagina web de un sistema de gestion escolar bien completo, entenderas que necesito que mis vistas sean impecables y sus colores sean los mejores y siempre se maneje las mismas tonalidades y paleta entonces ayudame a mejorar y actualizar los estilos con referencia a estos que te pasare(los 3 que te voy a pasar son ejemplos de estilos que ya tengo y considero que esten bien para que los tomes y actualices los otros, yo te dire donde van los que no son ejemplo), esto sin dañar nada de su logica nada mas es como cambiar los colores y uno que otro es cambiar los componentes de lugar y mas nada.
+estoy haciendo una pagina web de un sistema de gestion escolar bien completo, entenderas que necesito que mis vistas sean impecables y sus colores sean los mejores y siempre se maneje las mismas tonalidades y paleta entonces ayudame a mejorar y actualizar los estilos con referencia a estos que te pasare(los 3 que te voy a pasar son ejemplos de estilos que ya tengo y considero que esten bien para que los tomes y actualices los otros, yo te dire donde van los que no son ejemplo), esto sin dañar nada de su logica nada mas es como cambiar los colores y uno que otro es cambiar los componentes de lugar, hacerlo responsive y mas nada.
 
 estas son las vistas del profesor:
 
