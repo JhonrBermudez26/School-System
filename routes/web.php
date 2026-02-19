@@ -124,8 +124,8 @@
                 Route::get('/auditoria', [AuditController::class, 'index'])->name('rector.auditoria');
                 Route::get('/auditoria/stats', [AuditController::class, 'statistics'])->name('rector.auditoria.stats');
                 Route::get('/auditoria/recent', [AuditController::class, 'recentActivity'])->name('rector.auditoria.recent');
+               Route::get('/auditoria/export', [AuditController::class, 'export'])->name('rector.auditoria.export');
                 Route::get('/auditoria/{id}', [AuditController::class, 'show'])->name('rector.auditoria.show');
-                Route::get('/auditoria/export', [AuditController::class, 'export'])->name('rector.auditoria.export');
             });
 
           // RENDIMIENTO INSTITUCIONAL

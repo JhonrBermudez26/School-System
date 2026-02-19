@@ -1,6 +1,5 @@
 <?php
 // app/Http/Controllers/Rector/PerformanceController.php
-
 namespace App\Http\Controllers\Rector;
 
 use App\Http\Controllers\Controller;
@@ -30,72 +29,95 @@ class PerformanceController extends Controller
     public function index(Request $request)
     {
         $selectedPeriodId = $request->get('period_id');
-        $selectedGradeId = $request->get('grade_id');
-        
-        $activePeriod = AcademicPeriod::where('is_active', true)->first();
-        
+        $selectedGradeId  = $request->get('grade_id');
+
+        // PROBLEMA ORIGINAL: is_active lo recalcula el boot() solo por fecha actual,
+        // por lo que where('is_active', true) puede no encontrar nada si el periodo
+        // activo tiene fechas pasadas/futuras pero está marcado como 'active' en status.
+        // SOLUCIÓN: usar status='active' como fuente de verdad, con fallback al más reciente.
         if (!$selectedPeriodId) {
+            $activePeriod = AcademicPeriod::where('status', 'active')
+                ->orderBy('start_date', 'desc')
+                ->first();
+
+            // Fallback: si no hay ninguno con status='active', tomar el más reciente
+            if (!$activePeriod) {
+                $activePeriod = AcademicPeriod::orderBy('start_date', 'desc')->first();
+            }
+
             $selectedPeriodId = $activePeriod?->id;
         }
 
         if (!$selectedPeriodId) {
+            $periods = AcademicPeriod::orderBy('start_date', 'desc')->get()->map(fn($p) => [
+                'id'        => $p->id,
+                'name'      => $p->name,
+                'is_active' => $p->is_active,
+            ]);
+            $grades = Grade::orderBy('nombre')->get()->map(fn($g) => [
+                'id'     => $g->id,
+                'nombre' => $g->nombre,
+            ]);
             return Inertia::render('Rector/Performance', [
-                'error' => 'No hay periodos académicos disponibles',
+                'error'   => 'No hay periodos académicos disponibles. Crea al menos un periodo para continuar.',
+                'periods' => $periods,
+                'grades'  => $grades,
             ]);
         }
 
-        $selectedPeriod = AcademicPeriod::find($selectedPeriodId);
+        $selectedPeriod = AcademicPeriod::findOrFail($selectedPeriodId);
+
         $previousPeriod = AcademicPeriod::where('id', '<', $selectedPeriodId)
             ->orderBy('id', 'desc')
             ->first();
 
-        // Obtener todos los datos
-        $kpis = $this->analytics->getMainKPIs($selectedPeriodId, $selectedGradeId);
-        $performanceByGrade = $this->analytics->getPerformanceByGrade($selectedPeriodId, $selectedGradeId);
-        $performanceByGroup = $this->analytics->getPerformanceByGroup($selectedPeriodId, $selectedGradeId);
+        // Obtener todos los datos analíticos
+        $kpis                 = $this->analytics->getMainKPIs($selectedPeriodId, $selectedGradeId);
+        $performanceByGrade   = $this->analytics->getPerformanceByGrade($selectedPeriodId, $selectedGradeId);
+        $performanceByGroup   = $this->analytics->getPerformanceByGroup($selectedPeriodId, $selectedGradeId);
         $performanceBySubject = $this->analytics->getPerformanceBySubject($selectedPeriodId, $previousPeriod?->id);
-        
+
         $periodComparison = null;
         if ($previousPeriod) {
             $periodComparison = $this->analytics->getPeriodComparison($selectedPeriodId, $previousPeriod->id);
         }
 
-        $ranking = $this->analytics->getInstitutionalRanking($selectedPeriodId);
+        $ranking           = $this->analytics->getInstitutionalRanking($selectedPeriodId);
         $gradeDistribution = $this->analytics->getGradeDistribution($selectedPeriodId);
-        $atRiskStudents = $this->analytics->getAtRiskStudents($selectedPeriodId);
+        $atRiskStudents    = $this->analytics->getAtRiskStudents($selectedPeriodId);
 
         // Datos para filtros
         $periods = AcademicPeriod::orderBy('start_date', 'desc')->get()->map(fn($p) => [
-            'id' => $p->id,
-            'name' => $p->name,
+            'id'        => $p->id,
+            'name'      => $p->name,
             'is_active' => $p->is_active,
         ]);
 
         $grades = Grade::orderBy('nombre')->get()->map(fn($grade) => [
-            'id' => $grade->id,
+            'id'     => $grade->id,
             'nombre' => $grade->nombre,
         ]);
 
         return Inertia::render('Rector/Performance', [
-            'kpis' => $kpis,
-            'performanceByGrade' => $performanceByGrade,
-            'performanceByGroup' => $performanceByGroup,
+            'kpis'                 => $kpis,
+            'performanceByGrade'   => $performanceByGrade,
+            'performanceByGroup'   => $performanceByGroup,
             'performanceBySubject' => $performanceBySubject,
-            'periodComparison' => $periodComparison,
-            'ranking' => $ranking,
-            'gradeDistribution' => $gradeDistribution,
-            'atRiskStudents' => $atRiskStudents,
-            'periods' => $periods,
-            'grades' => $grades,
-            'selectedPeriod' => [
-                'id' => $selectedPeriod->id,
+            'periodComparison'     => $periodComparison,
+            'ranking'              => $ranking,
+            'gradeDistribution'    => $gradeDistribution,
+            'atRiskStudents'       => $atRiskStudents,
+            'periods'              => $periods,
+            'grades'               => $grades,
+            'selectedPeriod'       => [
+                'id'   => $selectedPeriod->id,
                 'name' => $selectedPeriod->name,
             ],
-            'previousPeriod' => $previousPeriod ? [
-                'id' => $previousPeriod->id,
+            'previousPeriod'       => $previousPeriod ? [
+                'id'   => $previousPeriod->id,
                 'name' => $previousPeriod->name,
             ] : null,
-            'filters' => $request->only(['period_id', 'grade_id']),
+            'filters'              => $request->only(['period_id', 'grade_id']),
         ]);
     }
 
@@ -104,9 +126,9 @@ class PerformanceController extends Controller
      */
     public function exportPDF(Request $request)
     {
+        $request->validate(['period_id' => 'required|exists:academic_periods,id']);
         $periodId = $request->get('period_id');
-        $gradeId = $request->get('grade_id');
-
+        $gradeId  = $request->get('grade_id');
         return $this->exportService->exportToPDF($periodId, $gradeId);
     }
 
@@ -115,9 +137,9 @@ class PerformanceController extends Controller
      */
     public function exportExcel(Request $request)
     {
+        $request->validate(['period_id' => 'required|exists:academic_periods,id']);
         $periodId = $request->get('period_id');
-        $gradeId = $request->get('grade_id');
-
+        $gradeId  = $request->get('grade_id');
         return $this->exportService->exportToExcel($periodId, $gradeId);
     }
 }
