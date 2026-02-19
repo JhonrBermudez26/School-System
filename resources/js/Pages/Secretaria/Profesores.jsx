@@ -1,11 +1,11 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import { Search, Edit3, Users, X, Filter, Plus, Trash2 , ArrowUpDown, ArrowUp, ArrowDown} from 'lucide-react';
+import { Search, Edit3, Users, X, Filter, Plus, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useState, useMemo, useRef } from 'react';
 import Layout from '@/Components/Layout/Layout';
 
 export default function Profesores() {
     const editFormRef = useRef(null);
-    const { profesores, asignaturas, grupos, error, flash } = usePage().props;
+    const { profesores, asignaturas, grupos, error, flash, can } = usePage().props;
 
     const [search, setSearch] = useState('');
     const [filterAsignatura, setFilterAsignatura] = useState('todos');
@@ -65,7 +65,7 @@ export default function Profesores() {
             return matchSearch && matchAsignatura && matchActive;
         });
 
-        
+
     }, [search, filterAsignatura, filterActive, profesores]);
 
     const handleEditClick = (prof) => {
@@ -265,7 +265,7 @@ export default function Profesores() {
                         <p className="text-xl sm:text-2xl font-bold text-red-600">
                             {filteredProfesores.filter(p => !p.is_active).length}
                         </p>
-                    </div>  
+                    </div>
                     <div className="bg-white rounded-lg shadow-md p-4">
                         <p className="text-gray-500 text-xs sm:text-sm">Asignaturas</p>
                         <p className="text-xl sm:text-2xl font-bold text-blue-600">{asignaturas?.length || 0}</p>
@@ -535,25 +535,36 @@ export default function Profesores() {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <div className="flex justify-end space-x-2">
-                                                    <button
-                                                        onClick={() => toggleActive(prof.id, prof.is_active)}
-                                                        className={`${prof.is_active
-                                                            ? 'text-orange-600 hover:text-orange-900 hover:bg-orange-50'
-                                                            : 'text-green-600 hover:text-green-900 hover:bg-green-50'
-                                                            } p-2 rounded`}
-                                                        title={prof.is_active ? 'Desactivar profesor' : 'Activar profesor'}
-                                                        aria-label={prof.is_active ? 'Desactivar profesor' : 'Activar profesor'}
-                                                    >
-                                                        <Users className="h-4 w-4" />
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleEditClick(prof)}
-                                                        className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded"
-                                                        title="Editar profesor"
-                                                        aria-label="Editar profesor"
-                                                    >
-                                                        <Edit3 className="h-4 w-4" />
-                                                    </button>
+                                                    {can?.update && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => toggleActive(prof.id, prof.is_active)}
+                                                                className={`${prof.is_active
+                                                                    ? 'text-orange-600 hover:text-orange-900 hover:bg-orange-50'
+                                                                    : 'text-green-600 hover:text-green-900 hover:bg-green-50'
+                                                                    } p-2 rounded`}
+                                                                title={prof.is_active ? 'Desactivar profesor' : 'Activar profesor'}
+                                                                aria-label={prof.is_active ? 'Desactivar profesor' : 'Activar profesor'}
+                                                            >
+                                                                <Users className="h-4 w-4" />
+                                                            </button>
+
+                                                            <button
+                                                                onClick={() => handleEditClick(prof)}
+                                                                className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded"
+                                                                title="Editar profesor"
+                                                                aria-label="Editar profesor"
+                                                            >
+                                                                <Edit3 className="h-4 w-4" />
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {/* ✅ Mensaje si no tiene permisos */}
+                                                    {!can?.update && (
+                                                        <span className="text-gray-400 text-xs italic px-2">
+                                                            Solo lectura
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>
@@ -571,29 +582,6 @@ export default function Profesores() {
                         </table>
                     </div>
                 </div>
-
-                {/* Pagination */}
-                {profesores?.links && profesores.links.length > 3 && (
-                    <div className="mt-6 flex justify-center">
-                        <div className="flex space-x-2">
-                            {profesores.links.map((link, index) => (
-                                <button
-                                    key={index}
-                                    onClick={() => link.url && router.visit(link.url)}
-                                    disabled={!link.url}
-                                    className={`px-4 py-2 rounded-lg ${link.active
-                                        ? 'bg-green-600 text-white'
-                                        : link.url
-                                            ? 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                            : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                        }`}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                    aria-label={`Ir a la página ${link.label}`}
-                                />
-                            ))}
-                        </div>
-                    </div>
-                )}
             </div>
         </Layout>
     );

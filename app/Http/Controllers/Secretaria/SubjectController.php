@@ -7,11 +7,18 @@ use App\Models\Subject;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 
 class SubjectController extends Controller
 {
     public function index(Request $request)
     {
+          // ✅ Verificar permiso directamente
+        if (!auth()->user()->can('subjects.view')) {
+            abort(403, 'No tienes permiso para ver las asignaturas.');
+        }
+
         try {
             $query = Subject::query();
 
@@ -33,6 +40,11 @@ class SubjectController extends Controller
             return Inertia::render('Secretaria/Asignaturas', [
                 'asignaturas' => $asignaturas,
                 'filters' => $request->only(['search', 'estado']),
+                'can' => [
+                    'create' => auth()->user()->can('subjects.create'),                    
+                    'update' => auth()->user()->can('subjects.update'),
+                    'delete' => auth()->user()->can('subjects.delete'),
+                ],
             ]);
         } catch (\Exception $e) {
             Log::error('Error al cargar asignaturas', [
@@ -44,12 +56,23 @@ class SubjectController extends Controller
                 'asignaturas' => [],
                 'filters' => [],
                 'error' => 'No se pudieron cargar las asignaturas.',
+                'can' => [
+                    'create' => false,                    
+                    'update' => false,
+                    'delete' => false,
+                ],
             ]);
         }
     }
 
     public function store(Request $request)
     {
+
+        // ✅ Verificar permiso directamente
+        if (!auth()->user()->can('subjects.create')) {
+            abort(403, 'No tienes permiso para crear asignaturas.');
+        }
+
         try {
             $validated = $request->validate([
                 'name' => 'required|string|max:255',
@@ -79,10 +102,13 @@ class SubjectController extends Controller
 
     public function update(Request $request, $id)
     {
+         $subject = Subject::findOrFail($id);
+          // ✅ Verificar permiso directamente
+        if (!auth()->user()->can('subjects.update')) {
+            abort(403, 'No tienes permiso para actualizar asignaturas.');
+        }
         try {
-            $subject = Subject::findOrFail($id);
-
-            $validated = $request->validate([
+                       $validated = $request->validate([
                 'name' => 'required|string|max:255',
                 'code' => 'required|string|max:50|unique:subjects,code,' . $id,
                 'description' => 'nullable|string',
@@ -101,31 +127,19 @@ class SubjectController extends Controller
 
     public function destroy($id)
     {
+       
         try {
-            $subject = Subject::findOrFail($id);
+             $subject = Subject::findOrFail($id);
+         // ✅ Verificar permiso directamente
+        if (!auth()->user()->can('subjects.delete')) {
+            abort(403, 'No tienes permiso para eliminar asignaturas.');
+        }
             $subject->delete();
 
             return redirect()->back()->with('success', '✅ Asignatura eliminada correctamente');
         } catch (\Exception $e) {
             Log::error('Error al eliminar asignatura', ['message' => $e->getMessage()]);
             return back()->with('error', '❌ No se pudo eliminar la asignatura');
-        }
-    }
-
-    public function toggle(Request $request, $id)
-    {
-        try {
-            $subject = Subject::findOrFail($id);
-            $validated = $request->validate([
-                'is_active' => 'required|boolean',
-            ]);
-
-            $subject->update(['is_active' => $validated['is_active']]);
-
-            return back()->with('success', '🔄 Estado actualizado correctamente');
-        } catch (\Exception $e) {
-            Log::error('Error al cambiar estado', ['message' => $e->getMessage()]);
-            return back()->with('error', '❌ No se pudo cambiar el estado');
         }
     }
 }

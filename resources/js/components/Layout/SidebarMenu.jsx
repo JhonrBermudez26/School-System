@@ -10,9 +10,13 @@ import {
   ClipboardList,
   UserCheck,
   UserCog,
-  ChartPie,
   Book,
   MessageSquare,
+  ShieldAlert,
+  History,
+  TrendingUp,
+  Scale,
+  Shield,
 } from "lucide-react";
 
 export default function SidebarMenu({ role }) {
@@ -23,15 +27,20 @@ export default function SidebarMenu({ role }) {
   const sections = {
     rector: [
       { icon: GraduationCap, label: "Dashboard", path: "/rector/dashboard" },
-      { icon: Users, label: "Gestión de usuarios", path: "/rector/usuarios" },
-      { icon: ChartPie, label: "Reportes institucionales", path: "/rector/reportes" },
-      { icon: Settings, label: "Configuración general", path: "/rector/configuracion" },
+      { icon: UserCog, label: "Gestión de usuarios", path: "/rector/usuarios" },
+      { icon: Shield, label: "Roles y Permisos", path: "/rector/roles" },
+      { icon: History, label: "Auditoría", path: "/rector/auditoria" },
+      { icon: TrendingUp, label: "Rendimiento", path: "/rector/performance" },
+      { icon: Settings, label: "Configuración", path: "/rector/configuracion" },
     ],
     coordinadora: [
       { icon: GraduationCap, label: "Dashboard", path: "/coordinadora/dashboard" },
-      { icon: ClipboardList, label: "Asignar materias", path: "/coordinadora/materias" },
-      { icon: Users, label: "Gestionar docentes", path: "/coordinadora/docentes" },
-      { icon: FileText, label: "Planificación académica", path: "/coordinadora/planificacion" },
+      { icon: Calendar, label: "Horarios", path: "/coordinadora/horarios" },
+      { icon: FileText, label: "Periodos Académicos", path: "/coordinadora/periodos" },
+      { icon: TrendingUp, label: "Supervisión Académica", path: "/coordinadora/supervision" },
+      { icon: UserCheck, label: "Control Asistencia", path: "/coordinadora/asistencia" },
+      { icon: Scale, label: "Registro Disciplinario", path: "/coordinadora/disciplina" },
+      { icon: ClipboardList, label: "Boletines", path: "/coordinadora/boletines" },
     ],
     secretaria: [
       { icon: GraduationCap, label: "Inicio", path: "/secretaria/dashboard" },
@@ -41,23 +50,23 @@ export default function SidebarMenu({ role }) {
       { icon: Book, label: "Gestionar Asignaturas", path: "/secretaria/asignaturas" },
       { icon: ClipboardList, label: "Gestionar Grupos", path: "/secretaria/grupos" },
       { icon: Calendar, label: "Horarios", path: "/secretaria/horarios" },
-      { icon: Calendar, label: "Periodos académicos", path: "/secretaria/periodos" },
       { icon: FileText, label: "Generar boletines", path: "/secretaria/boletines", module: "boletines" },
-      { icon: Settings, label: "Configuración", path: "/secretaria/configuracion" },
     ],
     profesor: [
-      { icon: GraduationCap, label: "Dashboard", path: "/profesor/dashboard" },
+      { icon: GraduationCap, label: "Inicio", path: "/profesor/dashboard" },
       { icon: MessageSquare, label: "Chat", path: "/profesor/chat" },
       { icon: BookOpen, label: "Mis clases", path: "/profesor/clases" },
       { icon: Calendar, label: "Horario", path: "/profesor/horario" },
-      { icon: ClipboardList, label: "Registro de notas", path: "/profesor/notas" },
+      { icon: ClipboardList, label: "Registro de notas", path: "/profesor/registrarNotas" },
       { icon: UserCheck, label: "Asistencias", path: "/profesor/asistencias" },
     ],
     estudiante: [
       { icon: GraduationCap, label: "Inicio", path: "/estudiante/dashboard" },
-      { icon: BookOpen, label: "Mis materias", path: "/estudiante/materias" },
-      { icon: FileText, label: "Calificaciones", path: "/estudiante/notas" },
-      { icon: UserCog, label: "Perfil académico", path: "/estudiante/perfil" },
+      { icon: MessageSquare, label: "Chat", path: "/estudiante/chat" },
+      { icon: BookOpen, label: "Mis clases", path: "/estudiante/clases" },
+      { icon: Calendar, label: "Horario", path: "/estudiante/horario" },
+      { icon: ClipboardList, label: "Mis notas", path: "/estudiante/notas" },
+      { icon: UserCheck, label: "Mis asistencias", path: "/estudiante/asistencias" },
     ],
   };
 

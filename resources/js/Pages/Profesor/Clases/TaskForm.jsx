@@ -5,7 +5,6 @@ import {
   FileText,
   Trash2,
   Calendar,
-  Users,
   AlertCircle,
   Image as ImageIcon,
   File,
@@ -14,6 +13,9 @@ import {
   Save,
   Loader2
 } from 'lucide-react';
+
+// Importar utilidades CSRF
+import { fetchWithCsrf, deleteWithCsrf } from '@/Utils/csrf-utils';
 
 export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTask = null }) {
   const [formData, setFormData] = useState({
@@ -24,7 +26,7 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
     due_date: editingTask?.due_date ? new Date(editingTask.due_date).toISOString().slice(0, 16) : '',
     close_date: editingTask?.close_date ? new Date(editingTask.close_date).toISOString().slice(0, 16) : '',
     allow_late_submission: editingTask?.allow_late_submission ?? true,
-    max_score: editingTask?.max_score || 100,
+    max_score: editingTask?.max_score || 5,
   });
 
   const [attachments, setAttachments] = useState([]);
@@ -66,23 +68,17 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
     if (!confirm('¿Eliminar este archivo?')) return;
 
     try {
-      // FIX: Corregir sintaxis - usar paréntesis en lugar de backticks
-      const response = await fetch(`/profesor/clases/tasks/attachments/${attachmentId}`, {
-        method: 'DELETE',
-        headers: {
-          'Accept': 'application/json',
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-        },
-      });
+      const response = await deleteWithCsrf(`/profesor/clases/tasks/attachments/${attachmentId}`);
 
       if (response.ok) {
         setExistingAttachments(prev => prev.filter(a => a.id !== attachmentId));
       } else {
-        alert('Error al eliminar el archivo');
+        const errorData = await response.json();
+        alert(errorData.message || 'Error al eliminar el archivo');
       }
     } catch (error) {
       console.error('Error eliminando archivo:', error);
-      alert('Error al eliminar el archivo');
+      alert('Error al eliminar el archivo: ' + error.message);
     }
   };
 
@@ -93,27 +89,22 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
     if (!formData.description.trim()) newErrors.description = 'La descripción es requerida';
     if (!formData.due_date) newErrors.due_date = 'La fecha de entrega es requerida';
 
-    // FIX: Validación de fechas mejorada
     if (formData.due_date) {
       const dueDate = new Date(formData.due_date);
       const now = new Date();
 
-      // Permitir fechas del día actual o futuras
-      if (dueDate < now) {
-        // Solo mostrar error si la fecha es de días anteriores, no del mismo día
-        const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
-        const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const dueDateOnly = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
+      const nowDateOnly = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        if (dueDateOnly < nowDateOnly) {
-          newErrors.due_date = 'La fecha de entrega debe ser hoy o en el futuro';
-        }
+      if (dueDateOnly < nowDateOnly) {
+        newErrors.due_date = 'La fecha de entrega debe ser hoy o en el futuro';
       }
     }
 
+    // Solo validar close_date si se proporcionó
     if (formData.close_date && formData.due_date) {
       const closeDate = new Date(formData.close_date);
       const dueDate = new Date(formData.due_date);
-
       if (closeDate <= dueDate) {
         newErrors.close_date = 'La fecha de cierre debe ser posterior a la fecha de entrega';
       }
@@ -136,57 +127,19 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
 
     setLoading(true);
 
-    let csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-
-    // Si no encontramos el token → intentamos refrescarlo usando Sanctum
-    if (!csrfToken) {
-      try {
-        console.log("CSRF token no encontrado → solicitando nuevo token...");
-        const csrfResponse = await fetch('/sanctum/csrf-cookie', {
-          method: 'GET',
-          credentials: 'include',           // Muy importante
-          headers: {
-            'Accept': 'application/json',
-          },
-        });
-
-        if (!csrfResponse.ok) {
-          throw new Error(`Error al obtener csrf-cookie: ${csrfResponse.status}`);
-        }
-
-        // Esperamos un momento pequeño porque a veces el meta tag tarda en aparecer
-        await new Promise(resolve => setTimeout(resolve, 300));
-
-        // Volvemos a buscar el token
-        csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
-
-        if (!csrfToken) {
-          console.error("Aún no se encuentra el meta tag csrf después de /sanctum/csrf-cookie");
-          alert('No se pudo obtener el token de seguridad automáticamente. Por favor recarga la página.');
-          setLoading(false);
-          return;
-        }
-
-        console.log("Nuevo CSRF token obtenido con éxito");
-      } catch (err) {
-        console.error("Error al intentar obtener CSRF token:", err);
-        alert('Error al obtener el token de seguridad. Por favor recarga la página.');
-        setLoading(false);
-        return;
-      }
-    }
-
     try {
       const submitData = new FormData();
-
       submitData.append('subject_id', classInfo.subject_id);
       submitData.append('group_id', classInfo.group_id);
 
-      // Campos normales
+      // Agregar campos del formulario
       Object.keys(formData).forEach(key => {
-        // Evitamos enviar campos vacíos o undefined
+        // No enviar close_date si está vacío
+        if (key === 'close_date' && !formData[key]) {
+          return;
+        }
+
         if (formData[key] !== undefined && formData[key] !== null && formData[key] !== '') {
-          // Tratamiento especial para booleanos
           if (typeof formData[key] === 'boolean') {
             submitData.append(key, formData[key] ? '1' : '0');
           } else {
@@ -195,6 +148,7 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
         }
       });
 
+      // Agregar archivos adjuntos
       attachments.forEach((file) => {
         submitData.append('attachments[]', file);
       });
@@ -203,21 +157,14 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
         ? `/profesor/clases/tasks/${editingTask.id}`
         : '/profesor/clases/tasks';
 
-      const method = editingTask ? 'POST' : 'POST'; // Laravel usa POST + _method=PUT
-
       if (editingTask) {
         submitData.append('_method', 'PUT');
       }
 
-      const response = await fetch(url, {
-        method: 'POST',           // Siempre POST cuando usamos FormData + _method
-        headers: {
-          'Accept': 'application/json',
-          'X-CSRF-TOKEN': csrfToken,
-          // NO pongas 'Content-Type': 'multipart/form-data' → fetch lo pone solo
-        },
+      // Usar fetchWithCsrf que maneja automáticamente el token y reintentos
+      const response = await fetchWithCsrf(url, {
+        method: 'POST',
         body: submitData,
-        credentials: 'include',   // ← importante si usas cookies/sanctum
       });
 
       if (response.ok) {
@@ -235,7 +182,6 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
         if (errorData.errors) {
           setErrors(errorData.errors);
         }
-
         alert(errorData.message || 'Error al guardar la tarea');
       }
     } catch (error) {
@@ -265,12 +211,10 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
 
   return (
     <div className="bg-white rounded-3xl shadow-2xl border-2 border-gray-100 overflow-hidden">
-      {/* Header mejorado */}
+      {/* Header */}
       <div className="bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-600 px-6 sm:px-8 py-6 flex items-center justify-between relative overflow-hidden">
-        {/* Efectos decorativos */}
         <div className="absolute inset-0 bg-white/10 transform -skew-y-3 origin-top-right"></div>
         <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -mr-32 -mt-32"></div>
-
         <div className="relative flex items-center gap-4">
           <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center">
             <FileText className="h-8 w-8 text-white" strokeWidth={2} />
@@ -287,7 +231,7 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
         </button>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6 max-h-[calc(100vh-200px)] overflow-y-auto">
+      <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
         {/* Título */}
         <div>
           <label className="block text-sm font-bold text-gray-800 mb-2">
@@ -330,7 +274,7 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
           )}
         </div>
 
-        {/* Tipo de trabajo mejorado */}
+        {/* Tipo de trabajo */}
         <div>
           <label className="block text-sm font-bold text-gray-800 mb-3">
             Tipo de trabajo *
@@ -361,7 +305,7 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
           </div>
         </div>
 
-        {/* Número máximo de integrantes */}
+        {/* Máximo de integrantes (solo para grupos) */}
         {formData.work_type === 'group' && (
           <div>
             <label className="block text-sm font-bold text-gray-800 mb-2">
@@ -385,7 +329,7 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
           </div>
         )}
 
-        {/* Fechas mejoradas */}
+        {/* Fechas */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-bold text-gray-800 mb-2 flex items-center gap-2">
@@ -427,7 +371,7 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
             )}
             <p className="text-xs text-gray-500 mt-2 flex items-center gap-1">
               <AlertCircle className="h-3 w-3" />
-              Después de esta fecha no se aceptarán entregas
+              Si no se especifica, las entregas tardías estarán permitidas indefinidamente (según configuración)
             </p>
           </div>
         </div>
@@ -440,8 +384,9 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
           </label>
           <input
             type="number"
-            min="1"
-            max="1000"
+            step="0.1"
+            min="0.1"
+            max="5"
             value={formData.max_score}
             onChange={(e) => handleChange('max_score', parseInt(e.target.value))}
             className={`w-full px-5 py-4 rounded-xl border-2 ${errors.max_score ? 'border-red-300 bg-red-50' : 'border-gray-200'
@@ -469,7 +414,7 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
           </label>
         </div>
 
-        {/* Archivos adjuntos mejorado */}
+        {/* Archivos adjuntos */}
         <div>
           <label className="block text-sm font-bold text-gray-800 mb-3">
             Archivos adjuntos (opcional)
@@ -565,7 +510,7 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
           />
         </div>
 
-        {/* Botones de acción mejorados */}
+        {/* Botones de acción */}
         <div className="flex flex-col-reverse sm:flex-row gap-3 pt-6 border-t-2 border-gray-100">
           <button
             type="button"

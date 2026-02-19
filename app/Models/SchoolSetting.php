@@ -43,9 +43,17 @@ class SchoolSetting extends Model
         'dane',
         'resolucion',
         'fecha_fundacion',
+
+        // Configuración académica
+        'minimum_passing_grade',
+        'minimum_attendance_percentage',
+        'grading_scale',
     ];
 
     protected $casts = [
         'fecha_fundacion' => 'date',
+        'minimum_passing_grade' => 'decimal:2',
+        'minimum_attendance_percentage' => 'integer',
+        'grading_scale' => 'array',
     ];
 }

@@ -16,10 +16,16 @@ class Message extends Model
         'type',
         'attachment',
         'read_by',
+        'deleted',
+        'edited',
+        'hidden_by',
     ];
 
     protected $casts = [
         'read_by' => 'array',
+        'deleted' => 'boolean',
+        'edited' => 'boolean',
+        'hidden_by' => 'array', 
     ];
 
     public function conversation()

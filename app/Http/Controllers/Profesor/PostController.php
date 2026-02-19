@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Profesor;
 
 use App\Http\Controllers\Controller;
@@ -10,18 +9,21 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Storage;
+use App\Events\NewPublicacion;
+use App\Events\PublicacionActualizada;
+use App\Events\PublicacionEliminada;
+use Illuminate\Support\Facades\Gate; 
 
 class PostController extends Controller
 {
+    private function assertPostOwnership(Post $post): void
+    {
+        $this->authorize('update', $post);
+    }
+
     private function assertOwnership(int $subjectId, int $groupId): void
     {
-        $userId = Auth::id();
-        $exists = DB::table('subject_group')
-            ->where('user_id', $userId)
-            ->where('subject_id', $subjectId)
-            ->where('group_id', $groupId)
-            ->exists();
-        abort_unless($exists, 403);
+        Gate::authorize('access-class', [$subjectId, $groupId]);
     }
 
     public function index(Request $request)
@@ -39,17 +41,21 @@ class PostController extends Controller
             ->where('subject_id', $subjectId)
             ->where('group_id', $groupId)
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->map(function ($post) {
+                return array_merge($post->toArray(), [
+                    'can' => [
+                        'update' => auth()->user()->can('update', $post),
+                        'delete' => auth()->user()->can('delete', $post),
+                    ]
+                ]);
+            });
 
         return response()->json($posts);
     }
 
     public function store(Request $request)
     {
-        // Log para debug
-        \Log::info('Datos recibidos:', $request->all());
-        \Log::info('Archivos:', $request->allFiles());
-
         $data = $request->validate([
             'subject_id' => 'required|integer',
             'group_id' => 'required|integer',
@@ -87,7 +93,6 @@ class PostController extends Controller
                         'mime' => $file->getMimeType(),
                         'size' => $file->getSize(),
                     ]);
-                    \Log::info('Archivo guardado:', ['filename' => $file->getClientOriginalName(), 'path' => $path]);
                 }
             }
         }
@@ -100,10 +105,22 @@ class PostController extends Controller
                         'type' => 'link',
                         'url' => $url,
                     ]);
-                    \Log::info('Enlace guardado:', ['url' => $url]);
                 }
             }
         }
+
+        // ✅ Recargar la publicación con todas sus relaciones
+        $post->load(['attachments', 'user']);
+
+        // ✅ Agregar campos calculados
+        $postData = $post->toArray();
+        $postData['author_name'] = $post->user->name . ' ' . ($post->user->last_name ?? '');
+        $postData['author_role'] = 'profesor';
+        $postData['author_photo'] = $post->user->photo ? "/storage/{$post->user->photo}" : null;
+        $postData['is_owner'] = true;
+
+        // ✅ Emitir el evento
+        broadcast(new NewPublicacion($postData, $data['subject_id'], $data['group_id']))->toOthers();
 
         return Redirect::back()->with('success', 'Publicación creada');
     }
@@ -111,6 +128,7 @@ class PostController extends Controller
     public function update(Request $request, Post $post)
     {
         // Verificar pertenencia de la clase a este profesor
+        $this->assertPostOwnership($post);
         $this->assertOwnership((int) $post->subject_id, (int) $post->group_id);
 
         $data = $request->validate([
@@ -118,16 +136,95 @@ class PostController extends Controller
             'content' => 'nullable|string',
             'type' => 'sometimes|in:post,tarea',
             'due_at' => 'nullable|date',
+            'files' => 'sometimes|array',
+            'files.*' => 'file|max:20480',
+            'links' => 'sometimes|array',
+            'links.*' => 'string',
+            'files_to_delete' => 'sometimes|array',
+            'files_to_delete.*' => 'integer',
+            'links_to_delete' => 'sometimes|array',
+            'links_to_delete.*' => 'integer',
         ]);
 
-        $post->update($data);
+        $post->update([
+            'title' => $data['title'] ?? $post->title,
+            'content' => $data['content'] ?? $post->content,
+            'type' => $data['type'] ?? $post->type,
+            'due_at' => $data['due_at'] ?? $post->due_at,
+        ]);
+
+        // Eliminar archivos marcados
+        if (isset($data['files_to_delete']) && is_array($data['files_to_delete'])) {
+            foreach ($data['files_to_delete'] as $attachmentId) {
+                $attachment = PostAttachment::where('post_id', $post->id)
+                    ->where('id', $attachmentId)
+                    ->first();
+                if ($attachment) {
+                    if ($attachment->type !== 'link' && $attachment->path) {
+                        Storage::disk('public')->delete($attachment->path);
+                    }
+                    $attachment->delete();
+                }
+            }
+        }
+
+        // Eliminar enlaces marcados
+        if (isset($data['links_to_delete']) && is_array($data['links_to_delete'])) {
+            PostAttachment::where('post_id', $post->id)
+                ->whereIn('id', $data['links_to_delete'])
+                ->delete();
+        }
+
+        // Agregar nuevos archivos
+        if ($request->hasFile('files')) {
+            foreach ($request->file('files') as $file) {
+                if ($file->isValid()) {
+                    $path = $file->store('posts', 'public');
+                    $post->attachments()->create([
+                        'type' => str_starts_with($file->getMimeType(), 'image/') ? 'image' : 'file',
+                        'filename' => $file->getClientOriginalName(),
+                        'path' => $path,
+                        'mime' => $file->getMimeType(),
+                        'size' => $file->getSize(),
+                    ]);
+                }
+            }
+        }
+
+        // Agregar nuevos enlaces
+        if (isset($data['links']) && is_array($data['links'])) {
+            foreach ($data['links'] as $url) {
+                if (!empty($url)) {
+                    $post->attachments()->create([
+                        'type' => 'link',
+                        'url' => $url,
+                    ]);
+                }
+            }
+        }
+
+        // ✅ Recargar publicación con datos completos
+        $post->load(['attachments', 'user']);
+
+        $postData = $post->toArray();
+        $postData['author_name'] = $post->user->name . ' ' . ($post->user->last_name ?? '');
+        $postData['author_role'] = 'profesor';
+        $postData['author_photo'] = $post->user->photo ? "/storage/{$post->user->photo}" : null;
+        $postData['is_owner'] = (int)$post->user_id === Auth::id();
+
+        // ✅ Emitir evento de actualización
+        broadcast(new PublicacionActualizada($postData, $post->subject_id, $post->group_id))->toOthers();
 
         return Redirect::back()->with('success', 'Publicación actualizada');
     }
 
     public function destroy(Post $post)
     {
-        $this->assertOwnership((int) $post->subject_id, (int) $post->group_id);
+        $subjectId = $post->subject_id;
+        $groupId = $post->group_id;
+        $postId = $post->id;
+
+        $this->authorize('delete', $post);
         
         // Eliminar archivos físicos antes de eliminar el post
         foreach ($post->attachments as $attachment) {
@@ -139,6 +236,9 @@ class PostController extends Controller
         // Eliminar attachments y post
         $post->attachments()->delete();
         $post->delete();
+
+        // ✅ Emitir evento de eliminación
+        broadcast(new PublicacionEliminada($postId, $subjectId, $groupId))->toOthers();
 
         return Redirect::back()->with('success', 'Publicación eliminada');
     }

@@ -1,121 +1,183 @@
-// Reunion.jsx
-import { useState, useEffect, useRef } from 'react';
+// Profesor Reunion.jsx
 import { usePage, router } from '@inertiajs/react';
-import { 
-  Video, VideoOff, Users, Copy, Check, Monitor, 
-  Play, Calendar, Clock, ExternalLink, Loader2 
+import {
+  Video, VideoOff, Users, Copy, Check, Monitor,
+  Play, Calendar, Clock, ExternalLink, Loader2
 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 export default function Reunion() {
   const { props } = usePage();
   const { classInfo, meeting = null, studentsCount } = props;
-  
+
   const [isCreating, setIsCreating] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const jitsiContainer = useRef(null);
+  const [isLoading, setIsLoading] = useState(true);
   const jitsiApi = useRef(null);
-  
+  const initializationAttempted = useRef(false);
+
   const meetingUrl = meeting?.url || '';
 
+  // LIMPIEZA cuando meeting cambia a null
   useEffect(() => {
-    if (meeting && jitsiContainer.current && !jitsiApi.current) {
-      loadJitsiScript();
-    }
-    return () => {
-      if (jitsiApi.current) {
+    console.log('[Jitsi] Meeting cambió:', meeting);
+
+    if (!meeting && jitsiApi.current) {
+      console.log('[Jitsi] Meeting eliminado, limpiando API');
+      try {
         jitsiApi.current.dispose();
-        jitsiApi.current = null;
+      } catch (e) {
+        console.error('[Jitsi] Error al dispose:', e);
       }
-    };
+      jitsiApi.current = null;
+      initializationAttempted.current = false;
+      setIsLoading(true); // Resetear loading
+    }
   }, [meeting]);
 
-  const loadJitsiScript = () => {
-    if (window.JitsiMeetExternalAPI) {
-      initJitsi();
+  // ✅ CALLBACK REF - DEPS CORREGIDAS (sin isLoading)
+  const containerRef = useCallback((node) => {
+    console.log('[Jitsi] Callback ref ejecutado, node:', node);
+
+    // Si el nodo se desmonta (null)
+    if (node === null) {
+      console.log('[Jitsi] Desmontando contenedor');
+      if (jitsiApi.current) {
+        try {
+          jitsiApi.current.dispose();
+        } catch (e) {
+          console.error('[Jitsi] Error al dispose:', e);
+        }
+        jitsiApi.current = null;
+      }
+      initializationAttempted.current = false;
       return;
     }
-    setIsLoading(true);
-    const script = document.createElement('script');
-    script.src = 'https://meet.jit.si/external_api.js';
-    script.async = true;
-    script.onload = () => {
-      setIsLoading(false);
-      initJitsi();
-    };
-    script.onerror = () => {
-      setIsLoading(false);
-      alert('Error cargando Jitsi. Verifica tu conexión.');
-    };
-    document.body.appendChild(script);
-  };
 
-  const initJitsi = () => {
-    if (window.JitsiMeetExternalAPI && jitsiContainer.current && meeting) {
-      const domain = 'meet.jit.si';
-      const options = {
-        roomName: meeting.room_name,
-        width: '100%',
-        height: 600,
-        parentNode: jitsiContainer.current,
-        
-        configOverwrite: {
-          startWithAudioMuted: true,
-          startWithVideoMuted: false,
-          enableWelcomePage: false,
-          prejoinPageEnabled: false,
-          disableDeepLinking: true,
-          defaultLanguage: 'es',
-          resolution: 720,
-          constraints: {
-            video: {
-              height: { ideal: 720, max: 720, min: 240 }
-            }
+    // Validar que tengamos meeting
+    if (!meeting?.room_name) {
+      console.log('[Jitsi] No hay meeting, esperando...');
+      return;
+    }
+
+    // Si ya se inicializó, no hacer nada
+    if (jitsiApi.current || initializationAttempted.current) {
+      console.log('[Jitsi] Ya inicializado');
+      return;
+    }
+
+    console.log('[Jitsi] Contenedor montado, inicializando...');
+
+    // Función de inicialización
+    const initializeJitsi = () => {
+      console.log('[Jitsi] initializeJitsi ejecutándose...');
+
+      if (!window.JitsiMeetExternalAPI) {
+        console.error('[Jitsi] ❌ JitsiMeetExternalAPI no disponible');
+        setIsLoading(false);
+        return;
+      }
+
+      console.log('[Jitsi] ✅ Todas las validaciones pasadas, creando API...');
+      initializationAttempted.current = true;
+
+      try {
+        const domain = 'meet.jit.si';
+        const options = {
+          roomName: meeting.room_name,
+          width: '100%',
+          height: '100%',
+          parentNode: node,
+          configOverwrite: {
+            startWithAudioMuted: true,
+            startWithVideoMuted: false,
+            enableWelcomePage: false,
+            prejoinPageEnabled: false,
+            disableDeepLinking: true,
+            defaultLanguage: 'es',
+            resolution: 720,
+            disableInviteFunctions: true,
+            doNotStoreRoom: true,
+            requireDisplayName: false,
           },
-          disableInviteFunctions: true,
-          doNotStoreRoom: true,
-        },
-        
-        interfaceConfigOverwrite: {
-          TOOLBAR_BUTTONS: [
-            'microphone', 
-            'camera', 
-            'desktop',
-            'fullscreen',
-            'hangup', 
-            'chat', 
-            'raisehand',
-            'videoquality', 
-            'tileview',
-            'stats',
-          ],
-          SHOW_JITSI_WATERMARK: false,
-          SHOW_BRAND_WATERMARK: false,
-          SHOW_POWERED_BY: false,
-          DEFAULT_LOGO_URL: '',
-          DEFAULT_WELCOME_PAGE_LOGO_URL: '',
-        },
-        
-        userInfo: {
-          displayName: classInfo.teacher_name || 'Profesor',
-        }
+          interfaceConfigOverwrite: {
+            TOOLBAR_BUTTONS: [
+              'microphone', 'camera', 'desktop', 'fullscreen', 'hangup',
+              'chat', 'raisehand', 'videoquality', 'tileview', 'stats'
+            ],
+            SHOW_JITSI_WATERMARK: false,
+            SHOW_BRAND_WATERMARK: false,
+            SHOW_POWERED_BY: false,
+          },
+          userInfo: {
+            displayName: classInfo?.teacher_name || 'Profesor',
+          }
+        };
+
+        console.log('[Jitsi] Creando JitsiMeetExternalAPI...');
+        jitsiApi.current = new window.JitsiMeetExternalAPI(domain, options);
+        console.log('[Jitsi] ✅ API creada exitosamente');
+
+        // Eventos
+        jitsiApi.current.on('videoConferenceJoined', () => {
+          console.log('[Jitsi] 🎉 Usuario se unió a la conferencia');
+          setIsLoading(false);
+        });
+
+        jitsiApi.current.on('videoConferenceLeft', () => {
+          console.log('[Jitsi] 👋 Usuario salió de la conferencia');
+        });
+
+        jitsiApi.current.on('participantJoined', (participant) => {
+          console.log('[Jitsi] ➕ Participante se unió:', participant.displayName);
+        });
+
+        jitsiApi.current.on('participantLeft', (participant) => {
+          console.log('[Jitsi] ➖ Participante salió:', participant.displayName);
+        });
+
+        jitsiApi.current.on('connection.disconnect', (msg) => {
+          console.error('[Jitsi] ⚠️ Desconexión:', msg);
+          setIsLoading(false);
+        });
+
+        // Fallback timeout
+        setTimeout(() => {
+          console.log('[Jitsi] ⏰ Ejecutando fallback timeout');
+          setIsLoading(false);
+        }, 3000);
+
+      } catch (error) {
+        console.error('[Jitsi] ❌ Error al crear API:', error);
+        setIsLoading(false);
+        initializationAttempted.current = false;
+      }
+    };
+
+    // Cargar script si es necesario
+    if (window.JitsiMeetExternalAPI) {
+      console.log('[Jitsi] Script ya cargado');
+      setTimeout(initializeJitsi, 500);
+    } else {
+      console.log('[Jitsi] Cargando script...');
+      const script = document.createElement('script');
+      script.src = 'https://meet.jit.si/external_api.js';
+      script.async = true;
+      script.id = 'jitsi-script';
+
+      script.onload = () => {
+        console.log('[Jitsi] ✅ Script cargado');
+        setTimeout(initializeJitsi, 500);
       };
 
-      jitsiApi.current = new window.JitsiMeetExternalAPI(domain, options);
-      
-      jitsiApi.current.on('participantJoined', (participant) => {
-        console.log('Usuario conectado:', participant);
-      });
-      
-      jitsiApi.current.on('participantLeft', (participant) => {
-        console.log('Usuario desconectado:', participant);
-      });
-      
-      jitsiApi.current.on('videoConferenceLeft', () => {
-        console.log('Saliste de la reunión');
-      });
+      script.onerror = (err) => {
+        console.error('[Jitsi] ❌ Error cargando script:', err);
+        setIsLoading(false);
+      };
+
+      document.body.appendChild(script);
     }
-  };
+  }, [meeting]); // ✅ SOLO meeting como dependencia
 
   const createMeeting = () => {
     setIsCreating(true);
@@ -128,9 +190,11 @@ export default function Reunion() {
       {
         preserveScroll: true,
         onSuccess: () => {
+          console.log('[Meeting] Reunión creada exitosamente');
           setIsCreating(false);
         },
-        onError: () => {
+        onError: (errors) => {
+          console.error('[Meeting] Error creando reunión:', errors);
           setIsCreating(false);
           alert('Error creando la reunión');
         },
@@ -140,15 +204,18 @@ export default function Reunion() {
 
   const endMeeting = () => {
     if (!confirm('¿Finalizar la reunión para todos?')) return;
-    
+
     router.delete(route('profesor.meetings.destroy', { meeting: meeting.id }), {
       preserveScroll: true,
       onSuccess: () => {
+        console.log('[Meeting] Reunión finalizada');
         if (jitsiApi.current) {
           jitsiApi.current.executeCommand('hangup');
           jitsiApi.current.dispose();
           jitsiApi.current = null;
         }
+        initializationAttempted.current = false;
+        setIsLoading(true);
       },
     });
   };
@@ -175,36 +242,38 @@ export default function Reunion() {
           <Users className="h-4 w-4" />
           {studentsCount} estudiantes esperando
         </div>
-        <button
-          onClick={createMeeting}
-          disabled={isCreating}
-          className="inline-flex items-center px-8 py-4 rounded-2xl 
-            bg-gradient-to-r from-blue-500 to-emerald-500 
-            text-white text-lg font-bold
-            hover:from-blue-600 hover:to-emerald-700 
-            disabled:opacity-50 disabled:cursor-not-allowed 
-            transition-all shadow-xl hover:shadow-2xl
-            hover:scale-105 active:scale-95
-            group"
-        >
-          {isCreating ? (
-            <>
-              <Loader2 className="h-6 w-6 mr-3 animate-spin" />
-              Creando reunión...
-            </>
-          ) : (
-            <>
-              <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
-                <Play className="h-6 w-6" />
-              </div>
-              Iniciar reunión virtual
-            </>
-          )}
-        </button>
+        {props.can?.start_meeting && (
+          <button
+            onClick={createMeeting}
+            disabled={isCreating}
+            className="inline-flex items-center px-8 py-4 rounded-2xl
+              bg-gradient-to-r from-blue-500 to-emerald-500
+              text-white text-lg font-bold
+              hover:from-blue-600 hover:to-emerald-700
+              disabled:opacity-50 disabled:cursor-not-allowed
+              transition-all shadow-xl hover:shadow-2xl
+              hover:scale-105 active:scale-95
+              group"
+          >
+            {isCreating ? (
+              <>
+                <Loader2 className="h-6 w-6 mr-3 animate-spin" />
+                Creando reunión...
+              </>
+            ) : (
+              <>
+                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center mr-3 group-hover:scale-110 transition-transform">
+                  <Play className="h-6 w-6" />
+                </div>
+                Iniciar reunión virtual
+              </>
+            )}
+          </button>
+        )}
       </div>
     );
   }
-
+  // Si hay meeting, mostrar interfaz
   return (
     <div className="space-y-5">
       {/* Info de la reunión */}
@@ -244,17 +313,19 @@ export default function Reunion() {
               </div>
             </div>
           </div>
-          <button
-            onClick={endMeeting}
-            className="inline-flex items-center justify-center px-5 py-3 rounded-xl 
-              bg-gradient-to-r from-red-500 to-red-600 text-white font-bold
-              hover:from-red-600 hover:to-red-700 
-              transition-all shadow-lg hover:shadow-xl
-              group whitespace-nowrap"
-          >
-            <VideoOff className="h-5 w-5 mr-2 group-hover:scale-110 transition-transform" />
-            Finalizar reunión
-          </button>
+          {meeting.can_end && (
+            <button
+              onClick={endMeeting}
+              className="inline-flex items-center justify-center px-5 py-3 rounded-xl 
+                bg-gradient-to-r from-red-500 to-red-600 text-white font-bold
+                hover:from-red-600 hover:to-red-700 
+                transition-all shadow-lg hover:shadow-xl
+                group whitespace-nowrap"
+            >
+              <VideoOff className="h-5 w-5 mr-2 group-hover:scale-110 transition-transform" />
+              Finalizar reunión
+            </button>
+          )}
         </div>
 
         {/* Enlace para compartir */}
@@ -324,9 +395,17 @@ export default function Reunion() {
             <p className="text-lg font-semibold text-gray-700 mb-2">Cargando reunión...</p>
             <p className="text-sm text-gray-500">Esto puede tardar unos segundos</p>
           </div>
-        ) : (
-          <div ref={jitsiContainer} className="w-full" />
-        )}
+        ) : null}
+
+        {/* ✅ CONTENEDOR SIEMPRE RENDERIZADO */}
+        <div
+          ref={containerRef}
+          className="w-full"
+          style={{
+            height: '600px',
+            display: isLoading ? 'none' : 'block' // Ocultar mientras carga
+          }}
+        />
       </div>
 
       {/* Instrucciones rápidas */}

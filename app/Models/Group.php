@@ -11,6 +11,16 @@ class Group extends Model
 
     protected $fillable = ['grade_id', 'course_id', 'nombre'];
 
+    /**
+     * ✅ ACCESSOR: Permite acceder a 'nombre' como 'name'
+     */
+    protected $appends = ['name'];
+
+    public function getNameAttribute()
+    {
+        return $this->nombre;
+    }
+
     public function grade()
     {
         return $this->belongsTo(Grade::class);
@@ -55,14 +65,14 @@ class Group extends Model
     {
         return $this->students()->where('is_active', true);
     }
-  
-/**
- * Asignaturas del grupo
- */
-public function subjects()
-{
-    return $this->belongsToMany(Subject::class, 'subject_group')
-        ->withPivot('user_id')
-        ->withTimestamps();
-}
+
+    /**
+     * Asignaturas del grupo
+     */
+    public function subjects()
+    {
+        return $this->belongsToMany(Subject::class, 'subject_group')
+            ->withPivot('user_id')
+            ->withTimestamps();
+    }
 }

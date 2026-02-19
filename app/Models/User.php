@@ -23,6 +23,9 @@ class User extends Authenticatable
         'address',
         'birth_date',
         'is_active',
+        'suspended_at',
+        'suspended_reason',
+        'last_login_at',
     ];
 
     protected $hidden = [
@@ -37,7 +40,30 @@ class User extends Authenticatable
             'password' => 'hashed',
             'birth_date' => 'date',
             'is_active' => 'boolean',
+            'suspended_at' => 'datetime',
+            'last_login_at' => 'datetime',
         ];
+    }
+    public function isSuspended(): bool
+    {
+        return !is_null($this->suspended_at);
+    }
+    public function getLastLoginHumanAttribute()
+    {
+        return $this->last_login_at 
+            ? $this->last_login_at->diffForHumans() 
+            : null;
+    }
+    // Scope para usuarios suspendidos
+    public function scopeSuspended($query)
+    {
+        return $query->whereNotNull('suspended_at');
+    }
+
+    // Scope para usuarios activos (no suspendidos)
+    public function scopeNotSuspended($query)
+    {
+        return $query->whereNull('suspended_at');
     }
 
     // ===== RELACIONES PARA ESTUDIANTES =====
@@ -173,5 +199,10 @@ class User extends Authenticatable
 public function messages()
 {
     return $this->hasMany(Message::class);
+}
+
+public function activityLogs()
+{
+    return $this->hasMany(ActivityLog::class);
 }
 }

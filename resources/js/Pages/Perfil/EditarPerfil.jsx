@@ -1,15 +1,14 @@
 import { Head, useForm, usePage } from "@inertiajs/react";
 import { Camera, Save, Mail, Phone, MapPin, User, Lock, IdCard } from "lucide-react";
 import { useState } from "react";
-import Layout from "../../components/Layout/Layout";
+import Layout from "@/Components/Layout/Layout";
 
 export default function EditarPerfil() {
     const { auth } = usePage().props;
     const user = auth?.user;
-
     const [previewImage, setPreviewImage] = useState(user?.photo ? `/storage/${user.photo}` : null);
 
-    const { data, setData, post, processing, errors, reset } = useForm({
+    const { data, setData, post, processing, errors } = useForm({
         name: user?.name || "",
         last_name: user?.last_name || "",
         email: user?.email || "",
@@ -19,17 +18,11 @@ export default function EditarPerfil() {
         address: user?.address || "",
         birth_date: user?.birth_date || "",
         photo: null,
-
-        // Para cambio de contraseña
         current_password: "",
         new_password: "",
         new_password_confirmation: "",
     });
 
-     const [preview, setPreview] = useState(
-    user.photo ? `/storage/${user.photo}` : null
-  );
-  
     const handleSubmit = (e) => {
         e.preventDefault();
         post("/perfil/actualizar", { forceFormData: true });
@@ -47,95 +40,204 @@ export default function EditarPerfil() {
 
     return (
         <Layout title="Editar Perfil">
-            <div className="max-w-5xl mx-auto bg-white shadow rounded-xl p-8 space-y-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Información Personal</h2>
+            <div className="max-w-4xl mx-auto space-y-6 px-0 sm:px-0">
+                {/* Header */}
+                <div>
+                    <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                        Editar Perfil
+                    </h1>
+                    <p className="text-gray-500 mt-1 text-sm">Actualiza tu información personal y credenciales</p>
+                </div>
 
-                <form onSubmit={handleSubmit} className="space-y-10">
-                    {/* FOTO DE PERFIL */}
-                    <div className="flex items-center space-x-6 mb-8">
-                        <div className="relative">
-                            {previewImage ? (
-                                <img
-                                    src={previewImage || "/default-user.png"}
-                                    alt="Preview"
-                                    className="w-24 h-24 rounded-full object-cover border-4 border-blue-200"
-                                />
-                            ) : (
-                                <div className="w-24 h-24 rounded-full bg-green-500 text-white flex items-center justify-center text-3xl font-bold">
-                                    {data.name?.[0]}{data.last_name?.[0]}
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Foto de perfil */}
+                    <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+                        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                            <h2 className="text-base font-bold text-white flex items-center gap-2">
+                                <User className="h-4 w-4" />
+                                Foto de Perfil
+                            </h2>
+                        </div>
+                        <div className="p-6">
+                            <div className="flex items-center gap-6">
+                                <div className="relative flex-shrink-0">
+                                    {previewImage ? (
+                                        <img
+                                            src={previewImage}
+                                            alt="Preview"
+                                            className="w-24 h-24 rounded-2xl object-cover border-4 border-blue-100 shadow-md"
+                                        />
+                                    ) : (
+                                        <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-3xl font-bold shadow-md">
+                                            {data.name?.[0]}{data.last_name?.[0]}
+                                        </div>
+                                    )}
+                                    <label
+                                        htmlFor="photo-upload"
+                                        className="absolute -bottom-2 -right-2 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl p-2 cursor-pointer hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg"
+                                    >
+                                        <Camera className="h-4 w-4 text-white" />
+                                        <input
+                                            id="photo-upload"
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={handleImageChange}
+                                            className="hidden"
+                                        />
+                                    </label>
                                 </div>
-                            )}
-                            <label
-                                htmlFor="photo-upload"
-                                className="absolute bottom-0 right-0 bg-blue-600 rounded-full p-2 cursor-pointer hover:bg-blue-700 transition"
-                            >
-                                <Camera className="h-4 w-4 text-white" />
-                                <input
-                                    id="photo-upload"
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageChange}
-                                    className="hidden"
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-800">
+                                        {data.name} {data.last_name}
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-0.5">{data.email}</p>
+                                    <p className="text-xs text-blue-600 mt-3 font-medium">
+                                        Haz clic en el ícono para cambiar tu foto
+                                    </p>
+                                    <p className="text-xs text-gray-400 mt-0.5">JPG, PNG o GIF. Máximo 2MB.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Datos personales */}
+                    <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+                        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                            <h2 className="text-base font-bold text-white flex items-center gap-2">
+                                <User className="h-4 w-4" />
+                                Información Personal
+                            </h2>
+                        </div>
+                        <div className="p-6">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <Input
+                                    label="Nombre"
+                                    icon={<User className="h-4 w-4" />}
+                                    value={data.name}
+                                    onChange={(e) => setData("name", e.target.value)}
+                                    error={errors.name}
                                 />
-                            </label>
+                                <Input
+                                    label="Apellido"
+                                    icon={<User className="h-4 w-4" />}
+                                    value={data.last_name}
+                                    onChange={(e) => setData("last_name", e.target.value)}
+                                    error={errors.last_name}
+                                />
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                                        <span className="flex items-center gap-1.5">
+                                            <IdCard className="h-4 w-4 text-gray-400" />
+                                            Tipo de documento
+                                        </span>
+                                    </label>
+                                    <select
+                                        value={data.document_type}
+                                        onChange={(e) => setData("document_type", e.target.value)}
+                                        className="w-full px-3 py-2.5 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm outline-none bg-white text-gray-700"
+                                    >
+                                        <option value="">Seleccione...</option>
+                                        <option value="CC">Cédula de Ciudadanía</option>
+                                        <option value="TI">Tarjeta de Identidad</option>
+                                        <option value="CE">Cédula de Extranjería</option>
+                                        <option value="PA">Pasaporte</option>
+                                    </select>
+                                    {errors.document_type && <p className="text-red-500 text-xs mt-1">{errors.document_type}</p>}
+                                </div>
+                                <Input
+                                    label="Número de documento"
+                                    icon={<IdCard className="h-4 w-4" />}
+                                    value={data.document_number}
+                                    onChange={(e) => setData("document_number", e.target.value)}
+                                    error={errors.document_number}
+                                />
+                                <Input
+                                    label="Correo electrónico"
+                                    icon={<Mail className="h-4 w-4" />}
+                                    type="email"
+                                    value={data.email}
+                                    onChange={(e) => setData("email", e.target.value)}
+                                    error={errors.email}
+                                />
+                                <Input
+                                    label="Teléfono"
+                                    icon={<Phone className="h-4 w-4" />}
+                                    value={data.phone}
+                                    onChange={(e) => setData("phone", e.target.value)}
+                                    error={errors.phone}
+                                />
+                                <Input
+                                    label="Dirección"
+                                    icon={<MapPin className="h-4 w-4" />}
+                                    value={data.address}
+                                    onChange={(e) => setData("address", e.target.value)}
+                                    error={errors.address}
+                                />
+                                <Input
+                                    label="Fecha de nacimiento"
+                                    type="date"
+                                    value={data.birth_date}
+                                    onChange={(e) => setData("birth_date", e.target.value)}
+                                    error={errors.birth_date}
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    {/* DATOS PERSONALES */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <Input label="Nombre" icon={<User />} value={data.name} onChange={(e) => setData("name", e.target.value)} error={errors.name} />
-                        <Input label="Apellido" icon={<User />} value={data.last_name} onChange={(e) => setData("last_name", e.target.value)} error={errors.last_name} />
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                                <IdCard className="mr-2 text-gray-500" /> Tipo de documento
-                            </label>
-                            <select
-                                value={data.document_type}
-                                onChange={(e) => setData("document_type", e.target.value)}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                            >
-                                <option value="">Seleccione...</option>
-                                <option value="CC">Cédula de Ciudadanía</option>
-                                <option value="TI">Tarjeta de Identidad</option>
-                                <option value="CE">Cédula de Extranjería</option>
-                                <option value="PA">Pasaporte</option>
-                            </select>
-                            {errors.document_type && <p className="text-red-500 text-sm mt-1">{errors.document_type}</p>}
+                    {/* Credenciales */}
+                    <div className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden">
+                        <div className="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                            <h2 className="text-base font-bold text-white flex items-center gap-2">
+                                <Lock className="h-4 w-4" />
+                                Credenciales de Acceso
+                            </h2>
                         </div>
-
-                        <Input label="Número de documento" icon={<IdCard />} value={data.document_number} onChange={(e) => setData("document_number", e.target.value)} error={errors.document_number} />
-                        <Input label="Correo electrónico" icon={<Mail />} type="email" value={data.email} onChange={(e) => setData("email", e.target.value)} error={errors.email} />
-                        <Input label="Teléfono" icon={<Phone />} value={data.phone} onChange={(e) => setData("phone", e.target.value)} error={errors.phone} />
-                        <Input label="Dirección" icon={<MapPin />} value={data.address} onChange={(e) => setData("address", e.target.value)} error={errors.address} />
-                        <Input label="Fecha de nacimiento" type="date" value={data.birth_date} onChange={(e) => setData("birth_date", e.target.value)} error={errors.birth_date} />
-                    </div>
-
-                    {/* SECCIÓN DE CREDENCIALES */}
-                    <div className="border-t border-gray-200 pt-8">
-                        <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center">
-                            <Lock className="mr-2 text-green-600" /> Credenciales de acceso
-                        </h3>
-                        <p className="text-sm text-gray-600 mb-4">
-                            Si deseas cambiar tu contraseña, completa los siguientes campos.
-                        </p>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Input label="Contraseña actual" type="password" value={data.current_password} onChange={(e) => setData("current_password", e.target.value)} error={errors.current_password} />
-                            <Input label="Nueva contraseña" type="password" value={data.new_password} onChange={(e) => setData("new_password", e.target.value)} error={errors.new_password} />
-                            <Input label="Confirmar nueva contraseña" type="password" value={data.new_password_confirmation} onChange={(e) => setData("new_password_confirmation", e.target.value)} error={errors.new_password_confirmation} />
+                        <div className="p-6">
+                            <p className="text-sm text-gray-500 mb-5 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                                Deja estos campos en blanco si no deseas cambiar tu contraseña.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <Input
+                                    label="Contraseña actual"
+                                    type="password"
+                                    value={data.current_password}
+                                    onChange={(e) => setData("current_password", e.target.value)}
+                                    error={errors.current_password}
+                                />
+                                <Input
+                                    label="Nueva contraseña"
+                                    type="password"
+                                    value={data.new_password}
+                                    onChange={(e) => setData("new_password", e.target.value)}
+                                    error={errors.new_password}
+                                />
+                                <Input
+                                    label="Confirmar nueva contraseña"
+                                    type="password"
+                                    value={data.new_password_confirmation}
+                                    onChange={(e) => setData("new_password_confirmation", e.target.value)}
+                                    error={errors.new_password_confirmation}
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    {/* BOTÓN DE GUARDADO */}
-                    <div className="flex justify-end">
+                    {/* Guardar */}
+                    <div className="flex justify-end gap-3 pb-4">
+                        <button
+                            type="button"
+                            onClick={() => window.history.back()}
+                            className="px-6 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors"
+                        >
+                            Cancelar
+                        </button>
                         <button
                             type="submit"
                             disabled={processing}
-                            className="flex items-center space-x-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50"
+                            className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 font-semibold text-sm shadow-md hover:shadow-lg"
                         >
                             <Save className="h-4 w-4" />
-                            <span>{processing ? "Guardando..." : "Guardar cambios"}</span>
+                            {processing ? "Guardando..." : "Guardar cambios"}
                         </button>
                     </div>
                 </form>
@@ -144,21 +246,22 @@ export default function EditarPerfil() {
     );
 }
 
-// COMPONENTE DE INPUT
 function Input({ label, icon, value, onChange, error, type = "text" }) {
     return (
         <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2 flex items-center">
-                {icon && <span className="mr-2 text-gray-500">{icon}</span>}
-                {label}
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                <span className="flex items-center gap-1.5">
+                    {icon && <span className="text-gray-400">{icon}</span>}
+                    {label}
+                </span>
             </label>
             <input
                 type={type}
                 value={value}
                 onChange={onChange}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                className={`w-full px-3 py-2.5 border ${error ? 'border-red-300 bg-red-50' : 'border-gray-200'} rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm outline-none transition-shadow`}
             />
-            {error && <p className="text-red-500 text-sm mt-1">{error}</p>}
+            {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
         </div>
     );
 }

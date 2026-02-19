@@ -4,12 +4,12 @@ import Layout from "@/Components/Layout/Layout";
 import { usePage, router } from "@inertiajs/react";
 
 export default function Usuarios() {
-    const { usuarios } = usePage().props;
+    const { usuarios, can } = usePage().props;
     
     const [search, setSearch] = useState("");
     const [filterRole, setFilterRole] = useState("todos");
     const [filterActive, setFilterActive] = useState("todos");
-    const [sortOrder, setSortOrder] = useState(null); // null, 'asc', 'desc'
+    const [sortOrder, setSortOrder] = useState(null);
     const [editingUser, setEditingUser] = useState(null);
     const [showNewUserForm, setShowNewUserForm] = useState(false);
     const [editData, setEditData] = useState({
@@ -20,8 +20,7 @@ export default function Usuarios() {
         password: "",
         is_active: true,
     });
-
-    // Formulario nuevo usuario
+    
     const [newUserData, setNewUserData] = useState({
         name: "",
         last_name: "",
@@ -36,7 +35,6 @@ export default function Usuarios() {
     });
     const [formErrors, setFormErrors] = useState({});
 
-    // Función para alternar el orden
     const toggleSort = () => {
         if (sortOrder === null) {
             setSortOrder('asc');
@@ -47,7 +45,6 @@ export default function Usuarios() {
         }
     };
 
-    // Filtrado y ordenamiento dinámico
     const filteredUsers = useMemo(() => {
         let result = usuarios.filter((u) => {
             const fullName = `${u.name} ${u.last_name || ''}`.toLowerCase();
@@ -64,7 +61,6 @@ export default function Usuarios() {
             return matchSearch && matchRole && matchActive;
         });
 
-        // Aplicar ordenamiento si está activo
         if (sortOrder !== null) {
             result = [...result].sort((a, b) => {
                 const nameA = `${a.name} ${a.last_name || ''}`.toLowerCase();
@@ -77,7 +73,6 @@ export default function Usuarios() {
                 }
             });
         }
-
         return result;
     }, [search, filterRole, filterActive, sortOrder, usuarios]);
 
@@ -153,7 +148,6 @@ export default function Usuarios() {
         return colors[role] || 'bg-gray-100 text-gray-800';
     };
 
-    // Icono de ordenamiento
     const getSortIcon = () => {
         if (sortOrder === 'asc') {
             return <ArrowUp className="h-4 w-4 text-green-600" />;
@@ -172,17 +166,21 @@ export default function Usuarios() {
                     <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Gestionar Usuarios</h1>
                     <p className="text-gray-600 mt-2">Administra la información de los usuarios del sistema</p>
                 </div>
-                <button
-                    onClick={() => setShowNewUserForm(!showNewUserForm)}
-                    className="flex items-center space-x-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition shadow-md w-full sm:w-auto justify-center"
-                >
-                    <UserPlus className="h-5 w-5" />
-                    <span>{showNewUserForm ? 'Ocultar Formulario' : 'Nuevo Usuario'}</span>
-                </button>
+                
+                {/* ✅ Botón solo visible si tiene permiso de crear */}
+                {can.create && (
+                    <button
+                        onClick={() => setShowNewUserForm(!showNewUserForm)}
+                        className="flex items-center space-x-2 bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition shadow-md w-full sm:w-auto justify-center"
+                    >
+                        <UserPlus className="h-5 w-5" />
+                        <span>{showNewUserForm ? 'Ocultar Formulario' : 'Nuevo Usuario'}</span>
+                    </button>
+                )}
             </div>
 
-            {/* Formulario Nuevo Usuario (Banner) */}
-            {showNewUserForm && (
+            {/* ✅ Formulario solo visible si tiene permiso de crear */}
+            {can.create && showNewUserForm && (
                 <div className="bg-gradient-to-r from-green-50 to-blue-50 rounded-xl shadow-lg p-6 sm:p-8 mb-6 border-2 border-green-200">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl sm:text-2xl font-bold text-gray-800 flex items-center gap-2">
@@ -196,13 +194,10 @@ export default function Usuarios() {
                             <X className="h-6 w-6" />
                         </button>
                     </div>
-
                     <form onSubmit={handleNewUserSubmit} className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                         {/* Nombre */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Nombre *
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Nombre *</label>
                             <input
                                 type="text"
                                 value={newUserData.name}
@@ -216,9 +211,7 @@ export default function Usuarios() {
 
                         {/* Apellido */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Apellido *
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Apellido *</label>
                             <input
                                 type="text"
                                 value={newUserData.last_name}
@@ -232,9 +225,7 @@ export default function Usuarios() {
 
                         {/* Email */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Correo
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Correo *</label>
                             <input
                                 type="email"
                                 value={newUserData.email}
@@ -248,9 +239,7 @@ export default function Usuarios() {
 
                         {/* Contraseña */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Contraseña *
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña *</label>
                             <input
                                 type="password"
                                 value={newUserData.password}
@@ -264,9 +253,7 @@ export default function Usuarios() {
 
                         {/* Tipo Documento */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Tipo de Documento *
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Documento *</label>
                             <select
                                 value={newUserData.document_type}
                                 onChange={(e) => setNewUserData({ ...newUserData, document_type: e.target.value })}
@@ -280,9 +267,7 @@ export default function Usuarios() {
 
                         {/* Número Documento */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Número de Documento *
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Número de Documento *</label>
                             <input
                                 type="text"
                                 value={newUserData.document_number}
@@ -296,9 +281,7 @@ export default function Usuarios() {
 
                         {/* Teléfono */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Teléfono
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
                             <input
                                 type="text"
                                 value={newUserData.phone}
@@ -310,9 +293,7 @@ export default function Usuarios() {
 
                         {/* Dirección */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Dirección
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Dirección</label>
                             <input
                                 type="text"
                                 value={newUserData.address}
@@ -324,9 +305,7 @@ export default function Usuarios() {
 
                         {/* Fecha Nacimiento */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Fecha de Nacimiento
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Fecha de Nacimiento</label>
                             <input
                                 type="date"
                                 value={newUserData.birth_date}
@@ -337,9 +316,7 @@ export default function Usuarios() {
 
                         {/* Rol */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Rol *
-                            </label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Rol *</label>
                             <select
                                 value={newUserData.role}
                                 onChange={(e) => setNewUserData({ ...newUserData, role: e.target.value })}
@@ -615,7 +592,7 @@ export default function Usuarios() {
                                             </span>
                                         </td>
 
-                                        {/* Acciones */}
+                                        {/* ✅ Acciones con control de permisos */}
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex justify-end space-x-2">
                                                 {editingUser === u.id ? (
@@ -637,30 +614,46 @@ export default function Usuarios() {
                                                     </>
                                                 ) : (
                                                     <>
-                                                        <button
-                                                            onClick={() => toggleActive(u.id, u.is_active)}
-                                                            className={`${u.is_active
-                                                                    ? 'text-orange-600 hover:text-orange-900 hover:bg-orange-50'
-                                                                    : 'text-green-600 hover:text-green-900 hover:bg-green-50'
-                                                                } p-2 rounded`}
-                                                            title={u.is_active ? 'Desactivar' : 'Activar'}
-                                                        >
-                                                            <Users className="h-4 w-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleEditClick(u)}
-                                                            className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded"
-                                                            title="Editar"
-                                                        >
-                                                            <Edit3 className="h-4 w-4" />
-                                                        </button>
-                                                        <button
-                                                            onClick={() => handleDelete(u.id)}
-                                                            className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded"
-                                                            title="Eliminar"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </button>
+                                                        {/* ✅ Toggle activo/inactivo - solo con permiso update */}
+                                                        {can.update && (
+                                                            <button
+                                                                onClick={() => toggleActive(u.id, u.is_active)}
+                                                                className={`${u.is_active
+                                                                        ? 'text-orange-600 hover:text-orange-900 hover:bg-orange-50'
+                                                                        : 'text-green-600 hover:text-green-900 hover:bg-green-50'
+                                                                    } p-2 rounded`}
+                                                                title={u.is_active ? 'Desactivar' : 'Activar'}
+                                                            >
+                                                                <Users className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                        
+                                                        {/* ✅ Editar - solo con permiso update */}
+                                                        {can.update && (
+                                                            <button
+                                                                onClick={() => handleEditClick(u)}
+                                                                className="text-blue-600 hover:text-blue-900 p-2 hover:bg-blue-50 rounded"
+                                                                title="Editar"
+                                                            >
+                                                                <Edit3 className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                        
+                                                        {/* ✅ Eliminar - solo con permiso delete */}
+                                                        {can.delete && (
+                                                            <button
+                                                                onClick={() => handleDelete(u.id)}
+                                                                className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded"
+                                                                title="Eliminar"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </button>
+                                                        )}
+                                                        
+                                                        {/* ✅ Mensaje cuando no hay permisos de acción */}
+                                                        {!can.update && !can.delete && (
+                                                            <span className="text-gray-400 text-xs italic px-2">Solo lectura</span>
+                                                        )}
                                                     </>
                                                 )}
                                             </div>

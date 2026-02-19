@@ -1,26 +1,21 @@
 <?php
-
 namespace App\Http\Controllers\Profesor;
 
 use App\Http\Controllers\Controller;
 use App\Models\Meeting;
+use App\Events\MeetingStarted;
+use App\Events\MeetingEnded;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Gate;
 
 class MeetingController extends Controller
 {
     private function assertOwnership(int $subjectId, int $groupId): void
     {
-        $userId = Auth::id();
-        $exists = DB::table('subject_group')
-            ->where('user_id', $userId)
-            ->where('subject_id', $subjectId)
-            ->where('group_id', $groupId)
-            ->exists();
-
-        abort_unless($exists, 403);
+        Gate::authorize('access-class', [$subjectId, $groupId]);
     }
 
     public function store(Request $request)
@@ -62,17 +57,23 @@ class MeetingController extends Controller
             'is_active' => true,
         ]);
 
+        // Disparar evento
+        event(new MeetingStarted($meeting));
+
         return Redirect::back()->with('success', 'Reunión creada exitosamente');
     }
 
     public function destroy(Meeting $meeting)
     {
-        $this->assertOwnership((int) $meeting->subject_id, (int) $meeting->group_id);
+        $this->authorize('end', $meeting);
 
         $meeting->update([
             'is_active' => false,
             'ended_at' => now()
         ]);
+
+        // Disparar evento
+        event(new MeetingEnded($meeting->id, $meeting->group_id, $meeting->subject_id));
 
         return Redirect::back()->with('success', 'Reunión finalizada exitosamente');
     }

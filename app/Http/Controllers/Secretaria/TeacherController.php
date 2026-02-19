@@ -10,11 +10,17 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\Gate;
 
 class TeacherController extends Controller
 {
     public function index(Request $request)
     {
+         // ✅ Verificar permiso directamente
+        if (!auth()->user()->can('teachers.view')) {
+            abort(403, 'No tienes permiso para ver profesores.');
+        }
+
         try {
             $query = User::role('profesor')
                 ->select('id', 'name', 'last_name', 'email', 'document_number', 'phone', 'is_active', 'created_at');
@@ -91,6 +97,9 @@ class TeacherController extends Controller
                 'asignaturas' => $asignaturas,
                 'grupos' => $grupos,
                 'filters' => $request->only(['search', 'subject_id', 'estado']),
+                  'can' => [
+                    'update' => auth()->user()->can('teachers.update'),
+                  ]
             ]);
         } catch (\Exception $e) {
             Log::error('Error al cargar profesores', [
@@ -109,15 +118,22 @@ class TeacherController extends Controller
                 'grupos' => Group::all(),
                 'filters' => [],
                 'error' => 'No se pudieron cargar los profesores.',
+                'can' => [
+                    'update' => false,
+                ]
             ]);
         }
     }
 
     public function update(Request $request, $id)
     {
-        try {
-            $profesor = User::role('profesor')->findOrFail($id);
+         $profesor = User::role('profesor')->findOrFail($id);
+ // ✅ Verificar permiso directamente
+        if (!auth()->user()->can('teachers.update')) {
+            abort(403, 'No tienes permiso para actualizar profesores.');
+        }
 
+        try {
             $validated = $request->validate([
                 'is_active' => 'required|boolean',
                 'asignaturas' => 'required|array|min:1',
@@ -175,8 +191,13 @@ class TeacherController extends Controller
 
     public function toggle(Request $request, $id)
     {
+ $profesor = User::role('profesor')->findOrFail($id);
+       // ✅ Verificar permiso directamente
+        if (!auth()->user()->can('teachers.update')) {
+            abort(403, 'No tienes permiso para cambiar el estado de profesores.');
+        } 
         try {
-            $profesor = User::role('profesor')->findOrFail($id);
+           
             $validated = $request->validate([
                 'is_active' => 'required|boolean',
             ]);

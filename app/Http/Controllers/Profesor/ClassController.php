@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Profesor;
 
 use App\Http\Controllers\Controller;
@@ -12,6 +11,7 @@ use App\Models\Folder;
 use App\Models\ClassFile;
 use App\Models\Meeting;
 use App\Models\Task;
+use Illuminate\Support\Facades\Gate; 
 
 class ClassController extends Controller
 {
@@ -61,6 +61,8 @@ class ClassController extends Controller
         $subjectId = (int) $request->query('subject_id');
         $groupId = (int) $request->query('group_id');
 
+        Gate::authorize('access-class', [$subjectId, $groupId]);
+
         // Obtener información de la clase
         $class = DB::table('subject_group as sg')
             ->join('subjects as s', 'sg.subject_id', '=', 's.id')
@@ -93,25 +95,74 @@ class ClassController extends Controller
             ->distinct()
             ->count('gu.user_id');
 
-        // Publicaciones
-        $publicaciones = Post::with('attachments')
+        // Publicaciones con información del autor
+        $publicaciones = Post::with(['attachments', 'user.roles'])
             ->where('subject_id', $subjectId)
             ->where('group_id', $groupId)
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->map(function ($post) {
+                // Obtener el rol del usuario
+                $userRole = $post->user->roles->first();
+                $roleName = $userRole ? $userRole->name : 'usuario';
+                
+                return [
+                    'id' => $post->id,
+                    'type' => $post->type,
+                    'title' => $post->title,
+                    'content' => $post->content,
+                    'created_at' => $post->created_at,
+                    'user_id' => $post->user_id,
+                    'author_name' => $post->user->name . ' ' . ($post->user->last_name ?? ''),
+                    'author_photo' => $post->user->photo
+                        ? asset('storage/' . $post->user->photo)
+                        : null,
+                    'author_role' => $roleName,
+                    'is_owner' => $post->user_id === auth()->id(),
+                    'attachments' => $post->attachments->map(function ($att) {
+                        return [
+                            'id' => $att->id,
+                            'type' => $att->type,
+                            'filename' => $att->filename,
+                            'path' => $att->path,
+                            'url' => $att->url,
+                            'created_at' => $att->created_at,
+                        ];
+                    }),
+                    'can' => [
+                        'update' => auth()->user()->can('update', $post),
+                        'delete' => auth()->user()->can('delete', $post),
+                    ]
+                ];
+            });
 
         // Carpetas con conteo de archivos
         $folders = Folder::where('subject_id', $subjectId)
             ->where('group_id', $groupId)
             ->withCount('files')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function ($folder) {
+                return array_merge($folder->toArray(), [
+                    'can' => [
+                        'update' => auth()->user()->can('update', $folder),
+                        'delete' => auth()->user()->can('delete', $folder),
+                    ]
+                ]);
+            });
 
         // Archivos
         $files = ClassFile::where('subject_id', $subjectId)
             ->where('group_id', $groupId)
             ->orderByDesc('created_at')
-            ->get();
+            ->get()
+            ->map(function ($file) {
+                return array_merge($file->toArray(), [
+                    'can' => [
+                        'delete' => auth()->user()->can('delete', $file),
+                    ]
+                ]);
+            });
 
         // Reunión activa
         $meeting = Meeting::where('subject_id', $subjectId)
@@ -119,7 +170,13 @@ class ClassController extends Controller
             ->where('is_active', true)
             ->first();
 
-        // ✅ NUEVO: Tareas
+        if ($meeting) {
+            $meetingData = $meeting->toArray();
+            $meetingData['can_end'] = auth()->user()->can('end', $meeting);
+            $meeting = $meetingData;
+        }
+
+        // Tareas
         $tasks = Task::with('attachments')
             ->where('subject_id', $subjectId)
             ->where('group_id', $groupId)
@@ -167,6 +224,12 @@ class ClassController extends Controller
                         'graded' => $graded,
                         'pending' => $totalStudents - $submitted,
                     ],
+                    'can' => [
+                        'update' => auth()->user()->can('update', $task),
+                        'delete' => auth()->user()->can('delete', $task),
+                        'view' => auth()->user()->can('view', $task),
+                        'grade' => auth()->user()->can('grade', $task),
+                    ],
                     'created_at' => $task->created_at,
                 ];
             });
@@ -179,6 +242,13 @@ class ClassController extends Controller
             'files' => $files,
             'meeting' => $meeting,
             'tasks' => $tasks,
+            'can' => [
+                'create_task' => $user->can('assignments.create'),
+                'create_post' => $user->can('posts.create'),
+                'create_folder' => $user->can('folders.create'), // Note: might need to check if these permissions exist in seeder
+                'create_file' => $user->can('files.create'),
+                'start_meeting' => $user->can('meetings.create'),
+            ]
         ]);
     }
 }
