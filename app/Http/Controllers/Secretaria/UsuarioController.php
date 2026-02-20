@@ -168,33 +168,27 @@ class UsuarioController extends Controller
         }
     }
 
-    /**
+   /**
      * Activar/Desactivar usuario
      */
     public function toggle(Request $request, $id)
-    {
-        $user = User::findOrFail($id);
-        
-        // ✅ Autorizar con Policy
-        $this->authorize('toggle', $user);
+{
+    $user = User::findOrFail($id);
 
-        try {
-            $user->update(['is_active' => $request->is_active]);
-
-            Log::info('Estado de usuario cambiado', [
-                'user_id' => $id,
-                'is_active' => $request->is_active,
-                'changed_by' => auth()->id(),
-            ]);
-
-            return back()->with('success', '🔄 Estado actualizado correctamente');
-        } catch (\Exception $e) {
-            Log::error('Error al cambiar estado', [
-                'user_id' => $id,
-                'error' => $e->getMessage(),
-            ]);
-
-            return back()->withErrors(['error' => '❌ Error al cambiar estado: ' . $e->getMessage()]);
-        }
+    if (!auth()->user()->can('users.update')) {
+        abort(403, 'No tienes permiso para cambiar el estado de usuarios.');
     }
+
+    // Protecciones manuales (reemplaza la policy)
+    if ($user->hasRole('rector') && !auth()->user()->hasRole('rector')) {
+        abort(403, 'No puedes modificar al Rector.');
+    }
+    if ($user->id === auth()->id()) {
+        abort(403, 'No puedes modificarte a ti mismo.');
+    }
+
+    $user->update(['is_active' => $request->is_active]);
+
+    return back()->with('success', '🔄 Estado actualizado correctamente');
+}
 }
