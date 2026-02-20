@@ -25,6 +25,7 @@ return new class extends Migration
             $table->date('birth_date')->nullable();
             $table->boolean('is_active')->default(true);
             $table->rememberToken();
+            $table->boolean('must_change_password')->default(false);
             $table->timestamps();
         });
 

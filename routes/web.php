@@ -4,11 +4,12 @@
     use Inertia\Inertia;
     use App\Http\Controllers\Auth\LoginController;
     use App\Http\Controllers\ProfileController;
+    use App\Http\Controllers\WelcomeController;
+
     use App\Http\Controllers\Secretaria\DashboardController;
     use App\Http\Controllers\Secretaria\UsuarioController;
     use App\Http\Controllers\Secretaria\StudentController;
     use App\Http\Controllers\Secretaria\GrupoController;
-  
     use App\Http\Controllers\Secretaria\TeacherController;
     use App\Http\Controllers\Secretaria\SubjectController;
 
@@ -51,9 +52,7 @@
         ->name('sanctum.csrf-cookie');
 
     // Página principal (pública)
-    Route::get('/', function () {
-        return Inertia::render('Welcome');
-    })->name('home');
+    Route::get('/', [WelcomeController::class, 'index'])->name('home');
 
     // Rutas de autenticación
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
@@ -61,7 +60,7 @@
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
     // Rutas protegidas por autenticación
-    Route::middleware(['auth'])->group(function () {
+    Route::middleware(['auth','check.password'])->group(function () {
         
         //RECTOR
         Route::middleware(['role:rector', 'log.activity'])->prefix('rector')->group(function () {

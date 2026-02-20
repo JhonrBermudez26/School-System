@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'log.activity' => \App\Http\Middleware\LogActivity::class,
+            'check.password' => \App\Http\Middleware\CheckPasswordChange::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

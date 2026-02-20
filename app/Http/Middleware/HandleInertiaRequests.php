@@ -97,8 +97,8 @@ class HandleInertiaRequests extends Middleware
                         'address' => $user->address,
                         'birth_date' => $user->birth_date,
                         'is_active' => $user->is_active,
+                        'must_change_password' => $user->must_change_password,
                         'roles' => $user->roles->pluck('name'),
-                        // ✅ CRÍTICO: Agregar grupos para notificaciones globales
                         'groups' => $userGroups,
                     ]
                     : null,

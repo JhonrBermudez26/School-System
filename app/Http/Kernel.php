@@ -63,5 +63,6 @@ class Kernel extends HttpKernel
         
         // Activity Logging
         'log.activity' => \App\Http\Middleware\LogActivity::class,
+        'check.password'     => \App\Http\Middleware\CheckPasswordChange::class,
     ];
 }
