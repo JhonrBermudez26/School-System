@@ -29,7 +29,7 @@ export default function Configuracion({ settings }) {
         jornada: settings?.jornada || 'Completa',
         nivel_educativo: settings?.nivel_educativo || '',
         caracter: settings?.caracter || 'Mixto',
-        min_grade: settings?.grading_scale?.min || 1.0,
+        min_grade: settings?.grading_scale?.min || 0.0,
         max_grade: settings?.grading_scale?.max || 5.0,
         passing_grade: settings?.grading_scale?.passing || 3.0,
         attendance_threshold: settings?.attendance_threshold || 80,

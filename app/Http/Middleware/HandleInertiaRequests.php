@@ -1,52 +1,31 @@
 <?php
 namespace App\Http\Middleware;
-
 use Illuminate\Http\Request;
 use Inertia\Middleware;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use App\Models\SchoolSetting;
 
 class HandleInertiaRequests extends Middleware
 {
-    /**
-     * The root template that's loaded on the first page visit.
-     *
-     * @see https://inertiajs.com/server-side-setup#root-template
-     *
-     * @var string
-     */
     protected $rootView = 'app';
 
-    /**
-     * Determines the current asset version.
-     *
-     * @see https://inertiajs.com/asset-versioning
-     */
     public function version(Request $request): ?string
     {
         return parent::version($request);
     }
 
-    /**
-     * Define the props that are shared by default.
-     *
-     * @see https://inertiajs.com/shared-data
-     *
-     * @return array<string, mixed>
-     */
     public function share(Request $request): array
     {
         $user = Auth::user();
         
-        // ✅ Obtener grupos del usuario con información completa para notificaciones
         $userGroups = [];
         
         if ($user) {
-            // Obtener el primer rol del usuario
             $roles = $user->roles->pluck('name')->toArray();
             $primaryRole = !empty($roles) ? $roles[0] : null;
             
-                if ($primaryRole === 'estudiante') {
+            if ($primaryRole === 'estudiante') {
                 $userGroups = DB::table('group_user')
                     ->join('groups', 'group_user.group_id', '=', 'groups.id')
                     ->join('subject_group', 'groups.id', '=', 'subject_group.group_id')
@@ -55,7 +34,7 @@ class HandleInertiaRequests extends Middleware
                     ->where('group_user.user_id', $user->id)
                     ->select(
                         'groups.id',
-                        'groups.nombre as group_name',     // ← aquí está el cambio importante
+                        'groups.nombre as group_name',
                         'subjects.id as subject_id',
                         'subjects.name as subject_name',
                         'users.name as teacher_name'
@@ -63,16 +42,14 @@ class HandleInertiaRequests extends Middleware
                     ->distinct()
                     ->get()
                     ->toArray();
-          } elseif ($primaryRole === 'profesor') {
-                // Para profesores: obtener grupos donde enseña
-                // ✅ CORREGIDO: usando grade_name en lugar de name
+            } elseif ($primaryRole === 'profesor') {
                 $userGroups = DB::table('subject_group')
                     ->join('groups', 'subject_group.group_id', '=', 'groups.id')
                     ->join('subjects', 'subject_group.subject_id', '=', 'subjects.id')
                     ->where('subject_group.user_id', $user->id)
                     ->select(
                         'groups.id',
-                        'groups.nombre as group_name', // ✅ Corregido
+                        'groups.nombre as group_name',
                         'subjects.id as subject_id',
                         'subjects.name as subject_name'
                     )
@@ -81,6 +58,9 @@ class HandleInertiaRequests extends Middleware
                     ->toArray();
             }
         }
+
+        // Logo del colegio para favicon y navbar
+        $school = SchoolSetting::first();
 
         return array_merge(parent::share($request), [
             'auth' => [
@@ -103,6 +83,11 @@ class HandleInertiaRequests extends Middleware
                     ]
                     : null,
             ],
+            'school' => $school ? [
+                'logo' => $school->logo_path ? '/storage/' . $school->logo_path : null,
+                'nombre' => $school->nombre_colegio,
+                'abreviacion' => $school->abreviacion,
+            ] : null,
         ]);
     }
 }

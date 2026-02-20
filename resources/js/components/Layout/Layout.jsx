@@ -13,7 +13,8 @@ import { NotificationProvider } from '../Notificationprovider';
 import UnifiedNotifications from '../UnifiedNotifications';
 
 export default function Layout({ title, children }) {
-  const { auth, app } = usePage().props;
+  const { auth, app, school } = usePage().props;
+  const schoolLogo = school?.logo || null;
   const currentUrl = usePage().url;
   const user = auth?.user;
   const [previewImage, setPreviewImage] = useState(user?.photo ? `/storage/${user.photo}` : null);
@@ -32,7 +33,11 @@ export default function Layout({ title, children }) {
 
   return (
     <NotificationProvider user={user}>
-      <Head title={title ? `${title} | ${appName}` : appFullName} />
+      <Head title={title ? `${title} | ${appName}` : appFullName}>
+        {schoolLogo && (
+          <link rel="icon" type="image/png" href={schoolLogo} />
+        )}
+      </Head>
       <div className="min-h-screen bg-gray-50 flex flex-col">
 
         {/* Navbar */}
@@ -45,9 +50,17 @@ export default function Layout({ title, children }) {
                 className="flex items-center gap-2 cursor-pointer group"
                 onClick={navigateToDashboard}
               >
-                <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-1.5 rounded-lg shadow-sm group-hover:shadow-md transition-shadow">
-                  <GraduationCap className="h-6 w-6 text-white" />
-                </div>
+                {schoolLogo ? (
+                  <img
+                    src={schoolLogo}
+                    alt={appName}
+                    className="h-9 w-9 rounded-lg object-contain shadow-sm group-hover:shadow-md transition-shadow flex-shrink-0"
+                  />
+                ) : (
+                  <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-1.5 rounded-lg shadow-sm group-hover:shadow-md transition-shadow">
+                    <GraduationCap className="h-6 w-6 text-white" />
+                  </div>
+                )}
                 <span className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
                   {appName}
                 </span>
