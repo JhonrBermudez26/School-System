@@ -51,7 +51,7 @@ export default function Configuracion({ settings }) {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post(route('rector.institucion.update'), { forceFormData: true });
+        post(route('rector.configuracion.actualizar'), { forceFormData: true });
     };
 
     const removeLogo = () => {

@@ -25,6 +25,7 @@ class User extends Authenticatable
         'is_active',
         'suspended_at',
         'suspended_reason',
+        'must_change_password',
         'last_login_at',
     ];
 

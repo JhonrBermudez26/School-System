@@ -42,7 +42,7 @@
     use App\Http\Controllers\Coordinadora\BoletinController;
 
     use App\Http\Controllers\Rector\RectorDashboardController;
-    use App\Http\Controllers\Rector\InstitutionController;
+    use App\Http\Controllers\Rector\SchoolSettingController;
     use App\Http\Controllers\Rector\RoleManagementController;
     use App\Http\Controllers\Rector\UserManagementController;
     use App\Http\Controllers\Rector\AuditController;
@@ -71,11 +71,11 @@
 
             // GESTIÓN INSTITUCIONAL
             Route::middleware(['permission:institution.update'])->group(function () {
-                Route::get('/configuracion', [InstitutionController::class, 'index'])->name('rector.configuracion');
-                Route::post('/configuracion', [InstitutionController::class, 'update'])->name('rector.configuracion.actualizar');
-                Route::post('/configuracion/grading-scale', [InstitutionController::class, 'configureGradingScale'])->name('rector.configuracion.grading-scale');
-                Route::post('/configuracion/approval-criteria', [InstitutionController::class, 'configureApprovalCriteria'])->name('rector.configuracion.approval-criteria');
-                Route::post('/configuracion/logo', [InstitutionController::class, 'uploadLogo'])->name('rector.configuracion.upload-logo');
+                Route::get('/configuracion', [SchoolSettingController::class, 'index'])->name('rector.configuracion');
+                Route::post('/configuracion', [SchoolSettingController::class, 'update'])->name('rector.configuracion.actualizar');
+                Route::post('/configuracion/grading-scale', [SchoolSettingController::class, 'configureGradingScale'])->name('rector.configuracion.grading-scale');
+                Route::post('/configuracion/approval-criteria', [SchoolSettingController::class, 'configureApprovalCriteria'])->name('rector.configuracion.approval-criteria');
+                Route::post('/configuracion/logo', [SchoolSettingController::class, 'uploadLogo'])->name('rector.configuracion.upload-logo');
             });
 
             // GESTIÓN DE ROLES Y PERMISOS
