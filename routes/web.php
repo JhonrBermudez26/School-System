@@ -40,6 +40,7 @@
     use App\Http\Controllers\Coordinadora\AttendanceSupervisionController;
     use App\Http\Controllers\Coordinadora\DisciplineRecordController;
     use App\Http\Controllers\Coordinadora\BoletinController;
+    use App\Http\Controllers\Coordinadora\Coordinadoradashboardcontroller;
 
     use App\Http\Controllers\Rector\RectorDashboardController;
     use App\Http\Controllers\Rector\SchoolSettingController;
@@ -154,9 +155,8 @@
         Route::middleware(['role:coordinadora', 'log.activity'])->prefix('coordinadora')->group(function () {
 
             // Dashboard
-            Route::get('/dashboard', function () {
-                return Inertia::render('Coordinadora/Dashboard');
-            })->name('coordinadora.dashboard');
+           Route::get('/dashboard', [CoordinadoraDashboardController::class, 'index'])
+            ->name('coordinadora.dashboard');
 
             // HORARIOS
             Route::middleware(['permission:schedules.view'])->group(function () {
