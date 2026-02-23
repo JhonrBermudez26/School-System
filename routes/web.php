@@ -33,6 +33,7 @@
     use App\Http\Controllers\Estudiante\ScheduleEstudentController;
     use App\Http\Controllers\Estudiante\AsistenciasEstudentController;
     use App\Http\Controllers\Estudiante\MisNotasController;
+    use App\Http\Controllers\Estudiante\EstudianteDisciplinaController;
 
     use App\Http\Controllers\Coordinadora\ScheduleController;
     use App\Http\Controllers\Coordinadora\PeriodController;
@@ -567,6 +568,10 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
             ->name('submissions.delete')->middleware('can:delete,submission');
     });
 
+Route::middleware(['permission:discipline.view'])->group(function () {
+    Route::get('/disciplina', [EstudianteDisciplinaController::class, 'index'])
+        ->name('estudiante.disciplina');
+});
 
     // CHAT
     Route::get('/chat', [EstudianteChatController::class, 'index'])

@@ -67,6 +67,7 @@ export default function SidebarMenu({ role }) {
       { icon: Calendar, label: "Horario", path: "/estudiante/horario" },
       { icon: ClipboardList, label: "Mis notas", path: "/estudiante/notas" },
       { icon: UserCheck, label: "Mis asistencias", path: "/estudiante/asistencias" },
+      { icon: Scale, label: "Mi disciplina", path: "/estudiante/disciplina" },
     ],
   };
 

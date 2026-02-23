@@ -24,7 +24,7 @@ class RolePermissionSeeder extends Seeder
             'users.force_logout', 'users.reset_password',
             
             // Estudiantes
-            'students.view', 'students.create', 'students.update', 'students.delete',
+            'students.view', 'students.create', 'students.update', 'students.delete', 
             
             // Docentes
             'teachers.view', 'teachers.create', 'teachers.update', 'teachers.delete',
@@ -312,6 +312,9 @@ class RolePermissionSeeder extends Seeder
             
             // Chat
             'chat.use',
+
+            //disciplina
+            'discipline.view',
         ]);
 
         $this->command->info('✅ Roles y permisos creados correctamente');
