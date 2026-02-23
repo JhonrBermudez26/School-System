@@ -250,6 +250,13 @@
                     ->name('coordinadora.boletines.vista-previa');
             });
             
+            Route::middleware(['permission:bulletins.confirm'])->group(function () {
+                Route::patch('/boletines/{id}/confirmar', [BoletinController::class, 'confirmar'])
+                    ->name('coordinadora.boletines.confirmar');
+                Route::post('/boletines/confirmar-todos', [BoletinController::class, 'confirmarTodos'])
+                    ->name('coordinadora.boletines.confirmar-todos');
+            });
+            
             Route::middleware(['permission:bulletins.generate'])->group(function () {
                 // Generar todos los boletines pendientes de un periodo
                 Route::post('/boletines/generar-todos', [BoletinController::class, 'generarTodos'])

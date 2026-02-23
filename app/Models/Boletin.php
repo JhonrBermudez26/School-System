@@ -29,12 +29,17 @@ class Boletin extends Model
         'estado',
         'fecha_generacion',
         'archivo_path',
+        'confirmado',
+        'fecha_confirmacion',
+        'confirmado_por',
     ];
 
     protected $casts = [
         'promedio_general' => 'decimal:2',
         'porcentaje_asistencia' => 'decimal:2',
         'fecha_generacion' => 'datetime',
+        'confirmado' => 'boolean',
+        'fecha_confirmacion' => 'datetime',
     ];
 
     // ==================== RELACIONES ====================
@@ -142,4 +147,25 @@ class Boletin extends Model
     {
         return $this->promedio_general >= 3.0;
     }
+
+    public function confirmar(int $userId): bool
+{
+    $this->confirmado = true;
+    $this->fecha_confirmacion = now();
+    $this->confirmado_por = $userId;
+    return $this->save();
+}
+
+public function desconfirmar(): bool
+{
+    $this->confirmado = false;
+    $this->fecha_confirmacion = null;
+    $this->confirmado_por = null;
+    return $this->save();
+}
+
+public function confirmadoPor()
+{
+    return $this->belongsTo(User::class, 'confirmado_por');
+}
 }

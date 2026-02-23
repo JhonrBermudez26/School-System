@@ -50,7 +50,7 @@ export default function SidebarMenu({ role }) {
       { icon: Book, label: "Gestionar Asignaturas", path: "/secretaria/asignaturas" },
       { icon: ClipboardList, label: "Gestionar Grupos", path: "/secretaria/grupos" },
       { icon: Calendar, label: "Horarios", path: "/secretaria/horarios" },
-      { icon: FileText, label: "Generar boletines", path: "/secretaria/boletines", module: "boletines" },
+      { icon: FileText, label: "Boletines confirmados", path: "/secretaria/boletines", module: "boletines" },
     ],
     profesor: [
       { icon: GraduationCap, label: "Inicio", path: "/profesor/dashboard" },

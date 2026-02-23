@@ -72,7 +72,7 @@ class RolePermissionSeeder extends Seeder
             'reports.institutional', 'reports.performance',
             
             // Boletines
-            'bulletins.view', 'bulletins.generate', 'bulletins.download',
+            'bulletins.view', 'bulletins.generate', 'bulletins.download','bulletins.confirm',
             
             // Disciplina
             'discipline.create', 'discipline.update', 'discipline.view', 'discipline.close',
@@ -171,6 +171,7 @@ class RolePermissionSeeder extends Seeder
             'bulletins.view',
             'bulletins.generate',
             'bulletins.download',
+            'bulletins.confirm',
             
             // Auditoría
             'audit_logs.view',

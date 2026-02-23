@@ -38,6 +38,11 @@ class BoletinController extends Controller
                 'nombre' => $p->name,
                 'fecha_inicio' => $p->start_date->format('Y-m-d'),
                 'fecha_fin' => $p->end_date->format('Y-m-d'),
+                'confirmado' => $p->confirmado,
+                'fecha_confirmacion' => $p->fecha_confirmacion?->format('d/m/Y H:i'),
+                'confirmado_por' => $p->confirmadoPor 
+                    ? $p->confirmadoPor->name . ' ' . $p->confirmadoPor->last_name 
+                    : null,
             ]);
 
         // Obtener grupos
@@ -81,7 +86,11 @@ class BoletinController extends Controller
                 'aprobo' => $boletin->aprobo,
             ];
         });
+        $user = auth()->user();
 
+        if ($user->hasRole('secretaria')) {
+            $query->where('confirmado', true)->where('estado', 'generado');
+        }
         // Estadísticas
         $stats = [
             'total' => $boletines->count(),
@@ -107,6 +116,7 @@ class BoletinController extends Controller
                 'generate' => auth()->user()->can('bulletins.generate'),
                 'download' => auth()->user()->can('bulletins.download'),
                 'update_observations' => auth()->user()->can('bulletins.update_observations'),
+                'confirm' => auth()->user()->can('bulletins.confirm'),
             ]
         ]);
     }
@@ -296,6 +306,43 @@ class BoletinController extends Controller
 
         return back()->with('success', 'Observaciones actualizadas correctamente');
     }
+
+    /**
+ * Confirmar boletín (habilita acceso a secretaria y estudiante)
+ */
+public function confirmar($id)
+{
+    $this->authorize('confirm', Boletin::class);
+
+    $boletin = Boletin::findOrFail($id);
+
+    if (!$boletin->isGenerado()) {
+        return back()->withErrors(['error' => 'Solo se pueden confirmar boletines ya generados']);
+    }
+
+    $boletin->confirmar(auth()->id());
+
+    return back()->with('success', 'Boletín confirmado y habilitado para descarga');
+}
+
+/**
+ * Confirmar todos los boletines generados de un periodo
+ */
+public function confirmarTodos(Request $request)
+{
+    $this->authorize('confirm', Boletin::class);
+
+    $request->validate(['periodo_id' => 'required|exists:academic_periods,id']);
+
+    $total = Boletin::where('academic_period_id', $request->periodo_id)
+        ->where('estado', 'generado')
+        ->where('confirmado', false)
+        ->get()
+        ->each(fn($b) => $b->confirmar(auth()->id()))
+        ->count();
+
+    return back()->with('success', "{$total} boletines confirmados y habilitados para descarga");
+}
 
     /**
      * Generar documento DOCX con formato colombiano
