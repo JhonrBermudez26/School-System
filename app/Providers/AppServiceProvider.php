@@ -8,6 +8,12 @@ use Illuminate\Support\Facades\Schema;
 use App\Models\AcademicPeriod;
 use App\Observers\AcademicPeriodObserver;
 
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Http\Request;
+
+
+
 class AppServiceProvider extends ServiceProvider
 {
     /**
@@ -44,5 +50,53 @@ class AppServiceProvider extends ServiceProvider
                 'boletines' => (bool) ($settings?->tiene_boletines ?? true),
             ],
         ]);
+        $this->configureRateLimiting();
     }
+
+    /**
+     * Configura los rate limiters de la aplicación
+     */
+    protected function configureRateLimiting(): void
+    {
+        // Login - muy restrictivo
+        RateLimiter::for('login', function (Request $request) {
+            return Limit::perMinute(5)->by($request->ip());
+        });
+
+        // Chat (mensajes) - profesor y estudiante
+        RateLimiter::for('chat', function (Request $request) {
+            return Limit::perMinute(40)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Creación / edición de contenido (posts, tareas, comentarios, etc)
+        RateLimiter::for('create-content', function (Request $request) {
+            return Limit::perMinute(20)->by($request->user()?->id);
+        });
+
+        // Subida de archivos y operaciones pesadas
+        RateLimiter::for('upload', function (Request $request) {
+            return Limit::perMinute(12)->by($request->user()?->id);
+        });
+
+        // Entrega / submit de tareas por estudiantes
+        RateLimiter::for('task-submit', function (Request $request) {
+            return Limit::perMinute(12)->by($request->user()?->id);
+        });
+
+        // Acciones masivas / bulk (asistencias masivas, generar boletines, etc)
+        RateLimiter::for('bulk-action', function (Request $request) {
+            return Limit::perMinute(8)->by($request->user()?->id);
+        });
+
+        // Acciones muy sensibles (suspender usuarios, reset password, force logout, etc)
+        RateLimiter::for('sensitive', function (Request $request) {
+            return Limit::perMinute(5)->by($request->user()?->id ?: $request->ip());
+        });
+
+        // Límite general para usuarios autenticados (seguridad extra)
+        RateLimiter::for('authenticated', function (Request $request) {
+            return Limit::perMinute(200)->by($request->user()?->id);
+        });
+    }
+    
 }

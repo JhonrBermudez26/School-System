@@ -58,11 +58,11 @@
 
     // Rutas de autenticación
     Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
-    Route::post('/login', [LoginController::class, 'login']);
+    Route::post('/login', [LoginController::class, 'login'])->middleware('throttle:login');
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 
     // Rutas protegidas por autenticación
-    Route::middleware(['auth','check.password'])->group(function () {
+    Route::middleware(['auth','check.password', 'throttle:authenticated'])->group(function () {
         
         //RECTOR
         Route::middleware(['role:rector', 'log.activity'])->prefix('rector')->group(function () {
@@ -98,12 +98,12 @@
             ->name('rector.usuarios.history');
             });
 
-        Route::middleware(['permission:users.activate'])->group(function () {
+        Route::middleware(['permission:users.activate', 'throttle:sensitive'])->group(function () {
             Route::post('/usuarios/{id}/activate', [UserManagementController::class, 'activate'])
                 ->name('rector.usuarios.activate');
         });
 
-        Route::middleware(['permission:users.suspend'])->group(function () {
+        Route::middleware(['permission:users.suspend', 'throttle:sensitive'])->group(function () {
             Route::post('/usuarios/{id}/suspend', [UserManagementController::class, 'suspend'])
                 ->name('rector.usuarios.suspend');
             Route::post('/usuarios/{id}/force-logout', [UserManagementController::class, 'forceLogout'])
@@ -115,7 +115,7 @@
                 ->name('rector.usuarios.role');
         });
 
-        Route::middleware(['permission:users.reset_password'])->group(function () {
+        Route::middleware(['permission:users.reset_password', 'throttle:sensitive'])->group(function () {
             Route::post('/usuarios/{id}/reset-password', [UserManagementController::class, 'resetPassword'])
                 ->name('rector.usuarios.reset-password');
         });
@@ -217,7 +217,7 @@
             });
 
             // CONTROL DE ASISTENCIA (SUPERVISIÓN)
-            Route::middleware(['permission:attendance.view_all'])->group(function () {
+            Route::middleware(['permission:attendance.view_all', 'throttle:bulk-action'])->group(function () {
                 Route::get('/asistencia', [AttendanceSupervisionController::class, 'index'])->name('coordinadora.asistencia');
                 Route::get('/asistencia/global', [AttendanceSupervisionController::class, 'globalAttendance'])->name('coordinadora.asistencia.global');
                 Route::get('/asistencia/grupo/{id}', [AttendanceSupervisionController::class, 'byGroup'])->name('coordinadora.asistencia.grupo');
@@ -250,14 +250,14 @@
                     ->name('coordinadora.boletines.vista-previa');
             });
             
-            Route::middleware(['permission:bulletins.confirm'])->group(function () {
+            Route::middleware(['permission:bulletins.confirm','throttle:bulk-action'])->group(function () {
                 Route::patch('/boletines/{id}/confirmar', [BoletinController::class, 'confirmar'])
                     ->name('coordinadora.boletines.confirmar');
                 Route::post('/boletines/confirmar-todos', [BoletinController::class, 'confirmarTodos'])
                     ->name('coordinadora.boletines.confirmar-todos');
             });
             
-            Route::middleware(['permission:bulletins.generate'])->group(function () {
+            Route::middleware(['permission:bulletins.generate', 'throttle:bulk-action'])->group(function () {
                 // Generar todos los boletines pendientes de un periodo
                 Route::post('/boletines/generar-todos', [BoletinController::class, 'generarTodos'])
                     ->name('coordinadora.boletines.generar-todos');
@@ -280,7 +280,7 @@
 
         //SECRETARIA
         // SECRETARIA - con permisos específicos
-Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(function () {
+Route::middleware(['role:secretaria'])->prefix('secretaria')->group(function () {
     
     // Dashboard
     Route::get('/dashboard', [DashboardController::class, 'index'])
@@ -292,12 +292,12 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
             ->name('secretaria.usuarios');
     });
     
-    Route::middleware(['permission:users.create'])->group(function () {
+    Route::middleware(['permission:users.create','throttle:create-content'])->group(function () {
         Route::post('/usuarios', [UsuarioController::class, 'store'])
             ->name('usuarios.store');
     });
     
-    Route::middleware(['permission:users.update'])->group(function () {
+    Route::middleware(['permission:users.update', 'permission:users.update','throttle:create-content'])->group(function () {
         Route::put('/usuarios/{id}', [UsuarioController::class, 'update'])
             ->name('usuarios.update');
         Route::put('/usuarios/{id}/toggle', [UsuarioController::class, 'toggle'])
@@ -424,16 +424,20 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
                 ->name('profesor.chat.show');
             
             Route::post('/chat/{id}/message', [ChatController::class, 'sendMessage'])
-                ->name('profesor.chat.message');
+                ->name('profesor.chat.message')
+                ->middleware('throttle:chat');
             
             Route::post('/chat/{id}/read', [ChatController::class, 'markAsRead'])
-                ->name('profesor.chat.read');
+                ->name('profesor.chat.read')
+                ->middleware('throttle:chat');
             
             Route::delete('/chat/message/{id}', [ChatController::class, 'deleteMessage'])
-                ->name('profesor.chat.delete-message');
+                ->name('profesor.chat.delete-message')
+                ->middleware('throttle:chat');
             
             Route::post('/chat/{id}/leave', [ChatController::class, 'leaveGroup'])
-                ->name('profesor.chat.leave');
+                ->name('profesor.chat.leave')
+                ->middleware('throttle:chat');
             
             Route::post('/chat/{id}/add-participant', [ChatController::class, 'addParticipant'])
                 ->name('profesor.chat.addParticipant');
@@ -442,10 +446,12 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
                 ->name('profesor.chat.update-group');
 
             Route::put('/chat/message/{id}/edit', [ChatController::class, 'editMessage'])
-                ->name('profesor.chat.edit-message');
+                ->name('profesor.chat.edit-message')
+                ->middleware('throttle:chat');
 
             Route::delete('/chat/message/{id}', [ChatController::class, 'deleteMessage'])
-                ->name('profesor.chat.delete-message');
+                ->name('profesor.chat.delete-message')
+                ->middleware('throttle:chat');
 
             Route::delete('/chat/conversation/{id}', [ChatController::class, 'deleteConversation'])
                 ->name('profesor.chat.delete-conversation');
@@ -456,21 +462,21 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
             
             // Publicaciones (CRUD)
             Route::get('/posts', [PostController::class, 'index'])->name('profesor.posts.index')->middleware('permission:posts.view');
-            Route::post('/posts', [PostController::class, 'store'])->name('profesor.posts.store')->middleware('permission:posts.create');
+            Route::post('/posts', [PostController::class, 'store'])->name('profesor.posts.store')->middleware(['permission:posts.create','throttle:create-content']);
             Route::put('/posts/{post}', [PostController::class, 'update'])->name('profesor.posts.update')->middleware('can:update,post');
             Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('profesor.posts.destroy')->middleware('can:delete,post');
             
             // Carpetas (CRUD)
-            Route::post('/clases/folders', [FolderController::class, 'store'])->name('profesor.folders.store')->middleware('permission:posts.create');
+            Route::post('/clases/folders', [FolderController::class, 'store'])->name('profesor.folders.store')->middleware(['permission:posts.create','throttle:create-content']);
             Route::put('/clases/folders/{folder}', [FolderController::class, 'update'])->name('profesor.folders.update')->middleware('can:update,folder');
             Route::delete('/clases/folders/{folder}', [FolderController::class, 'destroy'])->name('profesor.folders.destroy')->middleware('can:delete,folder');
             
             // Archivos (CRUD)
-            Route::post('/clases/files', [FileController::class, 'store'])->name('profesor.files.store')->middleware('permission:posts.create');
+            Route::post('/clases/files', [FileController::class, 'store'])->name('profesor.files.store')->middleware(['permission:posts.create','throttle:upload']);
             Route::delete('/clases/files/{file}', [FileController::class, 'destroy'])->name('profesor.files.destroy')->middleware('can:delete,file');
             
             // Reuniones (CRUD)
-            Route::post('/clases/meetings', [MeetingController::class, 'store'])->name('profesor.meetings.store')->middleware('permission:meetings.create');
+            Route::post('/clases/meetings', [MeetingController::class, 'store'])->name('profesor.meetings.store')->middleware(['permission:meetings.create','throttle:create-content']);
             Route::delete('/clases/meetings/{meeting}', [MeetingController::class, 'destroy'])->name('profesor.meetings.destroy')->middleware('can:end,meeting');
         
         // TAREAS
@@ -479,16 +485,16 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
         Route::get('/tasks', [TaskController::class, 'index'])->name('tasks.index')->middleware('permission:assignments.view');
         
         // Crear tarea
-        Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store')->middleware('permission:assignments.create');
+        Route::post('/tasks', [TaskController::class, 'store'])->name('tasks.store')->middleware(['permission:assignments.create','throttle:create-content']);
         
         // Ver detalle de tarea
         Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show')->middleware('can:view,task');
         
         // Actualizar tarea
-        Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update')->middleware('can:update,task');
+        Route::put('/tasks/{task}', [TaskController::class, 'update'])->name('tasks.update')->middleware(['can:update,task','throttle:update']);
         
         // Eliminar tarea
-        Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy')->middleware('can:delete,task');
+        Route::delete('/tasks/{task}', [TaskController::class, 'destroy'])->name('tasks.destroy')->middleware(['can:delete,task','throttle:update']);
         
         // Eliminar adjunto de tarea
         Route::delete('/tasks/attachments/{attachment}', [TaskController::class, 'deleteAttachment'])
@@ -511,9 +517,9 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
              Route::get('/asistencias', [AsistenciasController::class, 'index'])
                  ->name('profesor.asistencias')->middleware('permission:attendances.view');
              Route::post('/asistencias/bulk', [AsistenciasController::class, 'bulkStore'])
-                 ->name('profesor.asistencias.bulk')->middleware('permission:attendances.create');
+                 ->name('profesor.asistencias.bulk')->middleware(['permission:attendances.create','throttle:bulk-action']);
              Route::delete('/asistencias/{id}', [AsistenciasController::class, 'destroy'])
-                 ->name('profesor.asistencias.destroy')->middleware('permission:attendances.update');
+                 ->name('profesor.asistencias.destroy')->middleware([   'permission:attendances.update','throttle:update']);
  
  
              // REGISTRAR NOTAS - RUTAS COMPLETAS
@@ -541,7 +547,7 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
             Route::get('/clases/{subject_id}/{group_id}', [EstudianteClasesController::class, 'show'])->name('estudiante.clases.show');
                     
             // Publicaciones
-            Route::post('/posts', [EstudiantePostController::class, 'store'])->name('estudiante.posts.store')->middleware('permission:posts.create');
+            Route::post('/posts', [EstudiantePostController::class, 'store'])->name('estudiante.posts.store')->middleware(['permission:posts.create','throttle:create-content']);
             Route::put('/posts/{post}', [EstudiantePostController::class, 'update'])->name('estudiante.posts.update')->middleware('can:update,post');
             Route::delete('/posts/{post}', [EstudiantePostController::class, 'destroy'])->name('estudiante.posts.destroy')->middleware('can:delete,post');
                     
@@ -556,7 +562,7 @@ Route::middleware(['auth', 'role:secretaria'])->prefix('secretaria')->group(func
         Route::get('/{task}', [EstudianteTaskController::class, 'show'])->name('show')->middleware('can:view,task');
         
         // Enviar o editar entrega
-        Route::post('/submit', [EstudianteTaskController::class, 'submit'])->name('submit')->middleware('permission:assignments.submit');
+        Route::post('/submit', [EstudianteTaskController::class, 'submit'])->name('submit')->middleware(['permission:assignments.submit','throttle:task-submit']);
         
         // Obtener compañeros disponibles
         Route::get('/{task}/available-classmates', [EstudianteTaskController::class, 'getAvailableClassmates'])
@@ -597,13 +603,16 @@ Route::middleware(['permission:discipline.view'])->group(function () {
         ->name('estudiante.chat.show');
     
     Route::post('/chat/{id}/message', [EstudianteChatController::class, 'sendMessage'])
-        ->name('estudiante.chat.message');
+        ->name('estudiante.chat.message')
+         ->middleware('throttle:chat'); 
     
     Route::post('/chat/{id}/read', [EstudianteChatController::class, 'markAsRead'])
-        ->name('estudiante.chat.read');
+        ->name('estudiante.chat.read')
+         ->middleware('throttle:chat'); 
     
     Route::delete('/chat/message/{id}', [EstudianteChatController::class, 'deleteMessage'])
-        ->name('estudiante.chat.delete-message');
+        ->name('estudiante.chat.delete-message')
+         ->middleware('throttle:chat'); 
     
     Route::post('/chat/{id}/leave', [EstudianteChatController::class, 'leaveGroup'])
         ->name('estudiante.chat.leave');
@@ -615,7 +624,8 @@ Route::middleware(['permission:discipline.view'])->group(function () {
         ->name('estudiante.chat.update-group');
         
     Route::put('/chat/message/{id}/edit', [EstudianteChatController::class, 'editMessage'])
-        ->name('estudiante.chat.edit-message');
+        ->name('estudiante.chat.edit-message')
+         ->middleware('throttle:chat'); 
         
     Route::delete('/chat/conversation/{id}', [EstudianteChatController::class, 'deleteConversation'])
         ->name('estudiante.chat.delete-conversation');
@@ -651,12 +661,11 @@ Route::middleware(['permission:discipline.view'])->group(function () {
         //GET EDITAR
         Route::get('/perfil/editar', function () {
         return inertia('Perfil/EditarPerfil');
-        })->middleware(['auth'])->name('perfil.editar');
+    })->name('perfil.editar');
 
-        //POST EDITAR
-        Route::post('/perfil/actualizar', [ProfileController::class, 'update'])
-        ->middleware(['auth'])
-        ->name('perfil.update');
+    Route::post('/perfil/actualizar', [ProfileController::class, 'update'])
+        ->name('perfil.update')
+        ->middleware('throttle:create-content');
 
     });
 
