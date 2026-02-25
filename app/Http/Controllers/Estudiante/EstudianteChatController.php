@@ -454,9 +454,9 @@ class EstudianteChatController extends Controller
 
         if ($request->hasFile('file')) {
             if ($messageType === 'audio') {
-                $attachment = $request->file('file')->store('chat_audios', 'public');
+                $attachment = $request->file('file')->store('chat_audios', 'private');
             } else {
-                $attachment = $request->file('file')->store('chat_files', 'public');
+                $attachment = $request->file('file')->store('chat_files', 'private');
                 $messageType = 'file';
             }
         }
@@ -569,7 +569,7 @@ class EstudianteChatController extends Controller
 
         if ($data['delete_for'] === 'everyone') {
             if ($message->attachment && in_array($message->type, ['file', 'audio'])) {
-                Storage::disk('public')->delete($message->attachment);
+                Storage::disk('private')->delete($message->attachment);
             }
             $message->body       = 'Este mensaje fue eliminado';
             $message->deleted    = true;

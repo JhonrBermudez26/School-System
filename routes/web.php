@@ -465,6 +465,7 @@ Route::middleware(['role:secretaria'])->prefix('secretaria')->group(function () 
             Route::post('/posts', [PostController::class, 'store'])->name('profesor.posts.store')->middleware(['permission:posts.create','throttle:create-content']);
             Route::put('/posts/{post}', [PostController::class, 'update'])->name('profesor.posts.update')->middleware('can:update,post');
             Route::delete('/posts/{post}', [PostController::class, 'destroy'])->name('profesor.posts.destroy')->middleware('can:delete,post');
+            Route::get('/attachments/{attachment}/download',[PostController::class, 'download']);
             
             // Carpetas (CRUD)
             Route::post('/clases/folders', [FolderController::class, 'store'])->name('profesor.folders.store')->middleware(['permission:posts.create','throttle:create-content']);
@@ -473,6 +474,7 @@ Route::middleware(['role:secretaria'])->prefix('secretaria')->group(function () 
             
             // Archivos (CRUD)
             Route::post('/clases/files', [FileController::class, 'store'])->name('profesor.files.store')->middleware(['permission:posts.create','throttle:upload']);
+            Route::get('/files/{file}/download', [FileController::class, 'download']);
             Route::delete('/clases/files/{file}', [FileController::class, 'destroy'])->name('profesor.files.destroy')->middleware('can:delete,file');
             
             // Reuniones (CRUD)
@@ -550,6 +552,7 @@ Route::middleware(['role:secretaria'])->prefix('secretaria')->group(function () 
             Route::post('/posts', [EstudiantePostController::class, 'store'])->name('estudiante.posts.store')->middleware(['permission:posts.create','throttle:create-content']);
             Route::put('/posts/{post}', [EstudiantePostController::class, 'update'])->name('estudiante.posts.update')->middleware('can:update,post');
             Route::delete('/posts/{post}', [EstudiantePostController::class, 'destroy'])->name('estudiante.posts.destroy')->middleware('can:delete,post');
+            Route::get('/attachments/{attachment}/download',[EstudiantePostController::class, 'download']);
                     
             // Tareas - Rutas existentes
 

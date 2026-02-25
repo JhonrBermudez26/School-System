@@ -457,9 +457,9 @@ public function createConversation(Request $request)
         
         if ($request->hasFile('file')) {
             if ($messageType === 'audio') {
-                $attachment = $request->file('file')->store('chat_audios', 'public');
+                $attachment = $request->file('file')->store('chat_audios', 'private');
             } else {
-                $attachment = $request->file('file')->store('chat_files', 'public');
+                $attachment = $request->file('file')->store('chat_files', 'private');
                 $messageType = 'file';
             }
         }
@@ -576,7 +576,7 @@ public function deleteMessage(Request $request, $messageId)
     if ($data['delete_for'] === 'everyone') {
         // Eliminar para todos: marcar como deleted=true
         if ($message->attachment && in_array($message->type, ['file', 'audio'])) {
-            Storage::disk('public')->delete($message->attachment);
+            Storage::disk('private')->delete($message->attachment);
         }
         $message->body       = 'Este mensaje fue eliminado';
         $message->deleted    = true;  // ← booleano, no string

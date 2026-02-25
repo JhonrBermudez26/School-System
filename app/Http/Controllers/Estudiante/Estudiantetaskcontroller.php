@@ -366,7 +366,7 @@ class EstudianteTaskController extends Controller
             if ($request->hasFile('files')) {
                 foreach ($request->file('files') as $file) {
                     if ($file->isValid()) {
-                        $path = $file->store('submissions/' . $submission->id, 'public');
+                        $path = $file->store('submissions/' . $submission->id, 'private');
 
                         TaskSubmissionFile::create([
                             'submission_id' => $submission->id,

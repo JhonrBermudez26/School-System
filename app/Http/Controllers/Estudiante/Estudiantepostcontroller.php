@@ -44,7 +44,20 @@ class EstudiantePostController extends Controller
             'title' => 'required|string|max:255',
             'content' => 'nullable|string',
             'files' => 'sometimes|array',
-            'files.*' => 'file|max:20480', // 20MB max
+            'files.*' => [  
+            'file',
+            'max:20480', // 20MB
+            'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt',
+            'mimetypes:
+                application/pdf,
+                application/msword,
+                application/vnd.openxmlformats-officedocument.wordprocessingml.document,
+                application/vnd.ms-excel,
+                application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,
+                application/vnd.ms-powerpoint,
+                application/vnd.openxmlformats-officedocument.presentationml.presentation,
+                text/plain'
+            ],
             'links' => 'sometimes|array',
             'links.*' => 'string',
         ]);
@@ -65,7 +78,12 @@ class EstudiantePostController extends Controller
         if ($request->hasFile('files')) {
             foreach ($request->file('files') as $file) {
                 if ($file->isValid()) {
-                    $path = $file->store('posts', 'public');
+                     $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+                    $path = $file->storeAs(
+                        'posts/' . $post->id,
+                        $filename,
+                        'private'
+                    );
                     $post->attachments()->create([
                         'type' => str_starts_with($file->getMimeType(), 'image/') ? 'image' : 'file',
                         'filename' => $file->getClientOriginalName(),
@@ -117,7 +135,20 @@ class EstudiantePostController extends Controller
             'title' => 'sometimes|required|string|max:255',
             'content' => 'nullable|string',
             'files' => 'sometimes|array',
-            'files.*' => 'file|max:20480',
+            'files.*' => [  
+            'file',
+            'max:20480', // 20MB
+            'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,txt',
+            'mimetypes:
+                application/pdf,
+                application/msword,
+                application/vnd.openxmlformats-officedocument.wordprocessingml.document,
+                application/vnd.ms-excel,
+                application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,
+                application/vnd.ms-powerpoint,
+                application/vnd.openxmlformats-officedocument.presentationml.presentation,
+                text/plain'
+            ],
             'links' => 'sometimes|array',
             'links.*' => 'string',
             'files_to_delete' => 'sometimes|array',
@@ -140,7 +171,7 @@ class EstudiantePostController extends Controller
                     ->first();
                 if ($attachment) {
                     if ($attachment->type !== 'link' && $attachment->path) {
-                        Storage::disk('public')->delete($attachment->path);
+                        Storage::disk('private')->delete($attachment->path);
                     }
                     $attachment->delete();
                 }
@@ -158,7 +189,12 @@ class EstudiantePostController extends Controller
         if ($request->hasFile('files')) {
             foreach ($request->file('files') as $file) {
                 if ($file->isValid()) {
-                    $path = $file->store('posts', 'public');
+                  $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+                    $path = $file->storeAs(
+                        'posts/' . $post->id,
+                        $filename,
+                        'private'
+                    );
                     $post->attachments()->create([
                         'type' => str_starts_with($file->getMimeType(), 'image/') ? 'image' : 'file',
                         'filename' => $file->getClientOriginalName(),
@@ -211,7 +247,7 @@ class EstudiantePostController extends Controller
         // Eliminar archivos físicos
         foreach ($post->attachments as $attachment) {
             if ($attachment->type !== 'link' && $attachment->path) {
-                Storage::disk('public')->delete($attachment->path);
+                Storage::disk('private')->delete($attachment->path);
             }
         }
 
@@ -224,4 +260,20 @@ class EstudiantePostController extends Controller
 
         return Redirect::back()->with('success', 'Publicación eliminada exitosamente');
     }
+     public function download(PostAttachment $attachment)
+{
+    $post = $attachment->post;
+
+    // Verificar acceso a la clase
+    $this->assertOwnership((int) $post->subject_id, (int) $post->group_id);
+
+    if ($attachment->type === 'link') {
+        abort(404);
+    }
+
+    return Storage::disk('private')->download(
+        $attachment->path,
+        $attachment->filename
+    );
+}
 }

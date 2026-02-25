@@ -133,7 +133,7 @@ class TaskController extends Controller
             'allow_late_submission' => 'nullable|boolean',
             'max_score' => 'required|numeric|min:0.1|max:5.0',
             'attachments' => 'nullable|array',
-            'attachments.*' => 'file|max:10240',
+            'attachments.*' => 'file|mimes:pdf,doc,docx,xlsx,ppt,pptx,jpg,png|max:10240',
         ], [
             'max_score.max' => 'La calificación máxima no puede ser mayor a 5.0',
             'max_score.min' => 'La calificación máxima debe ser al menos 0.1',
@@ -198,7 +198,7 @@ class TaskController extends Controller
             // Guardar archivos adjuntos
             if ($request->hasFile('attachments')) {
                 foreach ($request->file('attachments') as $file) {
-                    $path = $file->store('tasks/' . $task->id, 'public');
+                    $path = $file->store('tasks/' . $task->id, 'private');
                     
                     TaskAttachment::create([
                         'task_id' => $task->id,
@@ -248,7 +248,7 @@ class TaskController extends Controller
             'is_active' => 'nullable|boolean',
             'academic_period_id' => 'nullable|integer|exists:academic_periods,id',
             'attachments' => 'nullable|array',
-            'attachments.*' => 'file|max:10240',
+            'attachments.*' => 'file|mimes:pdf,doc,docx,xlsx,ppt,pptx,jpg,png|max:10240',
         ]);
 
         // Validar periodo si se está cambiando
@@ -281,7 +281,7 @@ class TaskController extends Controller
             // Guardar nuevos archivos
             if ($request->hasFile('attachments')) {
                 foreach ($request->file('attachments') as $file) {
-                    $path = $file->store('tasks/' . $task->id, 'public');
+                    $path = $file->store('tasks/' . $task->id, 'private');
                     
                     TaskAttachment::create([
                         'task_id' => $task->id,
@@ -325,15 +325,15 @@ class TaskController extends Controller
 
             // Eliminar archivos
             foreach ($task->attachments as $attachment) {
-                if ($attachment->file_path && Storage::disk('public')->exists($attachment->file_path)) {
-                    Storage::disk('public')->delete($attachment->file_path);
+                if ($attachment->file_path && Storage::disk('private')->exists($attachment->file_path)) {
+                    Storage::disk('private')->delete($attachment->file_path);
                 }
             }
 
             foreach ($task->submissions as $submission) {
                 foreach ($submission->files as $file) {
-                    if ($file->file_path && Storage::disk('public')->exists($file->file_path)) {
-                        Storage::disk('public')->delete($file->file_path);
+                    if ($file->file_path && Storage::disk('private')->exists($file->file_path)) {
+                        Storage::disk('private')->delete($file->file_path);
                     }
                 }
             }
@@ -542,8 +542,8 @@ class TaskController extends Controller
         $this->authorize('update', $task);
 
         try {
-            if ($attachment->file_path && Storage::disk('public')->exists($attachment->file_path)) {
-                Storage::disk('public')->delete($attachment->file_path);
+            if ($attachment->file_path && Storage::disk('private')->exists($attachment->file_path)) {
+                Storage::disk('private')->delete($attachment->file_path);
             }
 
             $attachment->delete();

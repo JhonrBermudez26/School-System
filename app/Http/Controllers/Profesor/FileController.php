@@ -29,7 +29,7 @@ class FileController extends Controller
             'group_id' => 'required|integer',
             'folder_id' => 'nullable|integer|exists:folders,id',
             'files' => 'required|array',
-            'files.*' => 'file|max:51200', // 50MB max por archivo
+            'files.*' => 'file|mimes:pdf,doc,docx,xlsx,ppt,pptx,jpg,png|max:51200', // 50MB max por archivo
         ]);
 
         $this->assertOwnership((int) $data['subject_id'], (int) $data['group_id']);
@@ -37,7 +37,7 @@ class FileController extends Controller
         $uploadedFiles = [];
 
         foreach ($request->file('files') as $file) {
-            $path = $file->store('class_files', 'public');
+            $path = $file->store('class_files', 'private');
             
             $classFile = ClassFile::create([
                 'subject_id' => $data['subject_id'],
@@ -61,12 +61,21 @@ class FileController extends Controller
         $this->assertOwnership((int) $file->subject_id, (int) $file->group_id);
 
         // Eliminar archivo del almacenamiento
-        if ($file->path && Storage::disk('public')->exists($file->path)) {
-            Storage::disk('public')->delete($file->path);
+        if ($file->path && Storage::disk('private')->exists($file->path)) {
+            Storage::disk('private')->delete($file->path);
         }
 
         $file->delete();
 
         return Redirect::back()->with('success', 'Archivo eliminado');
     }
+    public function download(ClassFile $file)
+{
+    $this->assertOwnership($file->subject_id, $file->group_id);
+
+    return Storage::disk('private')->download(
+        $file->path,
+        $file->filename
+    );
+}
 }
