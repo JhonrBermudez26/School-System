@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Secretaria;
 
 use App\Http\Controllers\Controller;
@@ -17,17 +16,16 @@ class UsuarioController extends Controller
      */
     public function index()
     {
-        // ✅ Autorizar con Policy
         $this->authorize('viewAny', User::class);
 
         $usuarios = User::with('roles:id,name')->get();
 
         return Inertia::render('Secretaria/Usuarios', [
             'usuarios' => $usuarios,
-            'can' => [
+            'can'      => [
                 'create' => auth()->user()->can('create', User::class),
-                'update' => auth()->user()->can('users.update'), // Permiso general
-                'delete' => auth()->user()->can('users.delete'), // Permiso general
+                'update' => auth()->user()->can('users.update'),
+                'delete' => auth()->user()->can('users.delete'),
             ],
         ]);
     }
@@ -37,7 +35,6 @@ class UsuarioController extends Controller
      */
     public function store(Request $request)
     {
-        // ✅ Autorizar con Policy
         $this->authorize('create', User::class);
 
         $validated = $request->validate([
@@ -69,30 +66,21 @@ class UsuarioController extends Controller
 
             $user->assignRole($validated['role']);
 
-            Log::info('Usuario creado', [
-                'user_id' => $user->id,
-                'created_by' => auth()->id(),
-            ]);
+            Log::info('Usuario creado', ['user_id' => $user->id, 'created_by' => auth()->id()]);
 
             return redirect()->back()->with('success', '✅ Usuario creado correctamente');
         } catch (\Exception $e) {
-            Log::error('Error al crear usuario', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
+            Log::error('Error al crear usuario', ['error' => $e->getMessage()]);
             return back()->withErrors(['error' => '❌ Error al crear usuario: ' . $e->getMessage()]);
         }
     }
 
     /**
      * Actualizar usuario existente
+     * ✅ FIX IDOR: Route Model Binding + authorize('update', $user) con instancia real
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, User $user)
     {
-        $user = User::findOrFail($id);
-        
-        // ✅ Autorizar con Policy
         $this->authorize('update', $user);
 
         $validated = $request->validate([
@@ -105,7 +93,6 @@ class UsuarioController extends Controller
         ]);
 
         try {
-            // Actualizar datos básicos
             $user->update([
                 'name'      => $validated['name'],
                 'last_name' => $validated['last_name'],
@@ -113,82 +100,55 @@ class UsuarioController extends Controller
                 'is_active' => $validated['is_active'] ?? $user->is_active,
             ]);
 
-            // Actualizar contraseña solo si se proporciona
             if (!empty($validated['password'])) {
                 $user->update(['password' => Hash::make($validated['password'])]);
             }
 
-            // Actualizar rol si cambió
-            if ($user->roles->first()->name !== $validated['role']) {
+            if ($user->roles->first()?->name !== $validated['role']) {
                 $user->syncRoles([$validated['role']]);
             }
 
-            Log::info('Usuario actualizado', [
-                'user_id' => $user->id,
-                'updated_by' => auth()->id(),
-            ]);
+            Log::info('Usuario actualizado', ['user_id' => $user->id, 'updated_by' => auth()->id()]);
 
             return back()->with('success', '✅ Usuario actualizado correctamente');
         } catch (\Exception $e) {
-            Log::error('Error al actualizar usuario', [
-                'user_id' => $id,
-                'error' => $e->getMessage(),
-            ]);
-
+            Log::error('Error al actualizar usuario', ['user_id' => $user->id, 'error' => $e->getMessage()]);
             return back()->withErrors(['error' => '❌ Error al actualizar: ' . $e->getMessage()]);
         }
     }
 
     /**
      * Eliminar usuario
+     * ✅ FIX IDOR: Route Model Binding + authorize('delete', $user)
      */
-    public function destroy($id)
+    public function destroy(User $user)
     {
-        $user = User::findOrFail($id);
-        
-        // ✅ Autorizar con Policy
         $this->authorize('delete', $user);
 
         try {
+            $userId = $user->id;
             $user->delete();
 
-            Log::info('Usuario eliminado', [
-                'user_id' => $id,
-                'deleted_by' => auth()->id(),
-            ]);
+            Log::info('Usuario eliminado', ['user_id' => $userId, 'deleted_by' => auth()->id()]);
 
             return back()->with('success', '🗑️ Usuario eliminado correctamente');
         } catch (\Exception $e) {
-            Log::error('Error al eliminar usuario', [
-                'user_id' => $id,
-                'error' => $e->getMessage(),
-            ]);
-
+            Log::error('Error al eliminar usuario', ['user_id' => $user->id, 'error' => $e->getMessage()]);
             return back()->withErrors(['error' => '❌ Error al eliminar: ' . $e->getMessage()]);
         }
     }
 
-   /**
+    /**
      * Activar/Desactivar usuario
+     * ✅ FIX IDOR: Route Model Binding + authorize('update', $user)
+     *    La Policy previene modificar al rector y auto-modificación
      */
-    public function toggle(Request $request, $id)
-{
-    $user = User::findOrFail($id);
+    public function toggle(Request $request, User $user)
+    {
+        $this->authorize('update', $user);
 
-    if (!auth()->user()->can('users.update')) {
-        abort(403, 'No tienes permiso para cambiar el estado de usuarios.');
+        $user->update(['is_active' => $request->boolean('is_active')]);
+
+        return back()->with('success', '🔄 Estado actualizado correctamente');
     }
-
-    // Protecciones manuales (reemplaza la policy)
-    if ($user->hasRole('rector') && !auth()->user()->hasRole('rector')) {
-        abort(403, 'No puedes modificar al Rector.');
-    }
-    if ($user->id === auth()->id()) {
-        abort(403, 'No puedes modificarte a ti mismo.');
-    }
-
-    $user->update(['is_active' => $request->is_active]);
-
-    return back()->with('success', '🔄 Estado actualizado correctamente');
-}
 }

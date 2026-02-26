@@ -25,11 +25,11 @@ class RoleManagementController extends Controller
     {
         $this->authorize('viewAny', Role::class);
 
-        $roles = Role::with('permissions')->get();
-        $permissions = Permission::all(); // ✅ CORREGIDO: Array plano
+        $roles       = Role::with('permissions')->get();
+        $permissions = Permission::all();
 
         return Inertia::render('Rector/RoleManagement', [
-            'roles' => $roles,
+            'roles'       => $roles,
             'permissions' => $permissions,
         ]);
     }
@@ -42,7 +42,7 @@ class RoleManagementController extends Controller
         $this->authorize('create', Role::class);
 
         $role = Role::create([
-            'name' => $request->name,
+            'name'       => $request->name,
             'guard_name' => $request->guard_name ?? 'web',
         ]);
 
@@ -54,10 +54,10 @@ class RoleManagementController extends Controller
 
     /**
      * Actualizar un rol
+     * ✅ FIX IDOR: Route Model Binding reemplaza findOrFail($id) manual
      */
-    public function update(RoleRequest $request, $id)
+    public function update(RoleRequest $request, Role $role)
     {
-        $role = Role::findOrFail($id);
         $this->authorize('update', $role);
 
         $oldValues = $role->toArray();
@@ -71,13 +71,12 @@ class RoleManagementController extends Controller
 
     /**
      * Eliminar un rol
+     * ✅ FIX IDOR: Route Model Binding + authorize('delete', $role)
      */
-    public function destroy($id)
+    public function destroy(Role $role)
     {
-        $role = Role::findOrFail($id);
         $this->authorize('delete', $role);
 
-        // ✅ VERIFICAR: No eliminar si tiene usuarios asignados
         if ($role->users()->count() > 0) {
             return redirect()->route('rector.roles')
                 ->with('error', 'No se puede eliminar un rol que tiene usuarios asignados');
@@ -94,22 +93,22 @@ class RoleManagementController extends Controller
 
     /**
      * Asignar permisos a un rol
+     * ✅ FIX IDOR: Route Model Binding + authorize('assignPermissions', $role)
      */
-    public function assignPermissions(Request $request, $id)
+    public function assignPermissions(Request $request, Role $role)
     {
-        $role = Role::findOrFail($id);
-        $this->authorize('assignPermissions', $role); // ✅ CORREGIDO: Pasa $role
+        $this->authorize('assignPermissions', $role);
 
         $validated = $request->validate([
-            'permissions' => 'required|array',
+            'permissions'   => 'required|array',
             'permissions.*' => 'exists:permissions,name',
         ]);
 
         $oldPermissions = $role->permissions->pluck('name')->toArray();
         $role->syncPermissions($validated['permissions']);
-        
-        $this->activityLog->log($role, 'permissions_synced', 
-            ['permissions' => $oldPermissions], 
+
+        $this->activityLog->log($role, 'permissions_synced',
+            ['permissions' => $oldPermissions],
             ['permissions' => $validated['permissions']]
         );
 
@@ -119,14 +118,16 @@ class RoleManagementController extends Controller
 
     /**
      * Obtener permisos de un rol
+     * ✅ FIX IDOR: Route Model Binding + authorize('view', $role)
      */
-    public function getRolePermissions($id)
+    public function getRolePermissions(Role $role)
     {
-        $role = Role::with('permissions')->findOrFail($id);
         $this->authorize('view', $role);
 
+        $role->load('permissions');
+
         return response()->json([
-            'role' => $role,
+            'role'        => $role,
             'permissions' => $role->permissions->pluck('name'),
         ]);
     }

@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Coordinadora;
 
 use App\Http\Controllers\Controller;
@@ -29,95 +28,92 @@ class BoletinController extends Controller
     {
         $this->authorize('viewAny', Boletin::class);
 
-        // Obtener periodos cerrados (donde se pueden generar boletines)
         $periodos = AcademicPeriod::whereIn('status', ['closed', 'archived'])
             ->ordenado()
             ->get()
             ->map(fn($p) => [
-                'id' => $p->id,
-                'nombre' => $p->name,
-                'fecha_inicio' => $p->start_date->format('Y-m-d'),
-                'fecha_fin' => $p->end_date->format('Y-m-d'),
-                'confirmado' => $p->confirmado,
+                'id'                 => $p->id,
+                'nombre'             => $p->name,
+                'fecha_inicio'       => $p->start_date->format('Y-m-d'),
+                'fecha_fin'          => $p->end_date->format('Y-m-d'),
+                'confirmado'         => $p->confirmado,
                 'fecha_confirmacion' => $p->fecha_confirmacion?->format('d/m/Y H:i'),
-                'confirmado_por' => $p->confirmadoPor 
-                    ? $p->confirmadoPor->name . ' ' . $p->confirmadoPor->last_name 
+                'confirmado_por'     => $p->confirmadoPor
+                    ? $p->confirmadoPor->name . ' ' . $p->confirmadoPor->last_name
                     : null,
             ]);
 
-        // Obtener grupos
         $grupos = Group::with('grade', 'course')
             ->get()
             ->map(fn($g) => [
-                'id' => $g->id,
+                'id'     => $g->id,
                 'nombre' => $g->nombre,
             ]);
 
-        // Filtros
-        $periodoId = $request->get('periodo_id', $periodos->first()?->id);
-        $grupoId = $request->get('grupo_id');
+        $periodoId  = $request->get('periodo_id', $periodos->first()?->id);
+        $grupoId    = $request->get('grupo_id');
         $searchTerm = $request->get('search');
 
-        // Query base
         $query = Boletin::with(['student', 'academicPeriod', 'group'])
             ->when($periodoId, fn($q) => $q->byPeriod($periodoId))
             ->when($grupoId, fn($q) => $q->byGroup($grupoId))
-            ->when($searchTerm, function($q) use ($searchTerm) {
-                $q->whereHas('student', function($sq) use ($searchTerm) {
+            ->when($searchTerm, function ($q) use ($searchTerm) {
+                $q->whereHas('student', function ($sq) use ($searchTerm) {
                     $sq->where('name', 'like', "%{$searchTerm}%")
                        ->orWhere('last_name', 'like', "%{$searchTerm}%");
                 });
             });
 
-        $boletines = $query->get()->map(function($boletin) {
-            return [
-                'id' => $boletin->id,
-                'estudiante' => $boletin->student->name . ' ' . $boletin->student->last_name,
-                'documento' => $boletin->student->document_number,
-                'grado' => $boletin->group->nombre,
-                'periodo' => $boletin->academicPeriod->name,
-                'promedio' => $boletin->promedio_general,
-                'desempeno' => $boletin->desempeno,
-                'puesto' => $boletin->puesto_grupo,
-                'total_estudiantes' => $boletin->total_estudiantes_grupo,
-                'asistencia' => $boletin->porcentaje_asistencia,
-                'estado' => $boletin->estado,
-                'fecha_generacion' => $boletin->fecha_generacion?->format('Y-m-d H:i'),
-                'aprobo' => $boletin->aprobo,
-            ];
-        });
+        // Secretaria solo ve boletines confirmados y generados
         $user = auth()->user();
-
         if ($user->hasRole('secretaria')) {
             $query->where('confirmado', true)->where('estado', 'generado');
         }
-        // Estadísticas
+
+        $boletines = $query->get()->map(function ($boletin) {
+            return [
+                'id'               => $boletin->id,
+                'estudiante'       => $boletin->student->name . ' ' . $boletin->student->last_name,
+                'documento'        => $boletin->student->document_number,
+                'grado'            => $boletin->group->nombre,
+                'periodo'          => $boletin->academicPeriod->name,
+                'promedio'         => $boletin->promedio_general,
+                'desempeno'        => $boletin->desempeno,
+                'puesto'           => $boletin->puesto_grupo,
+                'total_estudiantes'=> $boletin->total_estudiantes_grupo,
+                'asistencia'       => $boletin->porcentaje_asistencia,
+                'estado'           => $boletin->estado,
+                'fecha_generacion' => $boletin->fecha_generacion?->format('Y-m-d H:i'),
+                'aprobo'           => $boletin->aprobo,
+            ];
+        });
+
         $stats = [
-            'total' => $boletines->count(),
-            'generados' => $boletines->where('estado', 'generado')->count(),
-            'pendientes' => $boletines->where('estado', 'pendiente')->count(),
-            'promedio_general' => $boletines->avg('promedio') ?? 0,
-            'aprobados' => $boletines->where('aprobo', true)->count(),
-            'reprobados' => $boletines->where('aprobo', false)->count(),
+            'total'           => $boletines->count(),
+            'generados'       => $boletines->where('estado', 'generado')->count(),
+            'pendientes'      => $boletines->where('estado', 'pendiente')->count(),
+            'promedio_general'=> $boletines->avg('promedio') ?? 0,
+            'aprobados'       => $boletines->where('aprobo', true)->count(),
+            'reprobados'      => $boletines->where('aprobo', false)->count(),
         ];
 
         return Inertia::render('Coordinadora/Boletines', [
             'boletines' => $boletines,
-            'periodos' => $periodos,
-            'grupos' => $grupos,
-            'stats' => $stats,
-            'filters' => [
+            'periodos'  => $periodos,
+            'grupos'    => $grupos,
+            'stats'     => $stats,
+            'filters'   => [
                 'periodo_id' => $periodoId,
-                'grupo_id' => $grupoId,
-                'search' => $searchTerm,
+                'grupo_id'   => $grupoId,
+                'search'     => $searchTerm,
             ],
             'can' => [
-                'view' => auth()->user()->can('bulletins.view'),
-                'generate' => auth()->user()->can('bulletins.generate'),
-                'download' => auth()->user()->can('bulletins.download'),
-                'update_observations' => auth()->user()->can('bulletins.update_observations'),
-                'confirm' => auth()->user()->can('bulletins.confirm'),
-            ]
+                'view'                => $user->can('bulletins.view'),
+                'generate'            => $user->can('bulletins.generate'),
+                'download'            => $user->can('bulletins.download'),
+                'update_observations' => $user->can('bulletins.update_observations'),
+                'confirm'             => $user->can('bulletins.confirm'),
+            ],
         ]);
     }
 
@@ -134,10 +130,9 @@ class BoletinController extends Controller
 
         $periodo = AcademicPeriod::findOrFail($request->periodo_id);
 
-        // Verificar que el periodo esté cerrado
         if (!$periodo->isClosed() && !$periodo->isArchived()) {
             return back()->withErrors([
-                'error' => 'Solo se pueden generar boletines de periodos cerrados'
+                'error' => 'Solo se pueden generar boletines de periodos cerrados',
             ]);
         }
 
@@ -152,73 +147,63 @@ class BoletinController extends Controller
         } catch (\Exception $e) {
             Log::error('Error generando boletines masivos', [
                 'periodo_id' => $periodo->id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
+                'error'      => $e->getMessage(),
+                'trace'      => $e->getTraceAsString(),
             ]);
 
             return back()->withErrors([
-                'error' => 'Error al generar boletines: ' . $e->getMessage()
+                'error' => 'Error al generar boletines: ' . $e->getMessage(),
             ]);
         }
     }
 
     /**
      * Generar boletín individual
+     * ✅ FIX IDOR: Route Model Binding reemplaza findOrFail($id) manual
      */
-    public function generarIndividual(Request $request, $id)
+    public function generarIndividual(Request $request, Boletin $boletin)
     {
         $this->authorize('generate', Boletin::class);
 
-        $boletin = Boletin::findOrFail($id);
-
         try {
-            // Regenerar datos del boletín
-            $periodo = $boletin->academicPeriod;
+            $periodo    = $boletin->academicPeriod;
             $estudiante = $boletin->student;
-            $grupo = $boletin->group;
+            $grupo      = $boletin->group;
 
             $this->boletinService->generarBoletinEstudiante($estudiante, $periodo, $grupo);
 
             return back()->with('success', 'Boletín generado correctamente');
         } catch (\Exception $e) {
             Log::error('Error generando boletín individual', [
-                'boletin_id' => $id,
-                'error' => $e->getMessage(),
+                'boletin_id' => $boletin->id,
+                'error'      => $e->getMessage(),
             ]);
 
             return back()->withErrors([
-                'error' => 'Error al generar boletín: ' . $e->getMessage()
+                'error' => 'Error al generar boletín: ' . $e->getMessage(),
             ]);
         }
     }
 
     /**
      * Generar documento DOCX del boletín
+     * ✅ FIX IDOR: Route Model Binding + authorize('view') antes de operar
      */
-    public function generarDocumento($id)
+    public function generarDocumento(Boletin $boletin)
     {
-        $boletin = Boletin::with([
-            'student',
-            'academicPeriod',
-            'group.grade',
-            'group.course',
-            'directorGrupo'
-        ])->findOrFail($id);
-
         $this->authorize('view', $boletin);
 
+        $boletin->load(['student', 'academicPeriod', 'group.grade', 'group.course', 'directorGrupo']);
+
         try {
-            // Obtener notas por asignatura
             $notasPorAsignatura = $this->boletinService->obtenerNotasPorAsignatura(
                 $boletin->student,
                 $boletin->academicPeriod,
                 $boletin->group
             );
 
-            // Generar el documento
             $rutaArchivo = $this->generarBoletinDOCX($boletin, $notasPorAsignatura);
 
-            // Actualizar estado del boletín
             $boletin->marcarComoGenerado($rutaArchivo);
 
             return response()->download(
@@ -227,30 +212,25 @@ class BoletinController extends Controller
             )->deleteFileAfterSend(false);
         } catch (\Exception $e) {
             Log::error('Error generando documento DOCX', [
-                'boletin_id' => $id,
-                'error' => $e->getMessage(),
+                'boletin_id' => $boletin->id,
+                'error'      => $e->getMessage(),
             ]);
 
             return back()->withErrors([
-                'error' => 'Error al generar documento: ' . $e->getMessage()
+                'error' => 'Error al generar documento: ' . $e->getMessage(),
             ]);
         }
     }
 
     /**
      * Vista previa del boletín (datos JSON)
+     * ✅ FIX IDOR: Route Model Binding + authorize('view')
      */
-    public function vistaPrevia($id)
+    public function vistaPrevia(Boletin $boletin)
     {
-        $boletin = Boletin::with([
-            'student',
-            'academicPeriod',
-            'group.grade',
-            'group.course',
-            'directorGrupo'
-        ])->findOrFail($id);
-
         $this->authorize('view', $boletin);
+
+        $boletin->load(['student', 'academicPeriod', 'group.grade', 'group.course', 'directorGrupo']);
 
         $notasPorAsignatura = $this->boletinService->obtenerNotasPorAsignatura(
             $boletin->student,
@@ -262,24 +242,24 @@ class BoletinController extends Controller
             'boletin' => [
                 'estudiante' => [
                     'nombre_completo' => $boletin->student->name . ' ' . $boletin->student->last_name,
-                    'documento' => $boletin->student->document_number,
+                    'documento'       => $boletin->student->document_number,
                 ],
-                'grupo' => $boletin->group->nombre,
-                'periodo' => $boletin->academicPeriod->name,
-                'año' => $boletin->academicPeriod->year,
-                'promedio_general' => $boletin->promedio_general,
-                'desempeno' => $boletin->desempeno,
-                'puesto' => $boletin->puesto_grupo,
-                'total_estudiantes' => $boletin->total_estudiantes_grupo,
-                'asistencia' => [
+                'grupo'                      => $boletin->group->nombre,
+                'periodo'                    => $boletin->academicPeriod->name,
+                'año'                        => $boletin->academicPeriod->year,
+                'promedio_general'           => $boletin->promedio_general,
+                'desempeno'                  => $boletin->desempeno,
+                'puesto'                     => $boletin->puesto_grupo,
+                'total_estudiantes'          => $boletin->total_estudiantes_grupo,
+                'asistencia'                 => [
                     'dias_asistidos' => $boletin->dias_asistidos,
-                    'dias_totales' => $boletin->dias_totales,
-                    'porcentaje' => $boletin->porcentaje_asistencia,
+                    'dias_totales'   => $boletin->dias_totales,
+                    'porcentaje'     => $boletin->porcentaje_asistencia,
                 ],
-                'observaciones_convivencia' => $boletin->observaciones_convivencia,
-                'observaciones_academicas' => $boletin->observaciones_academicas,
-                'recomendaciones' => $boletin->recomendaciones,
-                'director_grupo' => $boletin->directorGrupo 
+                'observaciones_convivencia'  => $boletin->observaciones_convivencia,
+                'observaciones_academicas'   => $boletin->observaciones_academicas,
+                'recomendaciones'            => $boletin->recomendaciones,
+                'director_grupo'             => $boletin->directorGrupo
                     ? $boletin->directorGrupo->name . ' ' . $boletin->directorGrupo->last_name
                     : null,
             ],
@@ -289,17 +269,17 @@ class BoletinController extends Controller
 
     /**
      * Actualizar observaciones del boletín
+     * ✅ FIX IDOR: Route Model Binding + authorize con instancia correcta
      */
-    public function actualizarObservaciones(Request $request, $id)
+    public function actualizarObservaciones(Request $request, Boletin $boletin)
     {
-        $boletin = Boletin::findOrFail($id);
-        $this->authorize('updateObservations', Boletin::class);
+        $this->authorize('updateObservations', $boletin);
 
         $validated = $request->validate([
             'observaciones_convivencia' => 'nullable|string|max:1000',
-            'observaciones_academicas' => 'nullable|string|max:1000',
-            'recomendaciones' => 'nullable|string|max:1000',
-            'observaciones_director' => 'nullable|string|max|1000',
+            'observaciones_academicas'  => 'nullable|string|max:1000',
+            'recomendaciones'           => 'nullable|string|max:1000',
+            'observaciones_director'    => 'nullable|string|max:1000',
         ]);
 
         $boletin->update($validated);
@@ -308,111 +288,104 @@ class BoletinController extends Controller
     }
 
     /**
- * Confirmar boletín (habilita acceso a secretaria y estudiante)
- */
-public function confirmar($id)
-{
-    $this->authorize('confirm', Boletin::class);
+     * Confirmar boletín (habilita acceso a secretaria y estudiante)
+     * ✅ FIX IDOR: Route Model Binding + verificación isGenerado()
+     */
+    public function confirmar(Boletin $boletin)
+    {
+        $this->authorize('confirm', Boletin::class);
 
-    $boletin = Boletin::findOrFail($id);
+        if (!$boletin->isGenerado()) {
+            return back()->withErrors(['error' => 'Solo se pueden confirmar boletines ya generados']);
+        }
 
-    if (!$boletin->isGenerado()) {
-        return back()->withErrors(['error' => 'Solo se pueden confirmar boletines ya generados']);
+        $boletin->confirmar(auth()->id());
+
+        return back()->with('success', 'Boletín confirmado y habilitado para descarga');
     }
 
-    $boletin->confirmar(auth()->id());
+    /**
+     * Confirmar todos los boletines generados de un periodo
+     */
+    public function confirmarTodos(Request $request)
+    {
+        $this->authorize('confirm', Boletin::class);
 
-    return back()->with('success', 'Boletín confirmado y habilitado para descarga');
-}
+        $request->validate(['periodo_id' => 'required|exists:academic_periods,id']);
 
-/**
- * Confirmar todos los boletines generados de un periodo
- */
-public function confirmarTodos(Request $request)
-{
-    $this->authorize('confirm', Boletin::class);
+        $total = Boletin::where('academic_period_id', $request->periodo_id)
+            ->where('estado', 'generado')
+            ->where('confirmado', false)
+            ->get()
+            ->each(fn($b) => $b->confirmar(auth()->id()))
+            ->count();
 
-    $request->validate(['periodo_id' => 'required|exists:academic_periods,id']);
-
-    $total = Boletin::where('academic_period_id', $request->periodo_id)
-        ->where('estado', 'generado')
-        ->where('confirmado', false)
-        ->get()
-        ->each(fn($b) => $b->confirmar(auth()->id()))
-        ->count();
-
-    return back()->with('success', "{$total} boletines confirmados y habilitados para descarga");
-}
+        return back()->with('success', "{$total} boletines confirmados y habilitados para descarga");
+    }
 
     /**
      * Generar documento DOCX con formato colombiano
-     * (Este método requiere Node.js - se creará un script separado)
      */
     private function generarBoletinDOCX(Boletin $boletin, array $notasPorAsignatura): string
     {
-        // Crear directorio si no existe
         $directory = 'boletines/' . $boletin->academicPeriod->id;
         Storage::makeDirectory($directory);
 
-        // Preparar datos para el script
         $datos = [
             'institucion' => [
-                'nombre' => config('app.name', 'Institución Educativa'),
-                'nit' => '000000000-0', // Configurar en settings
-                'ciudad' => 'Bogotá D.C.',
+                'nombre'     => config('app.name', 'Institución Educativa'),
+                'nit'        => '000000000-0',
+                'ciudad'     => 'Bogotá D.C.',
                 'resolucion' => 'Resolución No. XXXX',
             ],
             'estudiante' => [
                 'nombre_completo' => $boletin->student->name . ' ' . $boletin->student->last_name,
-                'documento' => $boletin->student->document_number,
-                'tipo_documento' => $boletin->student->document_type,
+                'documento'       => $boletin->student->document_number,
+                'tipo_documento'  => $boletin->student->document_type,
             ],
             'academico' => [
-                'grupo' => $boletin->group->nombre,
-                'periodo' => $boletin->academicPeriod->name,
-                'año' => $boletin->academicPeriod->year,
-                'fecha_inicio' => $boletin->academicPeriod->start_date->format('d/m/Y'),
-                'fecha_fin' => $boletin->academicPeriod->end_date->format('d/m/Y'),
+                'grupo'       => $boletin->group->nombre,
+                'periodo'     => $boletin->academicPeriod->name,
+                'año'         => $boletin->academicPeriod->year,
+                'fecha_inicio'=> $boletin->academicPeriod->start_date->format('d/m/Y'),
+                'fecha_fin'   => $boletin->academicPeriod->end_date->format('d/m/Y'),
             ],
             'rendimiento' => [
-                'promedio_general' => $boletin->promedio_general,
-                'desempeno' => $boletin->desempeno,
-                'puesto' => $boletin->puesto_grupo,
-                'total_estudiantes' => $boletin->total_estudiantes_grupo,
-                'aprobo' => $boletin->aprobo,
+                'promedio_general'   => $boletin->promedio_general,
+                'desempeno'          => $boletin->desempeno,
+                'puesto'             => $boletin->puesto_grupo,
+                'total_estudiantes'  => $boletin->total_estudiantes_grupo,
+                'aprobo'             => $boletin->aprobo,
             ],
             'asistencia' => [
                 'dias_asistidos' => $boletin->dias_asistidos,
-                'dias_totales' => $boletin->dias_totales,
-                'porcentaje' => $boletin->porcentaje_asistencia,
+                'dias_totales'   => $boletin->dias_totales,
+                'porcentaje'     => $boletin->porcentaje_asistencia,
             ],
             'notas_por_asignatura' => $notasPorAsignatura,
             'observaciones' => [
-                'convivencia' => $boletin->observaciones_convivencia,
-                'academicas' => $boletin->observaciones_academicas,
-                'recomendaciones' => $boletin->recomendaciones,
-                'director' => $boletin->observaciones_director,
+                'convivencia'    => $boletin->observaciones_convivencia,
+                'academicas'     => $boletin->observaciones_academicas,
+                'recomendaciones'=> $boletin->recomendaciones,
+                'director'       => $boletin->observaciones_director,
             ],
-            'director_grupo' => $boletin->directorGrupo 
+            'director_grupo'  => $boletin->directorGrupo
                 ? $boletin->directorGrupo->name . ' ' . $boletin->directorGrupo->last_name
                 : null,
-            'fecha_generacion' => now()->format('d/m/Y'),
+            'fecha_generacion'=> now()->format('d/m/Y'),
         ];
 
         $filename = "boletin_{$boletin->student->document_number}_{$boletin->academicPeriod->id}.docx";
         $filepath = $directory . '/' . $filename;
 
-        // Guardar JSON temporal
-        $jsonPath = storage_path('app/boletines/temp_' . $boletin->id . '.json');
+        $jsonPath   = storage_path('app/boletines/temp_' . $boletin->id . '.json');
         file_put_contents($jsonPath, json_encode($datos, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
-        // Llamar al script Node.js para generar el DOCX
         $scriptPath = base_path('scripts/generar-boletin.js');
         $outputPath = storage_path('app/' . $filepath);
 
         exec("node {$scriptPath} {$jsonPath} {$outputPath} 2>&1", $output, $returnCode);
 
-        // Limpiar archivo temporal
         @unlink($jsonPath);
 
         if ($returnCode !== 0) {

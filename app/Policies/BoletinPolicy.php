@@ -1,8 +1,9 @@
 <?php
+
 namespace App\Policies;
 
-use App\Models\User;
 use App\Models\Boletin;
+use App\Models\User;
 use Illuminate\Auth\Access\HandlesAuthorization;
 
 class BoletinPolicy
@@ -16,21 +17,19 @@ class BoletinPolicy
 
     public function view(User $user, Boletin $boletin): bool
     {
-        // Coordinadora y rector ven todos sin importar estado
+        // Rector y coordinadora ven todos
         if ($user->hasAnyRole(['rector', 'coordinadora'])) {
             return $user->hasPermissionTo('bulletins.view');
         }
 
-        // Secretaria: solo ve boletines confirmados
+        // Secretaria: solo boletines confirmados
         if ($user->hasRole('secretaria')) {
-            return $user->hasPermissionTo('bulletins.view') 
-                && $boletin->confirmado;
+            return $user->hasPermissionTo('bulletins.view') && $boletin->confirmado;
         }
 
-        // Estudiante: solo su propio boletín y solo si está confirmado
+        // Estudiante: SOLO su propio boletín y solo si está confirmado
         if ($user->hasRole('estudiante')) {
-            return $boletin->student_id === $user->id 
-                && $boletin->confirmado;
+            return $boletin->student_id === $user->id && $boletin->confirmado;
         }
 
         return false;
@@ -41,9 +40,13 @@ class BoletinPolicy
         return $user->hasPermissionTo('bulletins.generate');
     }
 
-    // NUEVO: confirmar boletín (solo coordinadora/rector)
-    public function confirm(User $user): bool
+    public function confirm(User $user, Boletin $boletin): bool
     {
+        // No confirmar si ya está confirmado
+        if ($boletin->confirmado) {
+            return false;
+        }
+
         return $user->hasPermissionTo('bulletins.confirm');
     }
 
@@ -53,16 +56,16 @@ class BoletinPolicy
             return false;
         }
 
-        // Para secretaria y estudiante: solo si está confirmado
+        // Para secretaria y estudiante: solo si está confirmado y les pertenece
         if ($user->hasAnyRole(['secretaria', 'estudiante'])) {
             return $boletin->confirmado && $this->view($user, $boletin);
         }
 
-        // Coordinadora y rector pueden descargar siempre
+        // Coordinadora y rector pueden descargar siempre (si tienen acceso de vista)
         return $this->view($user, $boletin);
     }
 
-    public function updateObservations(User $user): bool
+    public function updateObservations(User $user, Boletin $boletin): bool
     {
         return $user->hasAnyRole(['rector', 'coordinadora']);
     }

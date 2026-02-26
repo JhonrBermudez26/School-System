@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Rector;
 
 use App\Http\Controllers\Controller;
@@ -27,7 +26,6 @@ class UserManagementController extends Controller
 
         $query = User::with('roles');
 
-        // Filtros
         if ($request->filled('role')) {
             $query->role($request->role);
         }
@@ -44,7 +42,7 @@ class UserManagementController extends Controller
 
         if ($request->filled('search')) {
             $search = $request->search;
-            $query->where(function($q) use ($search) {
+            $query->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('last_name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
@@ -54,64 +52,56 @@ class UserManagementController extends Controller
 
         $users = $query->orderBy('name')->paginate(20)->through(function ($user) {
             return [
-                'id' => $user->id,
-                'name' => $user->name . ' ' . $user->last_name,
-                'email' => $user->email,
-                'document_number' => $user->document_number,
-                'is_active' => $user->is_active,
-                'suspended_at' => $user->suspended_at,
+                'id'               => $user->id,
+                'name'             => $user->name . ' ' . $user->last_name,
+                'email'            => $user->email,
+                'document_number'  => $user->document_number,
+                'is_active'        => $user->is_active,
+                'suspended_at'     => $user->suspended_at,
                 'suspended_reason' => $user->suspended_reason,
-                'last_login_at' => $user->last_login_at,
+                'last_login_at'    => $user->last_login_at,
                 'last_login_human' => $user->last_login_human,
-                'roles' => $user->roles->map(fn($role) => [
-                    'id' => $role->id,
-                    'name' => $role->name,
-                ]),
+                'roles'            => $user->roles->map(fn($r) => ['id' => $r->id, 'name' => $r->name]),
             ];
         });
 
-        // Obtener todos los roles disponibles
-        $roles = Role::orderBy('name')->get()->map(fn($role) => [
-            'id' => $role->id,
-            'name' => $role->name,
-        ]);
+        $roles = Role::orderBy('name')->get()->map(fn($r) => ['id' => $r->id, 'name' => $r->name]);
 
         return Inertia::render('Rector/GestionUsuarios', [
-            'users' => $users,
-            'roles' => $roles,
+            'users'   => $users,
+            'roles'   => $roles,
             'filters' => $request->only(['role', 'status', 'search']),
         ]);
     }
 
     /**
      * Activar un usuario suspendido
+     * ✅ FIX IDOR: Route Model Binding + authorize con instancia del usuario afectado
      */
-    public function activate($id)
+    public function activate(User $user)
     {
-        $user = User::findOrFail($id);
-        
-        $this->authorize('activate', User::class);
+        $this->authorize('activate', $user);
 
         if (!$user->suspended_at) {
             return back()->withErrors(['error' => 'El usuario no está suspendido']);
         }
 
         $oldValues = [
-            'suspended_at' => $user->suspended_at,
+            'suspended_at'     => $user->suspended_at,
             'suspended_reason' => $user->suspended_reason,
-            'is_active' => $user->is_active,
+            'is_active'        => $user->is_active,
         ];
 
         $user->update([
-            'suspended_at' => null,
+            'suspended_at'     => null,
             'suspended_reason' => null,
-            'is_active' => true,
+            'is_active'        => true,
         ]);
 
         $this->activityLog->log($user, 'activated', $oldValues, [
-            'suspended_at' => null,
+            'suspended_at'     => null,
             'suspended_reason' => null,
-            'is_active' => true,
+            'is_active'        => true,
         ]);
 
         return redirect()->route('rector.usuarios')
@@ -120,11 +110,11 @@ class UserManagementController extends Controller
 
     /**
      * Suspender un usuario
+     * ✅ FIX IDOR: Route Model Binding + authorize con instancia (Policy previene auto-suspensión
+     *    y suspensión de rector por no-rector)
      */
-    public function suspend(Request $request, $id)
+    public function suspend(Request $request, User $user)
     {
-        $user = User::findOrFail($id);
-        
         $this->authorize('suspend', $user);
 
         $validated = $request->validate([
@@ -132,25 +122,22 @@ class UserManagementController extends Controller
         ]);
 
         $oldValues = [
-            'suspended_at' => $user->suspended_at,
+            'suspended_at'     => $user->suspended_at,
             'suspended_reason' => $user->suspended_reason,
-            'is_active' => $user->is_active,
+            'is_active'        => $user->is_active,
         ];
 
         $user->update([
-            'suspended_at' => now(),
+            'suspended_at'     => now(),
             'suspended_reason' => $validated['reason'],
-            'is_active' => false,
+            'is_active'        => false,
         ]);
 
         $this->activityLog->log($user, 'suspended', $oldValues, [
-            'suspended_at' => $user->suspended_at,
+            'suspended_at'     => $user->suspended_at,
             'suspended_reason' => $user->suspended_reason,
-            'is_active' => false,
+            'is_active'        => false,
         ]);
-
-        // TODO: Aquí podrías invalidar todas las sesiones activas del usuario
-        // usando Laravel's session management
 
         return redirect()->route('rector.usuarios')
             ->with('success', "Usuario {$user->name} suspendido correctamente");
@@ -158,11 +145,10 @@ class UserManagementController extends Controller
 
     /**
      * Asignar rol a un usuario
+     * ✅ FIX IDOR: Route Model Binding + authorize('update', $user)
      */
-    public function assignRole(Request $request, $id)
+    public function assignRole(Request $request, User $user)
     {
-        $user = User::findOrFail($id);
-        
         $this->authorize('update', $user);
 
         $validated = $request->validate([
@@ -170,11 +156,10 @@ class UserManagementController extends Controller
         ]);
 
         $oldRoles = $user->getRoleNames()->toArray();
-
         $user->syncRoles([$validated['role']]);
 
-        $this->activityLog->log($user, 'role_changed', 
-            ['roles' => $oldRoles], 
+        $this->activityLog->log($user, 'role_changed',
+            ['roles' => $oldRoles],
             ['roles' => [$validated['role']]]
         );
 
@@ -184,40 +169,37 @@ class UserManagementController extends Controller
 
     /**
      * Ver historial de actividades de un usuario
+     * ✅ FIX IDOR: Route Model Binding + authorize('view', $user)
      */
-    public function history($id)
+    public function history(User $user)
     {
-        $user = User::findOrFail($id);
-        
         $this->authorize('view', $user);
 
-        $history = ActivityLog::where('user_id', $id)
-            ->orWhere(function($query) use ($id) {
+        $history = ActivityLog::where('user_id', $user->id)
+            ->orWhere(function ($query) use ($user) {
                 $query->where('model_type', User::class)
-                      ->where('model_id', $id);
+                      ->where('model_id', $user->id);
             })
             ->with('user')
             ->orderBy('created_at', 'desc')
             ->limit(100)
             ->get()
-            ->map(function($log) {
-                return [
-                    'id' => $log->id,
-                    'action' => $log->action,
-                    'description' => $log->getActionDescription(),
-                    'ip_address' => $log->ip_address,
-                    'user_agent' => $log->user_agent,
-                    'created_at' => $log->created_at->format('Y-m-d H:i:s'),
-                    'created_at_human' => $log->created_at->diffForHumans(),
-                    'old_values' => $log->old_values,
-                    'new_values' => $log->new_values,
-                ];
-            });
+            ->map(fn($log) => [
+                'id'               => $log->id,
+                'action'           => $log->action,
+                'description'      => $log->getActionDescription(),
+                'ip_address'       => $log->ip_address,
+                'user_agent'       => $log->user_agent,
+                'created_at'       => $log->created_at->format('Y-m-d H:i:s'),
+                'created_at_human' => $log->created_at->diffForHumans(),
+                'old_values'       => $log->old_values,
+                'new_values'       => $log->new_values,
+            ]);
 
         return response()->json([
             'user' => [
-                'id' => $user->id,
-                'name' => $user->name . ' ' . $user->last_name,
+                'id'    => $user->id,
+                'name'  => $user->name . ' ' . $user->last_name,
                 'email' => $user->email,
             ],
             'history' => $history,
@@ -226,16 +208,14 @@ class UserManagementController extends Controller
 
     /**
      * Resetear contraseña de un usuario
+     * ✅ FIX IDOR: Route Model Binding + authorize('update', $user)
      */
-    public function resetPassword($id)
+    public function resetPassword(User $user)
     {
-        $user = User::findOrFail($id);
-        
         $this->authorize('update', $user);
 
-        // Generar contraseña temporal
         $tempPassword = \Str::random(12);
-        
+
         $user->update([
             'password' => bcrypt($tempPassword),
         ]);
@@ -244,27 +224,23 @@ class UserManagementController extends Controller
             'reset_by' => auth()->user()->name,
         ]);
 
-        // TODO: Enviar email al usuario con la contraseña temporal
-        
         return response()->json([
-            'success' => true,
-            'message' => 'Contraseña reseteada correctamente',
-            'temporary_password' => $tempPassword, // En producción, solo enviar por email
+            'success'            => true,
+            'message'            => 'Contraseña reseteada correctamente',
+            'temporary_password' => $tempPassword,
         ]);
     }
 
     /**
      * Forzar cierre de sesión de un usuario
+     * ✅ FIX IDOR: Route Model Binding + authorize('suspend', $user) reutiliza misma policy
      */
-    public function forceLogout($id)
+    public function forceLogout(User $user)
     {
-        $user = User::findOrFail($id);
-        
         $this->authorize('suspend', $user);
 
-        // Invalidar todas las sesiones del usuario
         \DB::table('sessions')
-            ->where('user_id', $id)
+            ->where('user_id', $user->id)
             ->delete();
 
         $this->activityLog->log($user, 'force_logout', null, [

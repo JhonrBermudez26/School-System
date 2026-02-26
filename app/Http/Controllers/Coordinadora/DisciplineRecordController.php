@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Http\Controllers\Coordinadora;
 
 use App\Http\Controllers\Controller;
@@ -27,11 +26,10 @@ class DisciplineRecordController extends Controller
 
         $query = DisciplineRecord::with(['student', 'creator'])->recent();
 
-        // Búsqueda global
         if ($request->filled('search')) {
             $searchTerm = $request->search;
-            $query->where(function($q) use ($searchTerm) {
-                $q->whereHas('student', function($sq) use ($searchTerm) {
+            $query->where(function ($q) use ($searchTerm) {
+                $q->whereHas('student', function ($sq) use ($searchTerm) {
                     $sq->where('name', 'like', "%{$searchTerm}%")
                        ->orWhere('last_name', 'like', "%{$searchTerm}%")
                        ->orWhere('document_number', 'like', "%{$searchTerm}%")
@@ -42,81 +40,51 @@ class DisciplineRecordController extends Controller
             });
         }
 
-        // Filtros específicos
-        if ($request->filled('student_id')) {
-            $query->where('student_id', $request->student_id);
-        }
-
-        if ($request->filled('type')) {
-            $query->where('type', $request->type);
-        }
-
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-
-        if ($request->filled('severity')) {
-            $query->where('severity', $request->severity);
-        }
-
-        if ($request->filled('start_date')) {
-            $query->where('date', '>=', $request->start_date);
-        }
-
-        if ($request->filled('end_date')) {
-            $query->where('date', '<=', $request->end_date);
-        }
+        if ($request->filled('student_id')) $query->where('student_id', $request->student_id);
+        if ($request->filled('type'))       $query->where('type', $request->type);
+        if ($request->filled('status'))     $query->where('status', $request->status);
+        if ($request->filled('severity'))   $query->where('severity', $request->severity);
+        if ($request->filled('start_date')) $query->where('date', '>=', $request->start_date);
+        if ($request->filled('end_date'))   $query->where('date', '<=', $request->end_date);
 
         $records = $query->paginate(20);
 
-        // ✅ Cargar relación de grupo DESPUÉS de obtener los registros
-        $records->getCollection()->transform(function($record) {
+        $records->getCollection()->transform(function ($record) {
             $group = $record->student->groups()->first();
-            $record->student->current_group = $group ? [
-                'id' => $group->id,
-                'nombre' => $group->nombre, // ⭐ Usar 'nombre' no 'name'
-            ] : null;
+            $record->student->current_group = $group ? ['id' => $group->id, 'nombre' => $group->nombre] : null;
             return $record;
         });
 
-        // ✅ Estudiantes para selector con grupo
         $students = User::role('estudiante')
-            ->with('groups') // Cargar todos los grupos
-            ->orderBy('name')
-            ->orderBy('last_name')
+            ->with('groups')
+            ->orderBy('name')->orderBy('last_name')
             ->get()
-            ->map(function($student) {
+            ->map(function ($student) {
                 $group = $student->groups->first();
-                
                 return [
-                    'id' => $student->id,
-                    'name' => $student->name,
-                    'last_name' => $student->last_name ?? '',
-                    'full_name' => trim($student->name . ' ' . ($student->last_name ?? '')),
-                    'email' => $student->email,
+                    'id'              => $student->id,
+                    'name'            => $student->name,
+                    'last_name'       => $student->last_name ?? '',
+                    'full_name'       => trim($student->name . ' ' . ($student->last_name ?? '')),
+                    'email'           => $student->email,
                     'document_number' => $student->document_number,
-                    'group' => $group ? [
-                        'id' => $group->id,
-                        'nombre' => $group->nombre, // ⭐ Usar 'nombre' no 'name'
-                    ] : null,
+                    'group'           => $group ? ['id' => $group->id, 'nombre' => $group->nombre] : null,
                 ];
             });
 
-        // Estadísticas para el dashboard
         $stats = [
-            'total' => DisciplineRecord::count(),
-            'open' => DisciplineRecord::open()->count(),
-            'critical' => DisciplineRecord::where('severity', 'critical')->count(),
+            'total'     => DisciplineRecord::count(),
+            'open'      => DisciplineRecord::open()->count(),
+            'critical'  => DisciplineRecord::where('severity', 'critical')->count(),
             'thisMonth' => DisciplineRecord::whereMonth('date', now()->month)
-                ->whereYear('date', now()->year)
-                ->count(),
+                ->whereYear('date', now()->year)->count(),
         ];
 
         return Inertia::render('Coordinadora/Disciplina', [
-            'records' => $records,
+            'records'  => $records,
             'students' => $students,
-            'stats' => $stats,
-            'filters' => $request->only(['search', 'student_id', 'type', 'status', 'severity', 'start_date', 'end_date']),
+            'stats'    => $stats,
+            'filters'  => $request->only(['search', 'student_id', 'type', 'status', 'severity', 'start_date', 'end_date']),
         ]);
     }
 
@@ -127,9 +95,9 @@ class DisciplineRecordController extends Controller
     {
         $this->authorize('create', DisciplineRecord::class);
 
-        $validated = $request->validated();
-        $validated['created_by'] = auth()->id();
-        $validated['status'] = $validated['status'] ?? 'open';
+        $validated              = $request->validated();
+        $validated['created_by']= auth()->id();
+        $validated['status']    = $validated['status'] ?? 'open';
 
         $record = DisciplineRecord::create($validated);
 
@@ -141,16 +109,16 @@ class DisciplineRecordController extends Controller
 
     /**
      * Actualizar un registro disciplinario
+     * ✅ FIX IDOR: Route Model Binding + authorize('update', $record)
      */
-    public function update(DisciplineRecordRequest $request, $id)
+    public function update(DisciplineRecordRequest $request, DisciplineRecord $disciplineRecord)
     {
-        $record = DisciplineRecord::findOrFail($id);
-        $this->authorize('update', $record);
+        $this->authorize('update', $disciplineRecord);
 
-        $oldValues = $record->toArray();
-        $record->update($request->validated());
+        $oldValues = $disciplineRecord->toArray();
+        $disciplineRecord->update($request->validated());
 
-        $this->activityLog->log($record, 'updated', $oldValues, $record->getChanges());
+        $this->activityLog->log($disciplineRecord, 'updated', $oldValues, $disciplineRecord->getChanges());
 
         return redirect()->route('coordinadora.disciplina')
             ->with('success', 'Registro actualizado correctamente');
@@ -158,17 +126,17 @@ class DisciplineRecordController extends Controller
 
     /**
      * Cerrar un registro disciplinario
+     * ✅ FIX IDOR: Route Model Binding + authorize('close', $record)
      */
-    public function close($id)
+    public function close(DisciplineRecord $disciplineRecord)
     {
-        $record = DisciplineRecord::findOrFail($id);
-        $this->authorize('close', $record);
+        $this->authorize('close', $disciplineRecord);
 
-        $oldValues = $record->toArray();
+        $oldValues = $disciplineRecord->toArray();
 
-        if ($record->close()) {
-            $this->activityLog->log($record, 'closed', $oldValues, $record->getChanges());
-            
+        if ($disciplineRecord->close()) {
+            $this->activityLog->log($disciplineRecord, 'closed', $oldValues, $disciplineRecord->getChanges());
+
             return redirect()->route('coordinadora.disciplina')
                 ->with('success', 'Registro cerrado correctamente');
         }
@@ -178,17 +146,17 @@ class DisciplineRecordController extends Controller
 
     /**
      * Reabrir un registro cerrado
+     * ✅ FIX IDOR: Route Model Binding + authorize('update', $record)
      */
-    public function reopen($id)
+    public function reopen(DisciplineRecord $disciplineRecord)
     {
-        $record = DisciplineRecord::findOrFail($id);
-        $this->authorize('update', $record);
+        $this->authorize('update', $disciplineRecord);
 
-        $oldValues = $record->toArray();
+        $oldValues = $disciplineRecord->toArray();
 
-        if ($record->reopen()) {
-            $this->activityLog->log($record, 'reopened', $oldValues, $record->getChanges());
-            
+        if ($disciplineRecord->reopen()) {
+            $this->activityLog->log($disciplineRecord, 'reopened', $oldValues, $disciplineRecord->getChanges());
+
             return redirect()->route('coordinadora.disciplina')
                 ->with('success', 'Registro reabierto correctamente');
         }
@@ -198,16 +166,16 @@ class DisciplineRecordController extends Controller
 
     /**
      * Eliminar un registro disciplinario
+     * ✅ FIX IDOR: Route Model Binding + authorize('delete', $record)
      */
-    public function destroy($id)
+    public function destroy(DisciplineRecord $disciplineRecord)
     {
-        $record = DisciplineRecord::findOrFail($id);
-        $this->authorize('delete', $record);
+        $this->authorize('delete', $disciplineRecord);
 
-        $oldValues = $record->toArray();
-        $record->delete();
+        $oldValues = $disciplineRecord->toArray();
+        $disciplineRecord->delete();
 
-        $this->activityLog->log($record, 'deleted', $oldValues, null);
+        $this->activityLog->log($disciplineRecord, 'deleted', $oldValues, null);
 
         return redirect()->route('coordinadora.disciplina')
             ->with('success', 'Registro eliminado correctamente');
@@ -215,47 +183,43 @@ class DisciplineRecordController extends Controller
 
     /**
      * Historial disciplinario de un estudiante
+     * ✅ FIX IDOR: Route Model Binding en $student + validate role
      */
-    public function studentHistory($studentId)
+    public function studentHistory(User $student)
     {
         $this->authorize('viewAny', DisciplineRecord::class);
-
-        $student = User::with('groups')->findOrFail($studentId);
 
         if (!$student->hasRole('estudiante')) {
             return response()->json(['error' => 'El usuario no es un estudiante'], 400);
         }
 
-        // ✅ Obtener el primer grupo del estudiante
+        $student->load('groups');
         $group = $student->groups->first();
 
         $history = DisciplineRecord::with('creator')
-            ->forStudent($studentId)
+            ->forStudent($student->id)
             ->recent()
             ->get();
 
         $stats = [
-            'total_records' => $history->count(),
-            'open_records' => $history->where('status', 'open')->count(),
+            'total_records'  => $history->count(),
+            'open_records'   => $history->where('status', 'open')->count(),
             'closed_records' => $history->where('status', 'closed')->count(),
-            'by_type' => $history->groupBy('type')->map->count(),
-            'by_severity' => $history->groupBy('severity')->map->count(),
+            'by_type'        => $history->groupBy('type')->map->count(),
+            'by_severity'    => $history->groupBy('severity')->map->count(),
         ];
 
         return response()->json([
             'student' => [
-                'id' => $student->id,
-                'name' => $student->name,
-                'last_name' => $student->last_name ?? '',
-                'full_name' => trim($student->name . ' ' . ($student->last_name ?? '')),
-                'email' => $student->email,
+                'id'              => $student->id,
+                'name'            => $student->name,
+                'last_name'       => $student->last_name ?? '',
+                'full_name'       => trim($student->name . ' ' . ($student->last_name ?? '')),
+                'email'           => $student->email,
                 'document_number' => $student->document_number,
-                'group' => $group ? [
-                    'id' => $group->id,
-                    'nombre' => $group->nombre, // ⭐ Usar 'nombre' no 'name'
-                ] : null,
+                'group'           => $group ? ['id' => $group->id, 'nombre' => $group->nombre] : null,
             ],
-            'history' => $history,
+            'history'    => $history,
             'statistics' => $stats,
         ]);
     }
@@ -268,36 +232,27 @@ class DisciplineRecordController extends Controller
         $this->authorize('viewAny', DisciplineRecord::class);
 
         $startDate = $request->get('start_date', now()->startOfYear()->format('Y-m-d'));
-        $endDate = $request->get('end_date', now()->endOfYear()->format('Y-m-d'));
+        $endDate   = $request->get('end_date', now()->endOfYear()->format('Y-m-d'));
 
         $query = DisciplineRecord::whereBetween('date', [$startDate, $endDate]);
 
         $stats = [
-            'total_records' => $query->count(),
-            'open_records' => (clone $query)->open()->count(),
+            'total_records'  => $query->count(),
+            'open_records'   => (clone $query)->open()->count(),
             'closed_records' => (clone $query)->closed()->count(),
-            'by_type' => (clone $query)->select('type', \DB::raw('count(*) as count'))
-                ->groupBy('type')
-                ->pluck('count', 'type'),
-            'by_severity' => (clone $query)->select('severity', \DB::raw('count(*) as count'))
-                ->groupBy('severity')
-                ->pluck('count', 'severity'),
-            'by_month' => (clone $query)->select(
-                    \DB::raw('YEAR(date) as year'),
-                    \DB::raw('MONTH(date) as month'),
-                    \DB::raw('count(*) as count')
-                )
-                ->groupBy('year', 'month')
-                ->orderBy('year', 'asc')
-                ->orderBy('month', 'asc')
-                ->get(),
-            'top_students' => DisciplineRecord::select('student_id', \DB::raw('count(*) as record_count'))
-                ->whereBetween('date', [$startDate, $endDate])
-                ->with('student:id,name,last_name,email')
-                ->groupBy('student_id')
-                ->orderByDesc('record_count')
-                ->limit(10)
-                ->get(),
+            'by_type'        => (clone $query)->select('type', \DB::raw('count(*) as count'))
+                                    ->groupBy('type')->pluck('count', 'type'),
+            'by_severity'    => (clone $query)->select('severity', \DB::raw('count(*) as count'))
+                                    ->groupBy('severity')->pluck('count', 'severity'),
+            'by_month'       => (clone $query)->select(
+                                    \DB::raw('YEAR(date) as year'),
+                                    \DB::raw('MONTH(date) as month'),
+                                    \DB::raw('count(*) as count')
+                                )->groupBy('year', 'month')->orderBy('year')->orderBy('month')->get(),
+            'top_students'   => DisciplineRecord::select('student_id', \DB::raw('count(*) as record_count'))
+                                    ->whereBetween('date', [$startDate, $endDate])
+                                    ->with('student:id,name,last_name,email')
+                                    ->groupBy('student_id')->orderByDesc('record_count')->limit(10)->get(),
         ];
 
         return response()->json($stats);

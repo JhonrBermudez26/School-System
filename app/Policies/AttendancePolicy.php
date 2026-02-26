@@ -2,72 +2,83 @@
 
 namespace App\Policies;
 
-use App\Models\User;
 use App\Models\Attendance;
+use App\Models\User;
+use Illuminate\Auth\Access\HandlesAuthorization;
+use Illuminate\Support\Facades\DB;
 
 class AttendancePolicy
 {
-    /**
-     * Determine if the user can view any attendances.
-     */
+    use HandlesAuthorization;
+
     public function viewAny(User $user): bool
     {
         return $user->hasPermissionTo('attendances.view');
     }
 
-    /**
-     * Determine if the user can view the attendance.
-     */
     public function view(User $user, Attendance $attendance): bool
     {
-        // Profesores solo pueden ver asistencia de sus grupos
-        if ($user->hasRole('profesor')) {
-            // TODO: Verificar que el profesor tiene asignado el grupo
-            return $user->hasPermissionTo('attendances.view');
+        if ($user->hasAnyRole(['rector', 'coordinadora'])) {
+            return true;
         }
 
-        // Estudiantes solo pueden ver su propia asistencia
+        // Profesor: solo puede ver asistencias de sus grupos asignados
+        if ($user->hasRole('profesor')) {
+            return DB::table('subject_group')
+                ->where('user_id', $user->id)
+                ->where('group_id', $attendance->group_id)
+                ->exists();
+        }
+
+        // Estudiante: solo su propia asistencia
         if ($user->hasRole('estudiante')) {
             return $attendance->user_id === $user->id;
         }
 
-        // Coordinadora y rector pueden ver todas
-        return $user->hasAnyPermission(['attendances.view', 'attendance.view_all']);
+        return false;
     }
 
-    /**
-     * Determine if the user can view all attendances (supervisión).
-     */
     public function viewAll(User $user): bool
     {
         return $user->hasPermissionTo('attendance.view_all');
     }
 
-    /**
-     * Determine if the user can create attendances.
-     */
     public function create(User $user): bool
     {
         return $user->hasPermissionTo('attendances.create');
     }
 
     /**
-     * Determine if the user can update the attendance.
+     * Solo el profesor que registró la asistencia puede modificarla,
+     * y solo si pertenece a uno de sus grupos.
      */
     public function update(User $user, Attendance $attendance): bool
     {
-        // Solo el profesor que creó la asistencia puede modificarla
-        if ($user->hasRole('profesor')) {
-            // TODO: Verificar que el profesor creó esta asistencia
-            return $user->hasPermissionTo('attendances.update');
+        if (!$user->hasRole('profesor')) {
+            return false;
         }
 
-        return false;
+        return DB::table('subject_group')
+            ->where('user_id', $user->id)
+            ->where('group_id', $attendance->group_id)
+            ->exists();
     }
 
     /**
-     * Determine if the user can export attendance data.
+     * Solo el profesor que registró puede eliminar.
      */
+    public function delete(User $user, Attendance $attendance): bool
+    {
+        if (!$user->hasRole('profesor')) {
+            return false;
+        }
+
+        return DB::table('subject_group')
+            ->where('user_id', $user->id)
+            ->where('group_id', $attendance->group_id)
+            ->exists();
+    }
+
     public function export(User $user): bool
     {
         return $user->hasPermissionTo('attendance.export');
