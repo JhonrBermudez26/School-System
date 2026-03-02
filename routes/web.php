@@ -70,20 +70,7 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 // ─────────────────────────────────────────────
 // RUTAS PROTEGIDAS
 // ─────────────────────────────────────────────
-Route::middleware(['auth', 'check.password', 'throttle:authenticated'])->group(function () {
-
-    // ── DEBUG (solo en local, eliminar en producción) ──────────────────────
-    Route::get('/debug-auth', function () {
-        $user = auth()->user();
-        if (!$user) return response()->json(['error' => 'Not authenticated']);
-        return response()->json([
-            'user'        => $user->only(['id', 'name', 'email']),
-            'roles'       => $user->getRoleNames(),
-            'permissions' => $user->getAllPermissions()->pluck('name'),
-            'guard'       => auth()->guard()->getName(),
-        ]);
-    })->middleware('role:rector'); // ← restringir en producción
-
+Route::middleware(['auth', 'check.active', 'check.password', 'throttle:authenticated'])->group(function () {
     // ── PERFIL ─────────────────────────────────────────────────────────────
     Route::get('/perfil/editar', fn () => inertia('Perfil/EditarPerfil'))->name('perfil.editar');
     Route::post('/perfil/actualizar', [ProfileController::class, 'update'])

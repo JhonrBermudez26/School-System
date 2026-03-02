@@ -5,6 +5,7 @@ import {
   Link as LinkIcon, MessageSquare, Clock, FileText, Download, Save,
   User
 } from 'lucide-react';
+import { sanitizeHtml } from '@/utils/sanitize';
 
 export default function Publicaciones({ publicaciones = [], classInfo }) {
   const { props: inertiaProps } = usePage();
@@ -381,7 +382,7 @@ export default function Publicaciones({ publicaciones = [], classInfo }) {
               </div>
 
               {p.content && (
-                <div className="prose prose-sm sm:prose-base max-w-none text-gray-700 leading-relaxed mb-6" dangerouslySetInnerHTML={{ __html: p.content }} />
+                <div className="prose prose-sm sm:prose-base max-w-none text-gray-700 leading-relaxed mb-6" dangerouslySetInnerHTML={{ __html: sanitizeHtml(p.content) }} />
               )}
 
               {p.attachments?.length > 0 && (
@@ -394,7 +395,10 @@ export default function Publicaciones({ publicaciones = [], classInfo }) {
                     {p.attachments.map(att => (
                       <a
                         key={att.id}
-                        href={att.type === 'link' ? att.url : `/storage/${att.path}`}
+                        href={att.type === 'link'
+                          ? att.url
+                          : route('estudiante.attachments.download', { attachment: att.id })
+                        }
                         target="_blank"
                         rel="noreferrer"
                         className="flex items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-blue-50/30 hover:from-blue-50 hover:to-blue-100/50 rounded-xl border border-gray-200 hover:border-blue-300 transition-all duration-200 group/item"

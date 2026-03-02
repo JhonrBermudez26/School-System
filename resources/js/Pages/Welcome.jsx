@@ -7,48 +7,45 @@ import {
 } from 'lucide-react';
 
 export default function Welcome() {
-    const [showLoginModal, setShowLoginModal] = useState(false);
-    const [showPassword, setShowPassword]     = useState(false);
+    const { app, school, stats, periodo_activo, openLoginModal: openOnLoad } = usePage().props;
+    const [showLoginModal, setShowLoginModal] = useState(openOnLoad ?? false);
+    const [showPassword, setShowPassword] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     const { data, setData, post, processing, errors } = useForm({
         email: '', password: '', remember: false
     });
 
-    const { app, school, stats, periodo_activo } = usePage().props;
-    const appName    = app?.name;
+    const appName = app?.name;
     const appFullName = app?.fullName || appName;
 
-    // Datos institucionales con fallbacks
-    const schoolName = school?.nombre    || appFullName || 'Institución Educativa';
-    const schoolLema = school?.lema      || 'Formando líderes del mañana';
-    const schoolLogo = school?.logo      || null;
+    const schoolName = school?.nombre || appFullName || 'Institución Educativa';
+    const schoolLema = school?.lema || 'Formando líderes del mañana';
+    const schoolLogo = school?.logo || null;
     const schoolYear = school?.fecha_fundacion;
-    const anios      = school?.anios_existencia || stats?.anios || null;
-    const jornada    = school?.jornada   || null;
-    const caracter   = school?.caracter  || null;
-    const nivelEdu   = school?.nivel_educativo || null;
-    const rector     = school?.rector    || null;
-
-    const direccion  = school?.direccion && school?.ciudad
+    const anios = school?.anios_existencia || stats?.anios || null;
+    const jornada = school?.jornada || null;
+    const caracter = school?.caracter || null;
+    const nivelEdu = school?.nivel_educativo || null;
+    const rector = school?.rector || null;
+    const direccion = school?.direccion && school?.ciudad
         ? `${school.direccion}, ${school.ciudad}${school.departamento ? ', ' + school.departamento : ''}`
         : school?.direccion || null;
-    const telefono   = school?.telefono  || school?.celular || null;
-    const emailInst  = school?.email     || null;
+    const telefono = school?.telefono || school?.celular || null;
+    const emailInst = school?.email || null;
 
     const submit = (e) => { e.preventDefault(); post('/login'); };
 
     const navItems = [
-        { id: 'inicio',     label: 'Inicio'     },
-        { id: 'nosotros',   label: 'Nosotros'   },
-        { id: 'programas',  label: 'Programas'  },
+        { id: 'inicio', label: 'Inicio' },
+        { id: 'nosotros', label: 'Nosotros' },
+        { id: 'programas', label: 'Programas' },
         { id: 'admisiones', label: 'Admisiones' },
-        { id: 'contacto',   label: 'Contacto'   },
+        { id: 'contacto', label: 'Contacto' },
     ];
 
     return (<>
         <Head title={`Bienvenid@s | ${schoolName}`} />
-
         {/* ── NAVBAR ── */}
         <nav className="bg-white shadow-md fixed w-full top-0 z-50 border-b border-gray-100">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -66,7 +63,6 @@ export default function Welcome() {
                             {schoolLema && <p className="text-xs text-gray-500 hidden sm:block truncate italic">{schoolLema}</p>}
                         </div>
                     </div>
-
                     {/* Desktop */}
                     <div className="hidden md:flex items-center gap-5 lg:gap-7">
                         {navItems.map(({ id, label }) => (
@@ -81,7 +77,6 @@ export default function Welcome() {
                             Portal Académico
                         </button>
                     </div>
-
                     {/* Mobile */}
                     <div className="md:hidden flex items-center gap-2">
                         <button onClick={() => setShowLoginModal(true)}
@@ -94,7 +89,6 @@ export default function Welcome() {
                         </button>
                     </div>
                 </div>
-
                 {mobileMenuOpen && (
                     <div className="md:hidden border-t border-gray-100 py-3 space-y-1 pb-4">
                         {navItems.map(({ id, label }) => (
@@ -107,12 +101,10 @@ export default function Welcome() {
                 )}
             </div>
         </nav>
-
         {/* ── HERO ── */}
         <section id="inicio" className="pt-16 sm:pt-20 bg-gradient-to-br from-blue-50 via-white to-indigo-50 overflow-hidden relative">
             <div className="absolute top-32 right-0 w-72 h-72 bg-indigo-100 rounded-full mix-blend-multiply filter blur-3xl opacity-40 pointer-events-none" />
             <div className="absolute top-48 left-0 w-64 h-64 bg-blue-100 rounded-full mix-blend-multiply filter blur-3xl opacity-40 pointer-events-none" />
-
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24 relative">
                 <div className="grid md:grid-cols-2 gap-12 lg:gap-20 items-center">
                     <div>
@@ -122,18 +114,14 @@ export default function Welcome() {
                                 {anios}+ años formando ciudadanos de excelencia
                             </div>
                         )}
-
                         <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 mb-5 leading-tight">
                             Educación de Calidad para un Futuro{' '}
                             <span className="bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Brillante</span>
                         </h2>
-
                         <p className="text-base sm:text-lg text-gray-600 mb-5 leading-relaxed">
                             {schoolName} es una institución comprometida con la formación integral,
                             fomentando valores, excelencia académica y responsabilidad social.
                         </p>
-
-                        {/* Info chips */}
                         <div className="flex flex-wrap gap-2 mb-8">
                             {jornada && (
                                 <span className="inline-flex items-center gap-1.5 bg-white border border-gray-200 px-3 py-1.5 rounded-full text-xs font-medium text-gray-700 shadow-sm">
@@ -156,7 +144,6 @@ export default function Welcome() {
                                 </span>
                             )}
                         </div>
-
                         <div className="flex flex-col sm:flex-row gap-3">
                             <button onClick={() => setShowLoginModal(true)}
                                 className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-7 py-3.5 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all font-semibold shadow-lg hover:shadow-xl flex items-center justify-center gap-2">
@@ -168,17 +155,16 @@ export default function Welcome() {
                             </a>
                         </div>
                     </div>
-
                     {/* Stats card */}
                     <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-2xl sm:rounded-3xl p-1 shadow-2xl">
                         <div className="bg-white rounded-xl sm:rounded-2xl p-6 sm:p-7">
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5">Nuestra comunidad educativa</p>
                             <div className="space-y-3">
                                 {[
-                                    { icon: Users,    bg: 'bg-blue-100',   color: 'text-blue-600',   value: stats?.estudiantes, label: 'Estudiantes Activos'  },
-                                    { icon: Award,    bg: 'bg-indigo-100', color: 'text-indigo-600', value: stats?.profesores,  label: 'Docentes'             },
-                                    { icon: BookOpen, bg: 'bg-green-100',  color: 'text-green-600',  value: stats?.asignaturas, label: 'Asignaturas Activas'  },
-                                    { icon: Layers,   bg: 'bg-orange-100', color: 'text-orange-600', value: stats?.grupos,      label: 'Grupos / Cursos'      },
+                                    { icon: Users, bg: 'bg-blue-100', color: 'text-blue-600', value: stats?.estudiantes, label: 'Estudiantes Activos' },
+                                    { icon: Award, bg: 'bg-indigo-100', color: 'text-indigo-600', value: stats?.profesores, label: 'Docentes' },
+                                    { icon: BookOpen, bg: 'bg-green-100', color: 'text-green-600', value: stats?.asignaturas, label: 'Asignaturas Activas' },
+                                    { icon: Layers, bg: 'bg-orange-100', color: 'text-orange-600', value: stats?.grupos, label: 'Grupos / Cursos' },
                                 ].map(({ icon: Icon, bg, color, value, label }) => (
                                     <div key={label} className="flex items-center gap-4 p-3 rounded-xl hover:bg-gray-50 transition-colors">
                                         <div className={`${bg} p-2.5 rounded-xl flex-shrink-0`}>
@@ -193,8 +179,6 @@ export default function Welcome() {
                                     </div>
                                 ))}
                             </div>
-
-                            {/* Periodo activo */}
                             {periodo_activo && (
                                 <div className="mt-5 pt-4 border-t border-gray-100">
                                     <div className="flex items-center justify-between mb-2">
@@ -216,7 +200,6 @@ export default function Welcome() {
                 </div>
             </div>
         </section>
-
         {/* ── BANNER RECTOR ── */}
         {(rector || school?.dane || school?.nit) && (
             <div className="bg-gradient-to-r from-blue-700 to-indigo-700 py-4">
@@ -243,7 +226,6 @@ export default function Welcome() {
                 </div>
             </div>
         )}
-
         {/* ── NOSOTROS ── */}
         <section id="nosotros" className="py-16 sm:py-24 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -256,10 +238,10 @@ export default function Welcome() {
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6">
                     {[
-                        { bg: 'from-blue-500 to-blue-600',     icon: BookOpen,  title: 'Educación Integral',  desc: 'Formación académica, humana y ciudadana' },
-                        { bg: 'from-indigo-500 to-indigo-600', icon: Users,     title: 'Comunidad Activa',    desc: `${stats?.estudiantes || 'Cientos de'} estudiantes y ${stats?.profesores || 'varios'} docentes` },
-                        { bg: 'from-green-500 to-emerald-600', icon: Award,     title: 'Calidad Certificada', desc: 'Estándares nacionales de educación' },
-                        { bg: 'from-orange-500 to-amber-500',  icon: Heart,     title: 'Valores y Convivencia', desc: 'Respeto, responsabilidad y solidaridad' },
+                        { bg: 'from-blue-500 to-blue-600', icon: BookOpen, title: 'Educación Integral', desc: 'Formación académica, humana y ciudadana' },
+                        { bg: 'from-indigo-500 to-indigo-600', icon: Users, title: 'Comunidad Activa', desc: `${stats?.estudiantes || 'Cientos de'} estudiantes y ${stats?.profesores || 'varios'} docentes` },
+                        { bg: 'from-green-500 to-emerald-600', icon: Award, title: 'Calidad Certificada', desc: 'Estándares nacionales de educación' },
+                        { bg: 'from-orange-500 to-amber-500', icon: Heart, title: 'Valores y Convivencia', desc: 'Respeto, responsabilidad y solidaridad' },
                     ].map(({ bg, icon: Icon, title, desc }) => (
                         <div key={title} className="group text-center p-5 sm:p-7 rounded-2xl border border-gray-100 hover:border-transparent hover:shadow-xl transition-all duration-300">
                             <div className={`bg-gradient-to-br ${bg} w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
@@ -272,7 +254,6 @@ export default function Welcome() {
                 </div>
             </div>
         </section>
-
         {/* ── PROGRAMAS ── */}
         <section id="programas" className="py-16 sm:py-24 bg-gray-50">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -285,9 +266,9 @@ export default function Welcome() {
                 </div>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
                     {[
-                        { emoji: '🎨', title: 'Preescolar',      desc: 'Desarrollo integral mediante el juego y la exploración.', items: ['Estimulación temprana', 'Iniciación lectora', 'Desarrollo socioemocional'], highlight: false },
-                        { emoji: '📚', title: 'Básica Primaria',  desc: 'Construcción de bases sólidas para el aprendizaje.',       items: ['Lecto-escritura avanzada', 'Pensamiento lógico', 'Ciencias y tecnología'], highlight: true  },
-                        { emoji: '🎓', title: 'Básica y Media',   desc: 'Preparación para la vida universitaria y laboral.',        items: ['Preparación ICFES / SABER', 'Proyecto de vida', 'Competencias ciudadanas'], highlight: false },
+                        { emoji: '🎨', title: 'Preescolar', desc: 'Desarrollo integral mediante el juego y la exploración.', items: ['Estimulación temprana', 'Iniciación lectora', 'Desarrollo socioemocional'], highlight: false },
+                        { emoji: '📚', title: 'Básica Primaria', desc: 'Construcción de bases sólidas para el aprendizaje.', items: ['Lecto-escritura avanzada', 'Pensamiento lógico', 'Ciencias y tecnología'], highlight: true },
+                        { emoji: '🎓', title: 'Básica y Media', desc: 'Preparación para la vida universitaria y laboral.', items: ['Preparación ICFES / SABER', 'Proyecto de vida', 'Competencias ciudadanas'], highlight: false },
                     ].map(({ emoji, title, desc, items, highlight }) => (
                         <div key={title}
                             className={`bg-white rounded-2xl p-7 sm:p-8 shadow-md hover:shadow-xl transition-all duration-300 relative ${highlight ? 'border-2 border-blue-500 ring-2 ring-blue-100' : 'border border-gray-100'}`}>
@@ -312,15 +293,13 @@ export default function Welcome() {
                         </div>
                     ))}
                 </div>
-
-                {/* Cifras */}
                 {(stats?.asignaturas || stats?.grupos || stats?.profesores || anios) && (
                     <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-4">
                         {[
-                            { label: 'Asignaturas',       value: stats?.asignaturas, icon: BookOpen,   color: 'text-blue-600',   bg: 'bg-blue-50'   },
-                            { label: 'Grupos activos',    value: stats?.grupos,      icon: Layers,     color: 'text-indigo-600', bg: 'bg-indigo-50' },
-                            { label: 'Docentes',          value: stats?.profesores,  icon: Award,      color: 'text-green-600',  bg: 'bg-green-50'  },
-                            { label: 'Años de experiencia', value: anios,            icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-50' },
+                            { label: 'Asignaturas', value: stats?.asignaturas, icon: BookOpen, color: 'text-blue-600', bg: 'bg-blue-50' },
+                            { label: 'Grupos activos', value: stats?.grupos, icon: Layers, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+                            { label: 'Docentes', value: stats?.profesores, icon: Award, color: 'text-green-600', bg: 'bg-green-50' },
+                            { label: 'Años de experiencia', value: anios, icon: TrendingUp, color: 'text-orange-600', bg: 'bg-orange-50' },
                         ].filter(i => i.value != null).map(({ label, value, icon: Icon, color, bg }) => (
                             <div key={label} className={`${bg} rounded-2xl p-5 text-center border border-gray-100`}>
                                 <Icon className={`h-6 w-6 ${color} mx-auto mb-2`} />
@@ -332,7 +311,6 @@ export default function Welcome() {
                 )}
             </div>
         </section>
-
         {/* ── ADMISIONES ── */}
         <section id="admisiones" className="py-16 sm:py-24 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-700 text-white relative overflow-hidden">
             <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/3 pointer-events-none" />
@@ -347,9 +325,9 @@ export default function Welcome() {
                         </p>
                         <div className="space-y-4">
                             {[
-                                { icon: Calendar, title: 'Proceso continuo',   desc: 'Inscripciones abiertas durante todo el año'         },
-                                { icon: Users,    title: 'Cupos limitados',    desc: 'Grupos reducidos para mejor atención personalizada'  },
-                                { icon: Shield,   title: 'Proceso equitativo', desc: 'Criterios claros y transparentes de admisión'        },
+                                { icon: Calendar, title: 'Proceso continuo', desc: 'Inscripciones abiertas durante todo el año' },
+                                { icon: Users, title: 'Cupos limitados', desc: 'Grupos reducidos para mejor atención personalizada' },
+                                { icon: Shield, title: 'Proceso equitativo', desc: 'Criterios claros y transparentes de admisión' },
                             ].map(({ icon: Icon, title, desc }) => (
                                 <div key={title} className="flex items-start gap-4">
                                     <div className="bg-white/20 backdrop-blur-sm p-2.5 rounded-xl flex-shrink-0">
@@ -368,9 +346,9 @@ export default function Welcome() {
                         <p className="text-sm text-gray-500 mb-6">Completa el formulario y nos pondremos en contacto.</p>
                         <div className="space-y-4">
                             {[
-                                { type: 'text',  placeholder: 'Nombre completo del acudiente' },
-                                { type: 'email', placeholder: 'Correo electrónico'            },
-                                { type: 'tel',   placeholder: 'Teléfono de contacto'          },
+                                { type: 'text', placeholder: 'Nombre completo del acudiente' },
+                                { type: 'email', placeholder: 'Correo electrónico' },
+                                { type: 'tel', placeholder: 'Teléfono de contacto' },
                             ].map(({ type, placeholder }) => (
                                 <input key={placeholder} type={type} placeholder={placeholder}
                                     className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm outline-none" />
@@ -390,7 +368,6 @@ export default function Welcome() {
                 </div>
             </div>
         </section>
-
         {/* ── CONTACTO ── */}
         <section id="contacto" className="py-16 sm:py-24 bg-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -401,9 +378,9 @@ export default function Welcome() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 sm:gap-8">
                     {[
-                        { bg: 'from-blue-500 to-blue-600',     icon: MapPin, title: 'Dirección',            content: direccion  || 'Dirección no configurada', sub: null },
-                        { bg: 'from-green-500 to-emerald-600', icon: Phone,  title: 'Teléfono',             content: telefono   || 'No disponible',              sub: school?.celular && school?.telefono && school.celular !== school.telefono ? school.celular : null },
-                        { bg: 'from-indigo-500 to-indigo-600', icon: Mail,   title: 'Correo Institucional', content: emailInst  || 'No configurado',             sub: school?.sitio_web || null },
+                        { bg: 'from-blue-500 to-blue-600', icon: MapPin, title: 'Dirección', content: direccion || 'Dirección no configurada', sub: null },
+                        { bg: 'from-green-500 to-emerald-600', icon: Phone, title: 'Teléfono', content: telefono || 'No disponible', sub: school?.celular && school?.telefono && school.celular !== school.telefono ? school.celular : null },
+                        { bg: 'from-indigo-500 to-indigo-600', icon: Mail, title: 'Correo Institucional', content: emailInst || 'No configurado', sub: school?.sitio_web || null },
                     ].map(({ bg, icon: Icon, title, content, sub }) => (
                         <div key={title} className="group text-center p-7 rounded-2xl border border-gray-100 hover:shadow-xl transition-all duration-300">
                             <div className={`bg-gradient-to-br ${bg} w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
@@ -417,7 +394,6 @@ export default function Welcome() {
                 </div>
             </div>
         </section>
-
         {/* ── FOOTER ── */}
         <footer className="bg-gray-900 text-white py-14">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -443,19 +419,19 @@ export default function Welcome() {
                     <div>
                         <h4 className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-300">Institución</h4>
                         <ul className="space-y-2.5 text-gray-400 text-sm">
-                            {jornada         && <li className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 flex-shrink-0" />Jornada {jornada}</li>}
+                            {jornada && <li className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5 flex-shrink-0" />Jornada {jornada}</li>}
                             {school?.calendario && <li className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 flex-shrink-0" />Calendario {school.calendario}</li>}
-                            {caracter        && <li className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 flex-shrink-0" />{caracter}</li>}
-                            {school?.dane    && <li className="text-xs">DANE: {school.dane}</li>}
+                            {caracter && <li className="flex items-center gap-1.5"><Building2 className="h-3.5 w-3.5 flex-shrink-0" />{caracter}</li>}
+                            {school?.dane && <li className="text-xs">DANE: {school.dane}</li>}
                             {school?.resolucion && <li className="text-xs text-gray-500">Res. {school.resolucion}</li>}
                         </ul>
                     </div>
                     <div>
                         <h4 className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-300">Contacto</h4>
                         <ul className="space-y-2.5 text-gray-400 text-sm">
-                            {telefono   && <li className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 flex-shrink-0" />{telefono}</li>}
-                            {emailInst  && <li className="flex items-start gap-1.5 break-all"><Mail className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />{emailInst}</li>}
-                            {direccion  && <li className="flex items-start gap-1.5"><MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />{direccion}</li>}
+                            {telefono && <li className="flex items-center gap-1.5"><Phone className="h-3.5 w-3.5 flex-shrink-0" />{telefono}</li>}
+                            {emailInst && <li className="flex items-start gap-1.5 break-all"><Mail className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />{emailInst}</li>}
+                            {direccion && <li className="flex items-start gap-1.5"><MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />{direccion}</li>}
                         </ul>
                     </div>
                 </div>
@@ -465,7 +441,6 @@ export default function Welcome() {
                 </div>
             </div>
         </footer>
-
         {/* ── MODAL LOGIN ── */}
         {showLoginModal && (
             <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -479,7 +454,7 @@ export default function Welcome() {
                             ? <img src={schoolLogo} alt={schoolName} className="h-14 w-14 rounded-2xl object-contain mx-auto mb-4 shadow-md" />
                             : <div className="bg-gradient-to-br from-blue-100 to-indigo-100 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                 <GraduationCap className="h-8 w-8 text-blue-600" />
-                              </div>
+                            </div>
                         }
                         <h2 className="text-2xl font-bold text-gray-900">Portal Académico</h2>
                         <p className="text-gray-500 mt-1 text-sm">{schoolName}</p>
@@ -491,7 +466,7 @@ export default function Welcome() {
                                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
                                 <input type="email" value={data.email} onChange={(e) => setData('email', e.target.value)}
                                     className={`w-full pl-10 pr-4 py-2.5 border ${errors.email ? 'border-red-300 bg-red-50' : 'border-gray-200'} rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-sm`}
-                                    placeholder="tu@email.com" />
+                                    placeholder="tu@email.com" autoFocus />
                             </div>
                             {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
                         </div>

@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class BoletinController extends Controller
 {
@@ -328,7 +329,7 @@ class BoletinController extends Controller
      */
     private function generarBoletinDOCX(Boletin $boletin, array $notasPorAsignatura): string
     {
-        $directory = 'boletines/' . $boletin->academicPeriod->id;
+         $directory = 'boletines/' . $boletin->academicPeriod->id;
         Storage::makeDirectory($directory);
 
         $datos = [
@@ -378,18 +379,34 @@ class BoletinController extends Controller
         $filename = "boletin_{$boletin->student->document_number}_{$boletin->academicPeriod->id}.docx";
         $filepath = $directory . '/' . $filename;
 
-        $jsonPath   = storage_path('app/boletines/temp_' . $boletin->id . '.json');
+        // ✅ FIX RACE CONDITION: nombre único por ejecución
+        $jsonPath   = storage_path('app/boletines/temp_' . $boletin->id . '_' . uniqid('', true) . '.json');
+        $outputPath = storage_path('app/' . $filepath);
+        $scriptPath = base_path('scripts/generar-boletin.js');
+
         file_put_contents($jsonPath, json_encode($datos, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT));
 
-        $scriptPath = base_path('scripts/generar-boletin.js');
-        $outputPath = storage_path('app/' . $filepath);
+        // ✅ FIX COMMAND INJECTION: escapeshellarg en todos los argumentos
+        $cmd = 'node '
+            . escapeshellarg($scriptPath)
+            . ' ' . escapeshellarg($jsonPath)
+            . ' ' . escapeshellarg($outputPath)
+            . ' 2>&1';
 
-        exec("node {$scriptPath} {$jsonPath} {$outputPath} 2>&1", $output, $returnCode);
+        exec($cmd, $output, $returnCode);
 
         @unlink($jsonPath);
 
         if ($returnCode !== 0) {
-            throw new \Exception('Error ejecutando script de generación: ' . implode("\n", $output));
+           Log::error('Error script boletin', [
+        'boletin_id' => $boletin->id,
+        'output'     => implode("\n", $output),
+            ]);
+         throw new \Exception(
+            config('app.debug') 
+             ? 'Error script: ' . implode("\n", $output)
+                : 'Error al generar el documento. Contacta al administrador.'
+            );
         }
 
         return $filepath;

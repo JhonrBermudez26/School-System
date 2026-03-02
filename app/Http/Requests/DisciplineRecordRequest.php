@@ -38,4 +38,6 @@ class DisciplineRecordRequest extends FormRequest
             'sanction.max' => 'La sanción no puede exceder 500 caracteres',
         ];
     }
+
+    
 }

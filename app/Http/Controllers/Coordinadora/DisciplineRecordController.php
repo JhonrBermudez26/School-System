@@ -91,21 +91,23 @@ class DisciplineRecordController extends Controller
     /**
      * Crear un registro disciplinario
      */
-    public function store(DisciplineRecordRequest $request)
-    {
-        $this->authorize('create', DisciplineRecord::class);
+ public function store(DisciplineRecordRequest $request)
+{
+    $this->authorize('create', DisciplineRecord::class);
 
-        $validated              = $request->validated();
-        $validated['created_by']= auth()->id();
-        $validated['status']    = $validated['status'] ?? 'open';
+    $record = DisciplineRecord::create($request->validated());
 
-        $record = DisciplineRecord::create($validated);
+    // Campos protegidos — asignados explícitamente por el sistema, no por el request
+    $record->forceFill([
+        'created_by' => auth()->id(),
+        'status'     => 'open',
+    ])->save();
 
-        $this->activityLog->log($record, 'created', null, $record->toArray());
+    $this->activityLog->log($record, 'created', null, $record->toArray());
 
-        return redirect()->route('coordinadora.disciplina')
-            ->with('success', 'Registro disciplinario creado correctamente');
-    }
+    return redirect()->route('coordinadora.disciplina')
+        ->with('success', 'Registro disciplinario creado correctamente');
+}
 
     /**
      * Actualizar un registro disciplinario

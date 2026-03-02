@@ -66,7 +66,7 @@ class AcademicPeriodPolicy
             return false;
         }
 
-        return $user->hasPermissionTo('periods.delete');
+        return $user->hasPermissionTo('academic_period.delete');
     }
 
     /**

@@ -149,7 +149,11 @@ class TeacherController extends Controller
 
             DB::transaction(function () use ($profesor, $validated) {
                 // Actualizar estado
-                $profesor->update(['is_active' => $validated['is_active']]);
+               if ($validated['is_active']) {
+                $profesor->activate();
+            } else {
+                $profesor->deactivate();
+            }
 
                 // Eliminar asignaciones anteriores
                 DB::table('subject_group')->where('user_id', $profesor->id)->delete();
@@ -159,9 +163,9 @@ class TeacherController extends Controller
                 foreach ($validated['asignaturas'] as $asignatura) {
                     foreach ($asignatura['group_ids'] as $groupId) {
                         $asignaciones[] = [
-                            'user_id' => $profesor->id,
+                            'user_id'    => $profesor->id,
                             'subject_id' => $asignatura['subject_id'],
-                            'group_id' => $groupId,
+                            'group_id'   => $groupId,
                             'created_at' => now(),
                             'updated_at' => now(),
                         ];
@@ -176,7 +180,7 @@ class TeacherController extends Controller
                 ]);
             });
 
-            return redirect()->back()->with('success', '✅ Profesor actualizado correctamente');
+         return redirect()->back()->with('success', '✅ Profesor actualizado correctamente');
         } catch (\Illuminate\Validation\ValidationException $e) {
             Log::error('Error de validación', ['errors' => $e->errors()]);
             return back()->withErrors($e->errors())->with('error', '❌ Error de validación');
@@ -202,9 +206,14 @@ class TeacherController extends Controller
                 'is_active' => 'required|boolean',
             ]);
 
-            $profesor->update(['is_active' => $validated['is_active']]);
+            if ($validated['is_active']) {
+            $profesor->activate();
+        } else {
+            $profesor->deactivate();
+        }
 
-            return back()->with('success', '🔄 Estado actualizado correctamente');
+        return back()->with('success', '🔄 Estado actualizado correctamente');
+
         } catch (\Exception $e) {
             Log::error('Error al cambiar estado', ['message' => $e->getMessage()]);
             return back()->with('error', '❌ No se pudo cambiar el estado');

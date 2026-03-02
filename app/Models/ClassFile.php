@@ -4,21 +4,27 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class ClassFile extends Model
 {
     use HasFactory;
 
     protected $fillable = [
+        'user_id',
         'subject_id',
         'group_id',
         'folder_id',
-        'user_id',
         'filename',
-        'path',
-        'mime',
-        'size',
+        'path',    // ← agregar
+        'mime',    // ← agregar
+        'size',    // ← agregar
     ];
+
+    public function getRouteKeyName(): string
+    {
+        return 'uuid';
+    }
 
     public function folder()
     {
@@ -29,10 +35,15 @@ class ClassFile extends Model
     {
         parent::boot();
 
-        // Al eliminar un archivo, eliminarlo también del almacenamiento
+        static::creating(function ($file) {
+            if (empty($file->uuid)) {
+                $file->uuid = Str::uuid();
+            }
+        });
+
         static::deleting(function ($file) {
-            if ($file->path && Storage::disk('public')->exists($file->path)) {
-                Storage::disk('public')->delete($file->path);
+            if ($file->path && Storage::disk('private')->exists($file->path)) {
+                Storage::disk('private')->delete($file->path);
             }
         });
     }

@@ -117,17 +117,16 @@ class StudentController extends Controller
             ]);
 
             DB::transaction(function () use ($user, $validated) {
-                $user->update([
-                    'is_active' => $validated['is_active'],
-                ]);
+                 if ($validated['is_active']) {
+                $user->activate();
+            } else {
+                $user->deactivate();
+            }
 
-                $user->groups()->sync([$validated['group_id']]);
-                
-                Log::info('Grupo sincronizado', [
-                    'user_id' => $user->id,
-                    'group_id' => $validated['group_id'],
-                ]);
+            $user->groups()->sync([$validated['group_id']]);
             });
+
+            return redirect()->back()->with('success', '✅ Estudiante actualizado correctamente');
 
             Log::info('✅ Estudiante actualizado correctamente', [
                 'user_id' => $user->id,
@@ -165,14 +164,13 @@ class StudentController extends Controller
                 'is_active' => 'required|boolean',
             ]);
 
-            $user->update(['is_active' => $validated['is_active']]);
+           if ($validated['is_active']) {
+            $user->activate();
+        } else {
+            $user->deactivate();
+        }
 
-            Log::info('Estado de estudiante cambiado', [
-                'user_id' => $user->id,
-                'is_active' => $validated['is_active'],
-            ]);
-
-            return back()->with('success', '🔄 Estado actualizado correctamente');
+        return back()->with('success', '🔄 Estado actualizado correctamente');
         } catch (\Exception $e) {
             Log::error('Error al cambiar estado', [
                 'message' => $e->getMessage(),

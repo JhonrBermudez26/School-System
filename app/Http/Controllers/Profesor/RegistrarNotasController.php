@@ -201,36 +201,38 @@ class RegistrarNotasController extends Controller
     }
 
     public function saveManualGradeScore(Request $request)
-    {
-        $validated = $request->validate([
-            'manual_grade_id' => 'required|integer',
-            'student_id'      => 'required|integer',
-            'score'           => 'nullable|numeric|min:0|max:5.0',
-            'feedback'        => 'nullable|string',
-        ]);
+{
+    $validated = $request->validate([
+        'manual_grade_id' => 'required|integer',
+        'student_id'      => 'required|integer',
+        'score'           => 'nullable|numeric|min:0|max:5.0',
+        'feedback'        => 'nullable|string',
+    ]);
 
-        $manualGrade = DB::table('manual_grades')->where('id', $validated['manual_grade_id'])->first();
+    $manualGrade = DB::table('manual_grades')->where('id', $validated['manual_grade_id'])->first();
 
-        // ✅ Verifica propiedad: solo el teacher_id puede calificar su propia evaluación
-        if (!$manualGrade || $manualGrade->teacher_id !== Auth::id()) {
-            return response()->json(['message' => 'No autorizado'], 403);
-        }
-
-        if (!$this->validatePeriodEnabled($manualGrade->academic_period_id)) {
-            return response()->json(['message' => 'El periodo no permite calificaciones.', 'error' => 'period_disabled'], 403);
-        }
-
-        if ($validated['score'] !== null && $validated['score'] > $manualGrade->max_score) {
-            return response()->json(['message' => "La calificación no puede exceder {$manualGrade->max_score}"], 422);
-        }
-
-        DB::table('manual_grade_scores')->updateOrInsert(
-            ['manual_grade_id' => $validated['manual_grade_id'], 'student_id' => $validated['student_id']],
-            ['score' => $validated['score'], 'feedback' => $validated['feedback'] ?? null, 'graded_at' => now(), 'updated_at' => now()]
-        );
-
-        return response()->json(['success' => true, 'message' => 'Calificación guardada']);
+    if (!$manualGrade || $manualGrade->teacher_id !== Auth::id()) {
+        return response()->json(['message' => 'No autorizado'], 403);
     }
+
+    if (!$this->validatePeriodEnabled($manualGrade->academic_period_id)) {
+        return response()->json(['message' => 'El periodo no permite calificaciones.', 'error' => 'period_disabled'], 403);
+    }
+
+    if ($validated['score'] !== null && $validated['score'] > $manualGrade->max_score) {
+        return response()->json(['message' => "La calificación no puede exceder {$manualGrade->max_score}"], 422);
+    }
+
+    // ✅ CORREGIDO: pasar por el modelo ManualGradeScore con su método grade()
+    $score = \App\Models\ManualGradeScore::firstOrNew([
+        'manual_grade_id' => $validated['manual_grade_id'],
+        'student_id'      => $validated['student_id'],
+    ]);
+
+    $score->grade($validated['score'], $validated['feedback'] ?? null);
+
+    return response()->json(['success' => true, 'message' => 'Calificación guardada']);
+}
 
     /**
      * Eliminar nota manual

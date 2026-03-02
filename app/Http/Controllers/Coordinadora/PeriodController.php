@@ -6,6 +6,7 @@ use App\Models\AcademicPeriod;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 
 class PeriodController extends Controller
 {
@@ -56,40 +57,84 @@ class PeriodController extends Controller
     }
 
     public function store(\App\Http\Requests\PeriodRequest $request)
-    {
-        $validated = $request->validated();
+{
+    $validated = $request->validated();
 
-        $porcentajeTotal = AcademicPeriod::sum('grade_weight') ?? 0;
-        if (($porcentajeTotal + $validated['porcentaje']) > 100) {
-            return back()->withErrors([
-                'porcentaje' => 'La suma de porcentajes no puede exceder el 100%. Disponible: ' . (100 - $porcentajeTotal) . '%',
-            ]);
-        }
-
-        $periodNumber = null;
-        if (preg_match('/[-_\s]?(\d)$/', $validated['name'], $m)) {
-            $periodNumber = (int) $m[1];
-        }
-
-        $periodo = AcademicPeriod::create([
-            'name'                    => $validated['name'],
-            'year'                    => $validated['year'] ?? (int) date('Y', strtotime($validated['start_date'])),
-            'period_number'           => $periodNumber ?? 1,
-            'start_date'              => $validated['start_date'],
-            'end_date'                => $validated['end_date'],
-            'grades_enabled'          => $validated['habilitado'] ?? true,
-            'grades_enabled_manually' => false,
-            'status'                  => 'draft',
-            'is_active'               => false,
-            'guidelines'              => $validated['directrices'] ?? null,
-            'grade_weight'            => $validated['porcentaje'],
+    $porcentajeTotal = AcademicPeriod::sum('grade_weight') ?? 0;
+    if (($porcentajeTotal + $validated['porcentaje']) > 100) {
+        return back()->withErrors([
+            'porcentaje' => 'La suma de porcentajes no puede exceder el 100%. Disponible: ' . (100 - $porcentajeTotal) . '%',
         ]);
-
-        $this->activityLog->log($periodo, 'created', null, $periodo->toArray());
-
-        return redirect()->route('coordinadora.periodos')
-            ->with('success', 'Periodo creado correctamente');
     }
+
+    $periodNumber = null;
+    if (preg_match('/[-_\s]?(\d)$/', $validated['name'], $m)) {
+        $periodNumber = (int) $m[1];
+    }
+
+    // ✅ CORREGIDO: solo campos permitidos en $fillable de AcademicPeriod.
+    // grades_enabled, grades_enabled_manually, is_active, status son protegidos.
+    // Se crean con valores por defecto del modelo y luego se activan con métodos.
+    $periodo = AcademicPeriod::create([
+        'name'          => $validated['name'],
+        'year'          => $validated['year'] ?? (int) date('Y', strtotime($validated['start_date'])),
+        'period_number' => $periodNumber ?? 1,
+        'start_date'    => $validated['start_date'],
+        'end_date'      => $validated['end_date'],
+        'guidelines'    => $validated['directrices'] ?? null,
+        'grade_weight'  => $validated['porcentaje'],
+    ]);
+
+    // ✅ Si el formulario indicó que debería estar habilitado, activar via método
+    if ($validated['habilitado']) {
+        $periodo->enableGradesManually();
+    }
+
+    $this->activityLog->log($periodo, 'created', null, $periodo->toArray());
+
+    return redirect()->route('coordinadora.periodos')
+        ->with('success', 'Periodo creado correctamente');
+}
+
+// --- toggle() ---
+public function toggle(Request $request, AcademicPeriod $academicPeriod)
+{
+    $this->authorize('update', $academicPeriod);
+
+    $oldValues       = $academicPeriod->toArray();
+    $esPeriodoActual = $academicPeriod->isDentroFecha();
+
+    if (!$esPeriodoActual && !$academicPeriod->grades_enabled) {
+        $request->validate(['password' => 'required|string']);
+
+        if (!Hash::check($request->password, auth()->user()->password)) {
+            return back()->withErrors(['password' => 'La contraseña es incorrecta']);
+        }
+
+        // ✅ CORREGIDO: usa método controlado del modelo
+        $academicPeriod->enableGradesManually();
+
+    } else {
+        // ✅ CORREGIDO: usa métodos controlados según estado actual
+        if ($academicPeriod->grades_enabled) {
+            // Deshabilitar — asignación directa permitida solo de este campo no protegido
+            // Si grades_enabled está en $fillable básico, usar update; si no, setter directo
+            $academicPeriod->grades_enabled = false;
+            if ($esPeriodoActual) {
+                $academicPeriod->grades_enabled_manually = false;
+            }
+            $academicPeriod->save();
+        } else {
+            $academicPeriod->enableGradesManually();
+        }
+    }
+
+    $this->activityLog->log($academicPeriod, 'toggled_grades_enabled', $oldValues, $academicPeriod->getChanges());
+
+    $estado = $academicPeriod->grades_enabled ? 'habilitada' : 'deshabilitada';
+    return redirect()->route('coordinadora.periodos')
+        ->with('success', "Carga de notas {$estado} correctamente");
+}
 
     /**
      * ✅ FIX IDOR: Route Model Binding reemplaza findOrFail($id) manual
@@ -144,44 +189,7 @@ class PeriodController extends Controller
             ->with('success', 'Periodo eliminado correctamente');
     }
 
-    /**
-     * Habilitar/Deshabilitar carga de notas
-     * ✅ FIX IDOR: Route Model Binding + authorize('update', $periodo)
-     */
-    public function toggle(Request $request, AcademicPeriod $academicPeriod)
-    {
-        $this->authorize('update', $academicPeriod);
-
-        $oldValues       = $academicPeriod->toArray();
-        $esPeriodoActual = $academicPeriod->isDentroFecha();
-
-        if (!$esPeriodoActual && !$academicPeriod->grades_enabled) {
-            $request->validate(['password' => 'required|string']);
-
-            if (!Hash::check($request->password, auth()->user()->password)) {
-                return back()->withErrors(['password' => 'La contraseña es incorrecta']);
-            }
-
-            $academicPeriod->grades_enabled          = true;
-            $academicPeriod->grades_enabled_manually = true;
-        } else {
-            $academicPeriod->grades_enabled = !$academicPeriod->grades_enabled;
-            if ($esPeriodoActual) {
-                $academicPeriod->grades_enabled_manually = false;
-            }
-        }
-
-        $academicPeriod->save();
-
-        $this->activityLog->log($academicPeriod, 'toggled_grades_enabled', $oldValues, $academicPeriod->getChanges());
-
-        $estado = $academicPeriod->grades_enabled ? 'habilitada' : 'deshabilitada';
-
-        return redirect()->route('coordinadora.periodos')
-            ->with('success', "Carga de notas {$estado} correctamente");
-    }
-
-    /**
+       /**
      * ✅ FIX IDOR: Route Model Binding + authorize('close', $periodo)
      */
     public function close(AcademicPeriod $academicPeriod)

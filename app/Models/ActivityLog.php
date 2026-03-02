@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -11,120 +10,85 @@ class ActivityLog extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'user_id',
-        'action',
-        'model_type',
-        'model_id',
-        'old_values',
-        'new_values',
-        'ip_address',
-        'user_agent',
-    ];
+    /**
+     * ✅ ActivityLog NO debe ser fillable desde requests externos.
+     * Se usa guarded vacío pero SOLO se debe crear desde el servicio AuditService.
+     *
+     * NUNCA hacer: ActivityLog::create($request->all())
+     * SIEMPRE hacer: AuditService::log('action', $model)
+     *
+     * Se mantiene $fillable vacío para forzar asignación explícita.
+     */
+    protected $fillable = [];
+
+    /**
+     * Campos que el AuditService puede asignar directamente.
+     * Se usa este método para crear logs desde el servicio.
+     */
+    public static function record(
+        int $userId,
+        string $action,
+        ?Model $model,
+        array $oldValues = [],
+        array $newValues = []
+    ): self {
+        $instance = new self();
+        $instance->user_id    = $userId;
+        $instance->action     = $action;
+        $instance->model_type = $model ? get_class($model) : 'Unknown';  // ← proteger
+    $instance->model_id   = $model?->getKey(); 
+        $instance->old_values = $oldValues;
+        $instance->new_values = $newValues;
+        $instance->ip_address = request()->ip();
+        $instance->user_agent = request()->userAgent();
+        $instance->save();
+        return $instance;
+    }
 
     protected $casts = [
         'old_values' => 'array',
         'new_values' => 'array',
     ];
 
-    /**
-     * Relación con el usuario que realizó la acción
-     */
-    public function user(): BelongsTo
-    {
-        return $this->belongsTo(User::class);
-    }
+    public function user(): BelongsTo { return $this->belongsTo(User::class); }
+    public function model(): MorphTo  { return $this->morphTo(); }
 
-    /**
-     * Relación polimórfica con el modelo afectado
-     */
-    public function model(): MorphTo
-    {
-        return $this->morphTo();
-    }
+    public function scopeByUser($query, int $userId)        { return $query->where('user_id', $userId); }
+    public function scopeByModel($query, string $modelType) { return $query->where('model_type', $modelType); }
+    public function scopeByAction($query, string $action)   { return $query->where('action', $action); }
+    public function scopeRecent($query)                     { return $query->orderByDesc('created_at'); }
 
-    /**
-     * Scope para filtrar por usuario
-     */
-    public function scopeByUser($query, int $userId)
-    {
-        return $query->where('user_id', $userId);
-    }
-
-    /**
-     * Scope para filtrar por tipo de modelo
-     */
-    public function scopeByModel($query, string $modelType)
-    {
-        return $query->where('model_type', $modelType);
-    }
-
-    /**
-     * Scope para filtrar por acción
-     */
-    public function scopeByAction($query, string $action)
-    {
-        return $query->where('action', $action);
-    }
-
-    /**
-     * Scope para filtrar por rango de fechas
-     */
     public function scopeByDateRange($query, $startDate, $endDate)
     {
         return $query->whereBetween('created_at', [$startDate, $endDate]);
     }
 
-    /**
-     * Scope ordenado por fecha descendente
-     */
-    public function scopeRecent($query)
-    {
-        return $query->orderByDesc('created_at');
-    }
-
-    /**
-     * Obtiene los cambios realizados
-     */
     public function getChanges(): array
     {
         $changes = [];
-
-        if ($this->old_values && $this->new_values) {
-            $oldValues = is_array($this->old_values) ? $this->old_values : [];
-            $newValues = is_array($this->new_values) ? $this->new_values : [];
-
-            foreach ($newValues as $key => $newValue) {
-                $oldValue = $oldValues[$key] ?? null;
-                if ($oldValue !== $newValue) {
-                    $changes[$key] = [
-                        'old' => $oldValue,
-                        'new' => $newValue,
-                    ];
-                }
+        $oldValues = is_array($this->old_values) ? $this->old_values : [];
+        $newValues = is_array($this->new_values) ? $this->new_values : [];
+        foreach ($newValues as $key => $newValue) {
+            if (($oldValues[$key] ?? null) !== $newValue) {
+                $changes[$key] = ['old' => $oldValues[$key] ?? null, 'new' => $newValue];
             }
         }
-
         return $changes;
     }
 
-    /**
-     * Obtiene una descripción legible de la acción
-     */
     public function getActionDescription(): string
     {
         $modelName = class_basename($this->model_type);
-        $userName = $this->user ? $this->user->name : 'System';
-
+        $userName  = $this->user ? $this->user->name : 'System';
         return match ($this->action) {
-            'created' => "{$userName} creó {$modelName}",
-            'updated' => "{$userName} actualizó {$modelName}",
-            'deleted' => "{$userName} eliminó {$modelName}",
-            'activated' => "{$userName} activó {$modelName}",
+            'created'     => "{$userName} creó {$modelName}",
+            'updated'     => "{$userName} actualizó {$modelName}",
+            'deleted'     => "{$userName} eliminó {$modelName}",
+            'activated'   => "{$userName} activó {$modelName}",
             'deactivated' => "{$userName} desactivó {$modelName}",
-            'closed' => "{$userName} cerró {$modelName}",
-            'reopened' => "{$userName} reabrió {$modelName}",
-            default => "{$userName} realizó {$this->action} en {$modelName}",
+            'closed'      => "{$userName} cerró {$modelName}",
+            'reopened'    => "{$userName} reabrió {$modelName}",
+            default       => "{$userName} realizó {$this->action} en {$modelName}",
         };
     }
 }

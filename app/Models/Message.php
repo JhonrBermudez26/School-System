@@ -1,5 +1,5 @@
 <?php
-
+// app/Models/Message.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,9 +9,12 @@ class Message extends Model
 {
     use HasFactory;
 
+    /**
+     * ✅ Solo el contenido del mensaje que el usuario puede escribir.
+     *
+     */
     protected $fillable = [
         'conversation_id',
-        'user_id',
         'body',
         'type',
         'attachment',
@@ -19,42 +22,27 @@ class Message extends Model
         'deleted',
         'edited',
         'hidden_by',
+        'created_at',
+        'updated_at',
+        'deleted_at',
+        'conversation_id',
+        'user_id',
     ];
 
     protected $casts = [
-        'read_by' => 'array',
-        'deleted' => 'boolean',
-        'edited' => 'boolean',
-        'hidden_by' => 'array', 
+        'read_by'  => 'array',
+        'deleted'  => 'boolean',
+        'edited'   => 'boolean',
+        'hidden_by'=> 'array',
     ];
 
-    public function conversation()
-    {
-        return $this->belongsTo(Conversation::class);
-    }
+    /* =====================================================
+     |  MÉTODOS CONTROLADOS
+     ===================================================== */
 
-    public function user()
+    public function markAsRead($userId): void
     {
-        return $this->belongsTo(User::class);
-    }
-
-    /**
-     * Marcar mensaje como leído por un usuario
-     */
-    public function markAsRead($userId)
-    {
-        // Asegurar que read_by sea un array
-        $readBy = $this->read_by;
-        
-        // Si es null, string o no es array, convertir a array
-        if (!is_array($readBy)) {
-            if (is_string($readBy)) {
-                $readBy = json_decode($readBy, true) ?? [];
-            } else {
-                $readBy = [];
-            }
-        }
-        
+        $readBy = is_array($this->read_by) ? $this->read_by : [];
         if (!in_array($userId, $readBy)) {
             $readBy[] = $userId;
             $this->read_by = $readBy;
@@ -62,39 +50,48 @@ class Message extends Model
         }
     }
 
-    /**
-     * Verificar si un mensaje ha sido leído por un usuario
-     */
-    public function isReadBy($userId)
+    public function isReadBy($userId): bool
     {
-        $readBy = $this->read_by;
-        
-        if (!is_array($readBy)) {
-            if (is_string($readBy)) {
-                $readBy = json_decode($readBy, true) ?? [];
-            } else {
-                $readBy = [];
-            }
-        }
-        
+        $readBy = is_array($this->read_by) ? $this->read_by : [];
         return in_array($userId, $readBy);
     }
 
     /**
-     * Obtener la cantidad de lecturas (excluyendo al autor)
+     * Editar mensaje — solo el autor puede llamar esto.
      */
-    public function getReadCountAttribute()
+    public function edit(string $newBody): bool
     {
-        $readBy = $this->read_by;
-        
-        if (!is_array($readBy)) {
-            if (is_string($readBy)) {
-                $readBy = json_decode($readBy, true) ?? [];
-            } else {
-                $readBy = [];
-            }
-        }
-        
+        $this->body   = $newBody;
+        $this->edited = true;
+        return $this->save();
+    }
+
+    /**
+     * Eliminar lógicamente — solo el autor o admin.
+     */
+    public function softDelete(): bool
+    {
+        $this->deleted = true;
+        return $this->save();
+    }
+
+    /**
+     * Ocultar para un usuario específico.
+     */
+    public function hideFor(int $userId): bool
+    {
+        $hiddenBy   = is_array($this->hidden_by) ? $this->hidden_by : [];
+        $hiddenBy[] = $userId;
+        $this->hidden_by = array_unique($hiddenBy);
+        return $this->save();
+    }
+
+    public function getReadCountAttribute(): int
+    {
+        $readBy = is_array($this->read_by) ? $this->read_by : [];
         return count(array_filter($readBy, fn($id) => $id !== $this->user_id));
     }
+
+    public function conversation() { return $this->belongsTo(Conversation::class); }
+    public function user()         { return $this->belongsTo(User::class); }
 }

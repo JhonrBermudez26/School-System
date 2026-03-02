@@ -8,6 +8,8 @@ use Inertia\Inertia;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Log;
+use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserRequest;
 
 class UsuarioController extends Controller
 {
@@ -33,24 +35,14 @@ class UsuarioController extends Controller
     /**
      * Crear nuevo usuario
      */
-    public function store(Request $request)
+    public function store(StoreUserRequest $request)
     {
         $this->authorize('create', User::class);
 
-        $validated = $request->validate([
-            'name'            => 'required|string|max:255',
-            'last_name'       => 'required|string|max:255',
-            'email'           => 'required|email|unique:users',
-            'password'        => 'required|min:6',
-            'document_type'   => 'required|string|in:CC,TI,CE',
-            'document_number' => 'required|string|unique:users',
-            'phone'           => 'nullable|string|max:15',
-            'address'         => 'nullable|string|max:255',
-            'birth_date'      => 'nullable|date',
-            'role'            => 'required|string|in:estudiante,profesor,secretaria,coordinadora,rector',
-        ]);
+        $validated = $request->validated();
 
         try {
+
             $user = User::create([
                 'name'            => $validated['name'],
                 'last_name'       => $validated['last_name'],
@@ -62,6 +54,7 @@ class UsuarioController extends Controller
                 'address'         => $validated['address'] ?? null,
                 'birth_date'      => $validated['birth_date'] ?? null,
                 'is_active'       => true,
+                'must_change_password' => true,
             ]);
 
             $user->assignRole($validated['role']);
@@ -79,43 +72,57 @@ class UsuarioController extends Controller
      * Actualizar usuario existente
      * ✅ FIX IDOR: Route Model Binding + authorize('update', $user) con instancia real
      */
-    public function update(Request $request, User $user)
-    {
-        $this->authorize('update', $user);
+   public function update(UpdateUserRequest $request, User $user)
+{
+    $this->authorize('update', $user);
+    $validated = $request->validated();
+    
+    try {
+        // Preparar todos los campos juntos
+        $user->name      = $validated['name'];
+        $user->last_name = $validated['last_name'];
+        $user->email     = $validated['email'];
 
-        $validated = $request->validate([
-            'name'      => 'required|string|max:255',
-            'last_name' => 'required|string|max:255',
-            'email'     => ['required', 'email', Rule::unique('users')->ignore($user->id)],
-            'role'      => 'required|string|in:estudiante,profesor,secretaria,coordinadora,rector',
-            'password'  => 'nullable|min:6',
-            'is_active' => 'boolean',
-        ]);
-
-        try {
-            $user->update([
-                'name'      => $validated['name'],
-                'last_name' => $validated['last_name'],
-                'email'     => $validated['email'],
-                'is_active' => $validated['is_active'] ?? $user->is_active,
-            ]);
-
-            if (!empty($validated['password'])) {
-                $user->update(['password' => Hash::make($validated['password'])]);
-            }
-
-            if ($user->roles->first()?->name !== $validated['role']) {
-                $user->syncRoles([$validated['role']]);
-            }
-
-            Log::info('Usuario actualizado', ['user_id' => $user->id, 'updated_by' => auth()->id()]);
-
-            return back()->with('success', '✅ Usuario actualizado correctamente');
-        } catch (\Exception $e) {
-            Log::error('Error al actualizar usuario', ['user_id' => $user->id, 'error' => $e->getMessage()]);
-            return back()->withErrors(['error' => '❌ Error al actualizar: ' . $e->getMessage()]);
+        // Contraseña solo si viene
+        if (!empty($validated['password'])) {
+            $user->password = Hash::make($validated['password']);
+            $user->must_change_password = true;
         }
+
+        // Estado
+        if (isset($validated['is_active'])) {
+            $user->is_active = $validated['is_active'];
+        }
+
+        // UN SOLO save() — no múltiples update()/save()
+        $user->save();
+
+        // Rol después del save (syncRoles no afecta password)
+        if ($user->roles->first()?->name !== $validated['role']) {
+            $user->syncRoles([$validated['role']]);
+        }
+
+        return back()->with('success', '✅ Usuario actualizado correctamente');
+
+    } catch (\Exception $e) {
+        return back()->withErrors(['error' => '❌ Error al actualizar: ' . $e->getMessage()]);
     }
+}
+
+// --- toggle() ---
+public function toggle(Request $request, User $user)
+{
+    $this->authorize('update', $user);
+
+    // ✅ CORREGIDO: usa métodos controlados
+    if ($request->boolean('is_active')) {
+        $user->activate();
+    } else {
+        $user->deactivate();
+    }
+
+    return back()->with('success', '🔄 Estado actualizado correctamente');
+}
 
     /**
      * Eliminar usuario
@@ -138,17 +145,4 @@ class UsuarioController extends Controller
         }
     }
 
-    /**
-     * Activar/Desactivar usuario
-     * ✅ FIX IDOR: Route Model Binding + authorize('update', $user)
-     *    La Policy previene modificar al rector y auto-modificación
-     */
-    public function toggle(Request $request, User $user)
-    {
-        $this->authorize('update', $user);
-
-        $user->update(['is_active' => $request->boolean('is_active')]);
-
-        return back()->with('success', '🔄 Estado actualizado correctamente');
-    }
 }

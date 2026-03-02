@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Gate; 
+use App\Http\Requests\SubmitTaskRequest;
 
 
 class EstudianteTaskController extends Controller
@@ -232,20 +233,10 @@ class EstudianteTaskController extends Controller
         /**
      * Enviar o actualizar entrega de tarea
      */
-    public function submit(Request $request)
+    public function submit(SubmitTaskRequest $request)
     {
-        $validated = $request->validate([
-            'task_id'         => 'required|integer|exists:tasks,id',
-            'submission_id'   => 'nullable|integer|exists:task_submissions,id',
-            'comment'         => 'nullable|string',
-            'files'           => 'nullable|array',
-            'files.*'         => 'file|max:20480',
-            'member_ids'      => 'nullable|array',
-            'member_ids.*'    => 'integer|exists:users,id',
-        ], [
-            'files.*.max' => 'Cada archivo no puede exceder 20MB',
-        ]);
-
+        $validated = $request->validated();
+        
         $task = Task::findOrFail($validated['task_id']);
         
         $this->assertGroupMembership($task->group_id);
@@ -278,11 +269,10 @@ class EstudianteTaskController extends Controller
             }
 
             // Actualizar datos básicos de la entrega principal
-            $submission->comment      = $validated['comment'] ?? null;
-            $submission->status       = 'submitted';
-            $submission->submitted_at = now();
-            $submission->is_late      = $task->isPastDue();
-            $submission->save();
+            $submission->submit(
+                $task->isPastDue(),
+                $validated['comment'] ?? null
+            );
 
             // ==================================================
             // MANEJO DE MIEMBROS (creación y edición)
@@ -351,12 +341,7 @@ class EstudianteTaskController extends Controller
                         ]
                     );
 
-                    $memberSub->update([
-                        'status'       => 'submitted',
-                        'submitted_at' => $submission->submitted_at,
-                        'is_late'      => $submission->is_late,
-                        'comment'      => $submission->comment ?? null,
-                    ]);
+                    $memberSub->submit($submission->is_late, $submission->comment);
                 }
             }
 
@@ -428,8 +413,8 @@ class EstudianteTaskController extends Controller
         }
 
         try {
-            if ($file->file_path && Storage::disk('public')->exists($file->file_path)) {
-                Storage::disk('public')->delete($file->file_path);
+            if ($file->file_path && Storage::disk('private')->exists($file->file_path)) {
+                Storage::disk('private')->delete($file->file_path);
             }
 
             $file->delete();
@@ -542,19 +527,15 @@ public function removeMember($memberId)
 
             $files = TaskSubmissionFile::where('submission_id', $submission->id)->get();
             foreach ($files as $file) {
-                if ($file->file_path && Storage::disk('public')->exists($file->file_path)) {
-                    Storage::disk('public')->delete($file->file_path);
+                if ($file->file_path && Storage::disk('private')->exists($file->file_path)) {
+                    Storage::disk('private')->delete($file->file_path);
                 }
                 $file->delete();
             }
 
             TaskSubmissionMember::where('submission_id', $submission->id)->delete();
 
-            $submission->status = 'pending';
-            $submission->comment = null;
-            $submission->submitted_at = null;
-            $submission->is_late = false;
-            $submission->save();
+            $submission->resetToPending();
 
             DB::commit();
 

@@ -13,6 +13,9 @@ use App\Events\NewPublicacion;
 use App\Events\PublicacionActualizada;
 use App\Events\PublicacionEliminada;
 use Illuminate\Support\Facades\Gate; 
+use Mews\Purifier\Facades\Purifier;
+use Illuminate\Support\Str;
+
 
 class EstudiantePostController extends Controller
 {
@@ -71,7 +74,7 @@ class EstudiantePostController extends Controller
             'user_id' => Auth::id(),
             'type' => $data['type'] ?? 'post',
             'title' => $data['title'],
-            'content' => $data['content'] ?? null,
+            'content' => Purifier::clean($data['content'] ?? ''),
         ]);
 
         // Adjuntar archivos
@@ -160,7 +163,7 @@ class EstudiantePostController extends Controller
         // Actualizar datos básicos
         $post->update([
             'title' => $data['title'] ?? $post->title,
-            'content' => $data['content'] ?? $post->content,
+            'content' => isset($data['content']) ? Purifier::clean($data['content']) : $post->content,
         ]);
 
         // Eliminar archivos marcados
@@ -260,16 +263,15 @@ class EstudiantePostController extends Controller
 
         return Redirect::back()->with('success', 'Publicación eliminada exitosamente');
     }
-     public function download(PostAttachment $attachment)
+    public function download(PostAttachment $attachment)
 {
     $post = $attachment->post;
-
-    // Verificar acceso a la clase
-    $this->assertOwnership((int) $post->subject_id, (int) $post->group_id);
 
     if ($attachment->type === 'link') {
         abort(404);
     }
+
+    $this->assertGroupMembership((int) $post->group_id); // ← método correcto
 
     return Storage::disk('private')->download(
         $attachment->path,

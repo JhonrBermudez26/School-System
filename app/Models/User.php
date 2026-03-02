@@ -23,9 +23,9 @@ class User extends Authenticatable
         'address',
         'birth_date',
         'is_active',
+        'must_change_password',
         'suspended_at',
         'suspended_reason',
-        'must_change_password',
         'last_login_at',
     ];
 
@@ -37,49 +37,113 @@ class User extends Authenticatable
     protected function casts(): array
     {
         return [
-            'email_verified_at' => 'datetime',
-            'password' => 'hashed',
-            'birth_date' => 'date',
-            'is_active' => 'boolean',
-            'suspended_at' => 'datetime',
-            'last_login_at' => 'datetime',
+            'email_verified_at'  => 'datetime',
+            'password'           => 'hashed',
+            'birth_date'         => 'date',
+            'is_active'          => 'boolean',
+            'suspended_at'       => 'datetime',
+            'last_login_at'      => 'datetime',
+            'must_change_password' => 'boolean',
         ];
     }
+
+    /* =====================================================
+     |  MÉTODOS DE ESTADO (usan save() controlado)
+     ===================================================== */
+
     public function isSuspended(): bool
     {
         return !is_null($this->suspended_at);
     }
-    public function getLastLoginHumanAttribute()
+
+    /**
+     * Suspender usuario — usar SIEMPRE este método, nunca asignar suspended_at directamente.
+     */
+    public function suspend(string $reason, ?int $byUserId = null): bool
     {
-        return $this->last_login_at 
-            ? $this->last_login_at->diffForHumans() 
+        $this->suspended_at     = now();
+        $this->suspended_reason = $reason;
+        $this->is_active        = false;
+        return $this->save();
+    }
+
+    /**
+     * Levantar suspensión — usar SIEMPRE este método.
+     */
+    public function unsuspend(): bool
+    {
+        $this->suspended_at     = null;
+        $this->suspended_reason = null;
+        $this->is_active        = true;
+        return $this->save();
+    }
+
+    /**
+     * Registrar último login — solo desde AuthenticatedSessionController.
+     */
+    public function recordLogin(): bool
+    {
+        $this->last_login_at = now();
+        return $this->save();
+    }
+
+    /**
+     * Forzar cambio de contraseña — solo desde lógica de negocio.
+     */
+    public function requirePasswordChange(): bool
+    {
+        $this->must_change_password = true;
+        return $this->save();
+    }
+
+    public function clearPasswordChange(): bool
+    {
+        $this->must_change_password = false;
+        return $this->save();
+    }
+
+    /* =====================================================
+     |  ACCESSORS
+     ===================================================== */
+
+    public function getLastLoginHumanAttribute(): ?string
+    {
+        return $this->last_login_at
+            ? $this->last_login_at->diffForHumans()
             : null;
     }
-    // Scope para usuarios suspendidos
+
+    /* =====================================================
+     |  SCOPES
+     ===================================================== */
+
     public function scopeSuspended($query)
     {
         return $query->whereNotNull('suspended_at');
     }
 
-    // Scope para usuarios activos (no suspendidos)
     public function scopeNotSuspended($query)
     {
         return $query->whereNull('suspended_at');
     }
 
-    // ===== RELACIONES PARA ESTUDIANTES =====
-    
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true)->whereNull('suspended_at');
+    }
+
+    /* =====================================================
+     |  RELACIONES — ESTUDIANTES
+     ===================================================== */
+
     public function groups()
     {
-        return $this->belongsToMany(Group::class, 'group_user')
-            ->withTimestamps();
+        return $this->belongsToMany(Group::class, 'group_user')->withTimestamps();
     }
 
     public function group()
     {
-        return $this->belongsToMany(Group::class, 'group_user')
-            ->withTimestamps()
-            ->limit(1);
+        return $this->belongsToMany(Group::class, 'group_user')->withTimestamps()->limit(1);
     }
 
     public function getCurrentGroup()
@@ -87,23 +151,21 @@ class User extends Authenticatable
         return $this->groups()->first();
     }
 
-    public function isInGroup($groupId)
+    public function isInGroup($groupId): bool
     {
         return $this->groups()->where('group_id', $groupId)->exists();
     }
 
-    public function assignGroup($groupId)
+    public function assignGroup($groupId): void
     {
         $this->groups()->detach();
-        return $this->groups()->attach($groupId);
+        $this->groups()->attach($groupId);
     }
 
-    // ===== RELACIONES PARA PROFESORES =====
-    
-    /**
-     * Asignaturas que imparte el profesor
-     * Un profesor puede tener múltiples asignaturas
-     */
+    /* =====================================================
+     |  RELACIONES — PROFESORES
+     ===================================================== */
+
     public function subjects()
     {
         return $this->belongsToMany(Subject::class, 'subject_group')
@@ -111,10 +173,6 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
-    /**
-     * Obtener asignaturas con sus grupos para un profesor
-     * Incluye los grupos en la relación
-     */
     public function subjectsWithGroups()
     {
         return $this->belongsToMany(Subject::class, 'subject_group')
@@ -123,9 +181,6 @@ class User extends Authenticatable
             ->withTimestamps();
     }
 
-    /**
-     * Obtener todas las asignaciones (asignatura-grupo) del profesor
-     */
     public function subjectGroupAssignments()
     {
         return \DB::table('subject_group')
@@ -142,68 +197,61 @@ class User extends Authenticatable
             ->get();
     }
 
-    /**
-     * Asignar una asignatura a múltiples grupos para este profesor
-     */
-    public function assignSubjectToGroups($subjectId, $groupIds)
+    public function assignSubjectToGroups($subjectId, $groupIds): void
     {
         $data = [];
         foreach ($groupIds as $groupId) {
             $data[] = [
-                'user_id' => $this->id,
+                'user_id'    => $this->id,
                 'subject_id' => $subjectId,
-                'group_id' => $groupId,
+                'group_id'   => $groupId,
                 'created_at' => now(),
                 'updated_at' => now(),
             ];
         }
-        
         \DB::table('subject_group')->insert($data);
     }
 
-    /**
-     * Sincronizar todas las asignaciones del profesor
-     * Elimina las antiguas y crea las nuevas
-     */
-    public function syncSubjectAssignments($asignaciones)
+    public function syncSubjectAssignments($asignaciones): int
     {
-        // Eliminar asignaciones anteriores
         \DB::table('subject_group')->where('user_id', $this->id)->delete();
-        
-        // Crear nuevas asignaciones
+
         $data = [];
         foreach ($asignaciones as $asignacion) {
             foreach ($asignacion['group_ids'] as $groupId) {
                 $data[] = [
-                    'user_id' => $this->id,
+                    'user_id'    => $this->id,
                     'subject_id' => $asignacion['subject_id'],
-                    'group_id' => $groupId,
+                    'group_id'   => $groupId,
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
             }
         }
-        
+
         if (!empty($data)) {
             \DB::table('subject_group')->insert($data);
         }
-        
+
         return count($data);
     }
 
+    /* =====================================================
+     |  RELACIONES — CHAT / ACTIVIDAD
+     ===================================================== */
+
     public function conversations()
-{
-    return $this->belongsToMany(Conversation::class, 'participants')
-        ->withTimestamps();
-}
+    {
+        return $this->belongsToMany(Conversation::class, 'participants')->withTimestamps();
+    }
 
-public function messages()
-{
-    return $this->hasMany(Message::class);
-}
+    public function messages()
+    {
+        return $this->hasMany(Message::class);
+    }
 
-public function activityLogs()
-{
-    return $this->hasMany(ActivityLog::class);
-}
+    public function activityLogs()
+    {
+        return $this->hasMany(ActivityLog::class);
+    }
 }

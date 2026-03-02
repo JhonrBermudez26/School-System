@@ -57,25 +57,53 @@ class ProfileController extends Controller
             $validated['photo'] = $user->photo;
         }
 
-        // ✅ Cambio de contraseña (solo si viene relleno)
+      // ✅ Cambio de contraseña
+        $passwordWasChanged = false;
         if (!empty($validated['current_password']) && !empty($validated['new_password'])) {
             if (!Hash::check($validated['current_password'], $user->password)) {
                 return back()->withErrors([
                     'current_password' => 'La contraseña actual es incorrecta.',
                 ]);
             }
-
             $validated['password'] = Hash::make($validated['new_password']);
-
-            // ✅ Al cambiar contraseña, desactivar flag de cambio obligatorio
-            $validated['must_change_password'] = false;
+            $passwordWasChanged = true;
         }
 
-        // Limpiar campos que no van a la BD
-        unset($validated['current_password'], $validated['new_password'], $validated['new_password_confirmation']);
+        unset(
+            $validated['current_password'],
+            $validated['new_password'],
+            $validated['new_password_confirmation'],
+            $validated['must_change_password']
+        );
 
-        $user->update($validated);
+        $user->update($validated); // guarda todo incluyendo password correctamente
 
-        return redirect()->back()->with('success', 'Perfil actualizado correctamente.');
+        if ($passwordWasChanged) {
+        
+            // ✅ Solo actualizar el flag
+            $user->must_change_password = false;
+            $user->save();
+
+            return $this->redirectToDashboard($user, 'Contraseña actualizada correctamente. Bienvenid@ al sistema.');
+        }
+    }
+
+    private function redirectToDashboard($user, string $message)
+    {
+        $routes = [
+            'rector'       => '/rector/dashboard',
+            'coordinadora' => '/coordinadora/dashboard',
+            'secretaria'   => '/secretaria/dashboard',
+            'profesor'     => '/profesor/dashboard',
+            'estudiante'   => '/estudiante/dashboard',
+        ];
+
+        foreach ($routes as $role => $path) {
+            if ($user->hasRole($role)) {
+                return redirect($path)->with('success', $message);
+            }
+        }
+
+        return redirect('/')->with('success', $message);
     }
 }

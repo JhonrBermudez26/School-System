@@ -7,10 +7,20 @@ use App\Models\SchoolSetting;
 use Illuminate\Support\Facades\Schema;
 use App\Models\AcademicPeriod;
 use App\Observers\AcademicPeriodObserver;
+use App\Observers\UserObserver;
+use App\Observers\ClassFileObserver;
+use App\Observers\TaskSubmissionObserver;
+use App\Observers\DisciplineRecordObserver;
+
+use App\Models\User;             
+use App\Models\ClassFile;         
+use App\Models\TaskSubmission; 
+use App\Models\DisciplineRecord;
 
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Http\Request;
+
 
 
 
@@ -33,6 +43,10 @@ class AppServiceProvider extends ServiceProvider
         date_default_timezone_set('America/Bogota');
         \Carbon\Carbon::setLocale('es');
         AcademicPeriod::observe(AcademicPeriodObserver::class);
+        User::observe(UserObserver::class);
+        ClassFile::observe(ClassFileObserver::class);
+        TaskSubmission::observe(TaskSubmissionObserver::class);
+        DisciplineRecord::observe(DisciplineRecordObserver::class);
         $settings = null;
         if (Schema::hasTable('school_settings')) {
             $settings = SchoolSetting::first();
@@ -70,22 +84,22 @@ class AppServiceProvider extends ServiceProvider
 
         // Creación / edición de contenido (posts, tareas, comentarios, etc)
         RateLimiter::for('create-content', function (Request $request) {
-            return Limit::perMinute(20)->by($request->user()?->id);
+            return Limit::perMinute(20)->by($request->user()?->id ?: $request->ip());
         });
 
         // Subida de archivos y operaciones pesadas
         RateLimiter::for('upload', function (Request $request) {
-            return Limit::perMinute(12)->by($request->user()?->id);
+            return Limit::perMinute(12)->by($request->user()?->id ?: $request->ip());
         });
 
         // Entrega / submit de tareas por estudiantes
         RateLimiter::for('task-submit', function (Request $request) {
-            return Limit::perMinute(12)->by($request->user()?->id);
+            return Limit::perMinute(12)->by($request->user()?->id ?: $request->ip());
         });
 
         // Acciones masivas / bulk (asistencias masivas, generar boletines, etc)
         RateLimiter::for('bulk-action', function (Request $request) {
-            return Limit::perMinute(8)->by($request->user()?->id);
+            return Limit::perMinute(8)->by($request->user()?->id ?: $request->ip());
         });
 
         // Acciones muy sensibles (suspender usuarios, reset password, force logout, etc)
@@ -95,7 +109,7 @@ class AppServiceProvider extends ServiceProvider
 
         // Límite general para usuarios autenticados (seguridad extra)
         RateLimiter::for('authenticated', function (Request $request) {
-            return Limit::perMinute(200)->by($request->user()?->id);
+            return Limit::perMinute(200)->by($request->user()?->id ?: $request->ip());
         });
     }
     

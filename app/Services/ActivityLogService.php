@@ -20,16 +20,13 @@ class ActivityLogService
      */
     public function log(?Model $model, string $action, ?array $oldValues = null, ?array $newValues = null): ActivityLog
     {
-        return ActivityLog::create([
-            'user_id' => Auth::id(),
-            'action' => $action,
-            'model_type' => $model ? get_class($model) : null,
-            'model_id' => $model ? $model->getKey() : null,
-            'old_values' => $oldValues,
-            'new_values' => $newValues,
-            'ip_address' => Request::ip(),
-            'user_agent' => Request::userAgent(),
-        ]);
+        return ActivityLog::record(
+            userId:    auth()->id() ?? 0,
+            action:    $action,
+            model:     $model,
+            oldValues: $oldValues ?? [],
+            newValues: $newValues ?? [],
+        );
     }
 
     /**

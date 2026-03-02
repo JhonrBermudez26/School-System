@@ -309,76 +309,88 @@ class TaskController extends Controller
      * ✅ FIX IDOR: Verifica TaskPolicy::grade() antes de calificar
      */
     public function gradeSubmission(Request $request, TaskSubmission $submission)
-    {
-        $validated = $request->validate([
-            'score'                          => 'required|numeric|min:0',
-            'teacher_feedback'               => 'nullable|string|max:2000',
-            'individual_scores'              => 'nullable|array',
-            'individual_scores.*.student_id' => 'required|exists:users,id',
-            'individual_scores.*.score'      => 'required|numeric|min:0',
-            'individual_scores.*.feedback'   => 'nullable|string|max:1000',
-        ]);
+{
+    $validated = $request->validate([
+        'score'                          => 'required|numeric|min:0',
+        'teacher_feedback'               => 'nullable|string|max:2000',
+        'individual_scores'              => 'nullable|array',
+        'individual_scores.*.student_id' => 'required|exists:users,id',
+        'individual_scores.*.score'      => 'required|numeric|min:0',
+        'individual_scores.*.feedback'   => 'nullable|string|max:1000',
+    ]);
 
-        $task = $submission->task;
-        $this->authorize('grade', $task);
+    $task = $submission->task;
+    $this->authorize('grade', $task);
 
-        if ($validated['score'] > $task->max_score) {
-            return response()->json(['message' => "La calificación no puede exceder {$task->max_score} puntos"], 422);
-        }
+    if ($validated['score'] > $task->max_score) {
+        return response()->json(['message' => "La calificación no puede exceder {$task->max_score} puntos"], 422);
+    }
 
-        DB::beginTransaction();
-        try {
-            $useIndividual = !empty($validated['individual_scores']) && $task->work_type !== 'individual';
+    DB::beginTransaction();
+    try {
+        $useIndividual = !empty($validated['individual_scores']) && $task->work_type !== 'individual';
 
-            if ($useIndividual) {
-                $scoresSum = 0;
-                $count     = 0;
-                foreach ($validated['individual_scores'] as $ind) {
-                    $studentSub = TaskSubmission::where('task_id', $task->id)->where('student_id', $ind['student_id'])->first();
-                    if ($studentSub) {
-                        $studentSub->score = $ind['score'];
-                        $studentSub->teacher_feedback = $ind['feedback'] ?? $validated['teacher_feedback'] ?? null;
-                        $studentSub->status    = 'graded';
-                        $studentSub->graded_at = now();
-                        $studentSub->save();
-                        $scoresSum += (float) $ind['score'];
-                        $count++;
-                    }
-                }
-                $submission->score = $count > 0 ? round($scoresSum / $count, 2) : $validated['score'];
-            } else {
-                $submission->score            = $validated['score'];
-                $submission->teacher_feedback = $validated['teacher_feedback'] ?? null;
-                foreach ($submission->members as $member) {
-                    $memberSub = TaskSubmission::firstOrCreate(
-                        ['task_id' => $task->id, 'student_id' => $member->student_id],
-                        ['status' => 'pending', 'is_late' => false]
+        if ($useIndividual) {
+            $scoresSum = 0;
+            $count     = 0;
+
+            foreach ($validated['individual_scores'] as $ind) {
+                $studentSub = TaskSubmission::where('task_id', $task->id)
+                    ->where('student_id', $ind['student_id'])
+                    ->first();
+
+                if ($studentSub) {
+                    // ✅ CORREGIDO: usa método grade() del modelo
+                    $studentSub->grade(
+                        $ind['score'],
+                        $ind['feedback'] ?? $validated['teacher_feedback'] ?? null
                     );
-                    $memberSub->update([
-                        'score'            => $validated['score'],
-                        'teacher_feedback' => $validated['teacher_feedback'] ?? null,
-                        'status'           => 'graded',
-                        'graded_at'        => now(),
-                        'submitted_at'     => $submission->submitted_at,
-                        'is_late'          => $submission->is_late,
-                        'comment'          => "Trabajo en grupo con {$submission->student->name}",
-                    ]);
+                    $scoresSum += (float) $ind['score'];
+                    $count++;
                 }
             }
 
-            $submission->status    = 'graded';
-            $submission->graded_at = now();
-            $submission->save();
+            // ✅ CORREGIDO: calificar la entrega principal también via método
+            $submission->grade(
+                $count > 0 ? round($scoresSum / $count, 2) : $validated['score'],
+                $validated['teacher_feedback'] ?? null
+            );
 
-            DB::commit();
-            broadcast(new SubmissionGraded($submission))->toOthers();
+        } else {
+            // ✅ CORREGIDO: calificar via método grade()
+            $submission->grade($validated['score'], $validated['teacher_feedback'] ?? null);
 
-            return response()->json(['message' => 'Entrega calificada', 'submission' => $submission->fresh(['student', 'members.student'])]);
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json(['message' => 'Error al calificar'], 500);
+            // Propagar a los miembros del grupo
+            foreach ($submission->members as $member) {
+                $memberSub = TaskSubmission::firstOrCreate(
+                    ['task_id' => $task->id, 'student_id' => $member->student_id],
+                    ['status' => 'pending', 'is_late' => false]
+                );
+                // ✅ CORREGIDO: usa método grade() en cada miembro
+                $memberSub->grade($validated['score'], $validated['teacher_feedback'] ?? null);
+
+                // Sincronizar campos de entrega del miembro
+                $memberSub->submitted_at = $submission->submitted_at;
+                $memberSub->is_late      = $submission->is_late;
+                $memberSub->comment      = "Trabajo en grupo con {$submission->student->name}";
+                $memberSub->save();
+            }
         }
+
+        DB::commit();
+
+        broadcast(new SubmissionGraded($submission))->toOthers();
+
+        return response()->json([
+            'message'    => 'Entrega calificada',
+            'submission' => $submission->fresh(['student', 'members.student']),
+        ]);
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return response()->json(['message' => 'Error al calificar'], 500);
     }
+}
 
     public function deleteAttachment(TaskAttachment $attachment)
     {
@@ -396,10 +408,18 @@ class TaskController extends Controller
         }
     }
 
-    private function validatePeriodEnabled(?int $periodId): bool
-    {
-        if (!$periodId) return true;
-        $period = AcademicPeriod::find($periodId);
-        return $period ? $period->grades_enabled : false;
-    }
+   private function validatePeriodEnabled(?int $periodId): bool
+{
+    if (!$periodId) return true;
+    
+    $period = AcademicPeriod::find($periodId);
+    if (!$period) return false;
+    
+    // Periodo archivado nunca permite operaciones
+    if ($period->isArchived()) return false;
+    
+    // Permite si grades_enabled O si está dentro de fechas y no está cerrado
+    return $period->grades_enabled || 
+           ($period->isDentroFecha() && !$period->isClosed());
+}
 }

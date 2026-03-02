@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Redirect;
 use Illuminate\Support\Facades\Storage;
+use App\Http\Requests\StoreFileRequest;
 
 class FileController extends Controller
 {
@@ -22,16 +23,10 @@ class FileController extends Controller
         abort_unless($exists, 403);
     }
 
-    public function store(Request $request)
+    public function store(StoreFileRequest $request)
     {
-        $data = $request->validate([
-            'subject_id' => 'required|integer',
-            'group_id' => 'required|integer',
-            'folder_id' => 'nullable|integer|exists:folders,id',
-            'files' => 'required|array',
-            'files.*' => 'file|mimes:pdf,doc,docx,xlsx,ppt,pptx,jpg,png|max:51200', // 50MB max por archivo
-        ]);
-
+        $data = $request->validated();
+           
         $this->assertOwnership((int) $data['subject_id'], (int) $data['group_id']);
 
         $uploadedFiles = [];
@@ -69,13 +64,22 @@ class FileController extends Controller
 
         return Redirect::back()->with('success', 'Archivo eliminado');
     }
-    public function download(ClassFile $file)
+   public function download(ClassFile $file)
 {
-    $this->assertOwnership($file->subject_id, $file->group_id);
+    $user = auth()->user();
 
-    return Storage::disk('private')->download(
-        $file->path,
-        $file->filename
-    );
+    if ($user->hasRole('profesor')) {
+        // El profesor debe ser dueño de la clase
+        $this->assertOwnership($file->subject_id, $file->group_id);
+    } else {
+        // El estudiante debe pertenecer al grupo
+        $belongs = DB::table('group_user')
+            ->where('user_id', $user->id)
+            ->where('group_id', $file->group_id)
+            ->exists();
+        abort_unless($belongs, 403);
+    }
+
+    return Storage::disk('private')->download($file->path, $file->filename);
 }
 }

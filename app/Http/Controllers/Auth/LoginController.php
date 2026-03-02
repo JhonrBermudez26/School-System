@@ -14,13 +14,17 @@ class LoginController extends Controller
      */
     public function showLoginForm()
     {
-        return Inertia::render('Auth/Login');
+        if (Auth::check()) {
+        return $this->redirectByRole(Auth::user());
+    }
+    return Inertia::render('Welcome', ['openLoginModal' => true]);
+    
     }
 
     /**
      * Procesar login
      */
-    public function login(Request $request)
+    public function login(Request $request) 
     {
         $credentials = $request->validate([
             'email' => ['required', 'email'],
@@ -29,10 +33,8 @@ class LoginController extends Controller
 
         if (Auth::attempt($credentials, $request->boolean('remember'))) {
             $request->session()->regenerate();
-
             $user = Auth::user();
 
-            // Verificar si el usuario está activo
             if (!$user->is_active) {
                 Auth::logout();
                 return back()->withErrors([
@@ -40,8 +42,15 @@ class LoginController extends Controller
                 ]);
             }
 
-            // Redirigir según el rol
-            return $this->redirectByRole($user);
+            // ✅ AGREGADO: registrar login via método del modelo
+            $user->recordLogin();
+            
+            if ($user->must_change_password) {
+    return redirect()->route('perfil.editar')
+        ->with('warning', 'Debes cambiar tu contraseña antes de continuar.');
+}
+
+return $this->redirectByRole($user);
         }
 
         return back()->withErrors([

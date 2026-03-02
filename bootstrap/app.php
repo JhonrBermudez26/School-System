@@ -12,6 +12,14 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->validateCsrfTokens(except: [
+            // rutas que excluyes de CSRF si las hay (webhooks, etc.)
+        ]);
+        
+        $middleware->trustHosts(at: [
+            env('APP_URL', 'http://localhost'),
+        ]);
+
         $middleware->web(append: [
             \App\Http\Middleware\HandleInertiaRequests::class,
         ]);
@@ -23,6 +31,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'log.activity' => \App\Http\Middleware\LogActivity::class,
             'check.password' => \App\Http\Middleware\CheckPasswordChange::class,
+            'check.active'       => \App\Http\Middleware\CheckActiveUser::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

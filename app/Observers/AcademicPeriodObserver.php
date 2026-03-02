@@ -5,6 +5,7 @@ namespace App\Observers;
 use App\Models\AcademicPeriod;
 use App\Services\BoletinService;
 use Illuminate\Support\Facades\Log;
+use App\Models\ActivityLog;
 
 class AcademicPeriodObserver
 {
@@ -22,7 +23,14 @@ class AcademicPeriodObserver
     public function updated(AcademicPeriod $period)
     {
         // Verificar si el periodo acaba de cerrarse
-        if ($period->isDirty('status') && $period->status === 'closed') {
+       if ($period->wasChanged('status') && $period->status === 'closed') {
+            ActivityLog::record(
+                userId: auth()->id() ?? 0,
+                action: 'closed',
+                model: $period,
+                oldValues: ['status' => $period->getOriginal('status')],
+                newValues: ['status' => 'closed']
+            );
             Log::info("Periodo cerrado, generando boletines automáticamente", [
                 'period_id' => $period->id,
                 'period_name' => $period->name,
@@ -31,7 +39,7 @@ class AcademicPeriodObserver
             try {
                 // Generar boletines en segundo plano (idealmente usar Jobs/Queues)
                 dispatch(function() use ($period) {
-                    $this->boletinService->generarBoletinesPeriodo($period);
+                    app(\App\Services\BoletinService::class)->generarBoletinesPeriodo($period);
                     
                     Log::info("Boletines generados exitosamente", [
                         'period_id' => $period->id,

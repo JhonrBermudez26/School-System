@@ -92,11 +92,8 @@ class UserManagementController extends Controller
             'is_active'        => $user->is_active,
         ];
 
-        $user->update([
-            'suspended_at'     => null,
-            'suspended_reason' => null,
-            'is_active'        => true,
-        ]);
+        // ✅ CORREGIDO: usa método controlado del modelo
+        $user->unsuspend();
 
         $this->activityLog->log($user, 'activated', $oldValues, [
             'suspended_at'     => null,
@@ -127,11 +124,8 @@ class UserManagementController extends Controller
             'is_active'        => $user->is_active,
         ];
 
-        $user->update([
-            'suspended_at'     => now(),
-            'suspended_reason' => $validated['reason'],
-            'is_active'        => false,
-        ]);
+        // ✅ CORREGIDO: usa método controlado del modelo
+        $user->suspend($validated['reason']);
 
         $this->activityLog->log($user, 'suspended', $oldValues, [
             'suspended_at'     => $user->suspended_at,

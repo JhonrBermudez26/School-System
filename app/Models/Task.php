@@ -1,4 +1,5 @@
 <?php
+// app/Models/Task.php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -10,11 +11,18 @@ class Task extends Model
 {
     use HasFactory;
 
+    /**
+     * ✅ Solo campos que el profesor ingresa al crear/editar la tarea.
+     *
+     * REMOVIDOS del fillable original:
+     * - 'teacher_id'  → CRÍTICO: se asigna en el controller con auth()->id(), nunca desde request
+     * - 'is_active'   → controlado con activate()/deactivate(), no desde request
+     */
     protected $fillable = [
+        'teacher_id',
         'subject_id',
         'group_id',
-        'academic_period_id', // ✅ NUEVO
-        'teacher_id',
+        'academic_period_id',
         'title',
         'description',
         'work_type',
@@ -23,7 +31,7 @@ class Task extends Model
         'close_date',
         'allow_late_submission',
         'max_score',
-        'is_active',
+        'is_active', 
     ];
 
     protected $casts = [
@@ -33,58 +41,40 @@ class Task extends Model
         'is_active'             => 'boolean',
     ];
 
-    // ========== RELACIONES ==========
-    
-    public function academicPeriod()
+    /* =====================================================
+     |  MÉTODOS DE ESTADO
+     ===================================================== */
+
+    /**
+     * Activar tarea — solo desde lógica del controller/service.
+     */
+    public function activate(): bool
     {
-        return $this->belongsTo(AcademicPeriod::class);
+        $this->is_active = true;
+        return $this->save();
     }
 
-    public function subject()
+    public function deactivate(): bool
     {
-        return $this->belongsTo(\App\Models\Subject::class, 'subject_id');
+        $this->is_active = false;
+        return $this->save();
     }
 
-    public function group()
-    {
-        return $this->belongsTo(\App\Models\Group::class, 'group_id');
-    }
-
-    public function teacher()
-    {
-        return $this->belongsTo(User::class, 'teacher_id');
-    }
-
-    public function attachments()
-    {
-        return $this->hasMany(TaskAttachment::class);
-    }
-
-    public function submissions()
-    {
-        return $this->hasMany(TaskSubmission::class);
-    }
-
-    public function groupSubmissions()
-    {
-        return $this->hasMany(TaskGroupSubmission::class);
-    }
-
-    // ========== MÉTODOS DE ESTADO ==========
-    
-    public function isPastDue()
+    public function isPastDue(): bool
     {
         return Carbon::now('America/Bogota')->isAfter($this->due_date);
     }
 
-    public function isClosed()
+    public function isClosed(): bool
     {
         return $this->close_date && Carbon::now('America/Bogota')->isAfter($this->close_date);
     }
 
-    // ========== MÉTODOS DE CONTEO ==========
-    
-    public function getTotalStudentsCount()
+    /* =====================================================
+     |  MÉTODOS DE CONTEO
+     ===================================================== */
+
+    public function getTotalStudentsCount(): int
     {
         return DB::table('group_user as gu')
             ->join('model_has_roles as mhr', function ($join) {
@@ -98,62 +88,52 @@ class Task extends Model
             ->count('gu.user_id');
     }
 
-    public function getSubmissionStats()
+    public function getSubmissionStats(): array
     {
-        $total = $this->getTotalStudentsCount();
+        $total     = $this->getTotalStudentsCount();
         $submitted = $this->submissions()->where('status', '!=', 'pending')->count();
-        $graded = $this->submissions()->where('status', 'graded')->count();
-        $pending = $total - $submitted;
-
+        $graded    = $this->submissions()->where('status', 'graded')->count();
         return [
-            'total' => $total,
+            'total'     => $total,
             'submitted' => $submitted,
-            'graded' => $graded,
-            'pending' => $pending,
+            'graded'    => $graded,
+            'pending'   => $total - $submitted,
         ];
     }
 
-    // ========== SCOPES ==========
-    
-    public function scopeByTeacher($query, $teacherId)
-    {
-        return $query->where('teacher_id', $teacherId);
-    }
+    /* =====================================================
+     |  SCOPES
+     ===================================================== */
 
-    public function scopeByClass($query, $subjectId, $groupId)
-    {
-        return $query->where('subject_id', $subjectId)
-                     ->where('group_id', $groupId);
-    }
-
-    public function scopeActive($query)
-    {
-        return $query->where('is_active', true);
-    }
+    public function scopeByTeacher($query, $teacherId)          { return $query->where('teacher_id', $teacherId); }
+    public function scopeByClass($query, $subjectId, $groupId)  { return $query->where('subject_id', $subjectId)->where('group_id', $groupId); }
+    public function scopeActive($query)                         { return $query->where('is_active', true); }
+    public function scopeByPeriod($query, $periodId)            { return $query->where('academic_period_id', $periodId); }
 
     public function scopeNotClosed($query)
     {
         return $query->where(function ($q) {
-            $q->whereNull('close_date')
-              ->orWhere('close_date', '>', now());
+            $q->whereNull('close_date')->orWhere('close_date', '>', now());
         });
     }
 
-    // ✅ NUEVO: Filtrar por periodo académico
-    public function scopeByPeriod($query, $periodId)
-    {
-        return $query->where('academic_period_id', $periodId);
-    }
-
-    // ✅ NUEVO: Obtener tareas del periodo actual
     public function scopeCurrentPeriod($query)
     {
         $currentPeriod = AcademicPeriod::getPeriodoActual();
-        
-        if (!$currentPeriod) {
-            return $query->whereNull('academic_period_id');
-        }
-
-        return $query->where('academic_period_id', $currentPeriod->id);
+        return $currentPeriod
+            ? $query->where('academic_period_id', $currentPeriod->id)
+            : $query->whereNull('academic_period_id');
     }
+
+    /* =====================================================
+     |  RELACIONES
+     ===================================================== */
+
+    public function academicPeriod()  { return $this->belongsTo(AcademicPeriod::class); }
+    public function subject()         { return $this->belongsTo(Subject::class, 'subject_id'); }
+    public function group()           { return $this->belongsTo(Group::class, 'group_id'); }
+    public function teacher()         { return $this->belongsTo(User::class, 'teacher_id'); }
+    public function attachments()     { return $this->hasMany(TaskAttachment::class); }
+    public function submissions()     { return $this->hasMany(TaskSubmission::class); }
+    public function groupSubmissions(){ return $this->hasMany(TaskGroupSubmission::class); }
 }

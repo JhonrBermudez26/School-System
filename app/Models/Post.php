@@ -1,5 +1,4 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -9,10 +8,13 @@ class Post extends Model
 {
     use HasFactory;
 
+    /**
+     * ✅ Solo contenido que el profesor introduce.
+     */
     protected $fillable = [
+        'user_id',
         'subject_id',
         'group_id',
-        'user_id',
         'type',
         'title',
         'content',
@@ -23,12 +25,6 @@ class Post extends Model
         'due_at' => 'datetime',
     ];
 
-    public function attachments()
-    {
-        return $this->hasMany(PostAttachment::class);
-    }
-    public function user()
-    {
-        return $this->belongsTo(User::class, 'user_id');
-    }
+    public function attachments() { return $this->hasMany(PostAttachment::class); }
+    public function user()        { return $this->belongsTo(User::class, 'user_id'); }
 }

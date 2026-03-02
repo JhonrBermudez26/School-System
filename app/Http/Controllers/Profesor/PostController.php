@@ -14,6 +14,7 @@ use App\Events\NewPublicacion;
 use App\Events\PublicacionActualizada;
 use App\Events\PublicacionEliminada;
 use Illuminate\Support\Facades\Gate; 
+use Mews\Purifier\Facades\Purifier;
 
 class PostController extends Controller
 {
@@ -92,7 +93,7 @@ class PostController extends Controller
             'user_id' => Auth::id(),
             'type' => $data['type'] ?? 'post',
             'title' => $data['title'],
-            'content' => $data['content'] ?? null,
+            'content' => Purifier::clean($data['content'] ?? ''),
             'due_at' => $data['due_at'] ?? null,
         ]);
 
@@ -181,7 +182,7 @@ class PostController extends Controller
 
         $post->update([
             'title' => $data['title'] ?? $post->title,
-            'content' => $data['content'] ?? $post->content,
+             'content' => isset($data['content']) ? Purifier::clean($data['content']) : $post->content,
             'type' => $data['type'] ?? $post->type,
             'due_at' => $data['due_at'] ?? $post->due_at,
         ]);
