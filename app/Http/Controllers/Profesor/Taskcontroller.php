@@ -262,6 +262,7 @@ class TaskController extends Controller
 
         $submissions = $submissions->map(fn($s) => [
             'id'               => $s->id,
+            'uuid'             => $s->uuid,
             'student'          => $s->student,
             'comment'          => $s->comment,
             'status'           => $s->status,

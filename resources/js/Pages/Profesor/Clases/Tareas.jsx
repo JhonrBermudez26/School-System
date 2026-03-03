@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   ClipboardList,
   Plus,
@@ -17,6 +18,7 @@ import { fetchWithCsrf, deleteWithCsrf } from '@/Utils/csrf-utils';
 import { usePage } from '@inertiajs/react';
 
 export default function Tareas({ tasks: initialTasks = [], classInfo }) {
+  console.log('initialTasks:', initialTasks.length, initialTasks.map(t => ({id: t.id, title: t.title, period: t.academic_period_id})));
   const { props: inertiaProps } = usePage();
   const [tasks, setTasks] = useState(initialTasks);
   const [showForm, setShowForm] = useState(false);
@@ -31,69 +33,49 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  const loadTasks = async () => {
+ const loadTasks = async () => {
     try {
-      const response = await fetch(
-        `/profesor/clases/tasks?subject_id=${classInfo.subject_id}&group_id=${classInfo.group_id}`,
-        {
-          headers: {
-            'Accept': 'application/json',
-          }
+        const { data } = await axios.get(
+            `/profesor/clases/tasks?subject_id=${classInfo.subject_id}&group_id=${classInfo.group_id}`
+        );
+        console.log('Tareas del fetch:', data.length, data.map(t => ({id: t.id, title: t.title, period: t.academic_period})));
+        if (Array.isArray(data)) {
+            setTasks(data);
         }
-      );
-      const data = await response.json();
-      setTasks(data);
     } catch (error) {
-      console.error('Error cargando tareas:', error);
+        console.error('Error cargando tareas:', error.response?.data || error);
     }
-  };
+};
 
   useEffect(() => {
     if (classInfo.subject_id && classInfo.group_id) {
-      loadTasks();
+        loadTasks(); // ya corregido arriba
 
-      console.log(`📡 Profesor escuchando tareas en grupo: ${classInfo.group_id}`);
-
-      const channel = window.Echo?.channel(`group.${classInfo.group_id}`);
-
-      if (channel) {
-        channel
-          .listen('.task.created', (data) => {
-            console.log("✅ Nueva tarea recibida por Echo:", data);
-            loadTasks();
-          })
-          .listen('.task.updated', (data) => {
-            console.log("🔄 Tarea actualizada:", data);
-            loadTasks();
-          })
-          .listen('.task.deleted', (data) => {
-            console.log("🗑️ Tarea eliminada:", data);
-            loadTasks();
-          })
-          .listen('.submission.created', (data) => {
-            console.log("📥 Nueva entrega recibida:", data);
-            showNotification(`📥 ${data.message}`, 'info');
-            loadTasks();
-          })
-          .listen('.submission.updated', (data) => {
-            console.log("📝 Entrega actualizada:", data);
-            showNotification(`📝 ${data.message}`, 'info');
-            loadTasks();
-          });
-      }
-
-      return () => {
+        const channel = window.Echo?.channel(`group.${classInfo.group_id}`);
         if (channel) {
-          console.log("🔌 Desconectando canal de tareas");
-          channel.stopListening('.task.created')
-            .stopListening('.task.updated')
-            .stopListening('.task.deleted')
-            .stopListening('.submission.created')
-            .stopListening('.submission.updated');
+            channel
+                .listen('.task.created', () => loadTasks())
+                .listen('.task.updated', () => loadTasks())
+                .listen('.task.deleted', () => loadTasks())
+                .listen('.submission.created', (data) => {
+                    showNotification(`📥 ${data.message}`, 'info');
+                    loadTasks();
+                })
+                .listen('.submission.updated', (data) => {
+                    showNotification(`📝 ${data.message}`, 'info');
+                    loadTasks();
+                });
         }
-      };
+
+        return () => {
+            channel?.stopListening('.task.created')
+                .stopListening('.task.updated')
+                .stopListening('.task.deleted')
+                .stopListening('.submission.created')
+                .stopListening('.submission.updated');
+        };
     }
-  }, [classInfo.subject_id, classInfo.group_id]);
+}, [classInfo.subject_id, classInfo.group_id]);
 
   const handleTaskCreated = () => {
     setShowForm(false);
@@ -102,22 +84,12 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
   };
 
   const handleDeleteTask = async (taskId) => {
-    if (!confirm('¿Estás seguro de eliminar esta tarea? Se eliminarán todas las entregas asociadas.')) {
-      return;
-    }
-
+    if (!confirm('¿Estás seguro de eliminar esta tarea? Se eliminarán todas las entregas asociadas.')) return;
     try {
-      const response = await deleteWithCsrf(`/profesor/clases/tasks/${taskId}`);
-
-      if (response.ok) {
-        loadTasks();
-      } else {
-        const data = await response.json();
-        alert(data.message || 'Error al eliminar la tarea');
-      }
+      await axios.delete(`/profesor/clases/tasks/${taskId}`);
+      loadTasks();
     } catch (error) {
-      console.error('Error eliminando tarea:', error);
-      alert('Error al eliminar la tarea: ' + error.message);
+      alert(error.response?.data?.message || 'Error al eliminar la tarea');
     }
   };
 

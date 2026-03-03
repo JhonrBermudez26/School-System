@@ -97,9 +97,9 @@ export default function Archivos() {
     });
   };
 
-  const deleteFile = (id) => {
+  const deleteFile = (uuid) => {
     if (!confirm('¿Eliminar este archivo?')) return;
-    router.delete(route('profesor.files.destroy', { file: id }), {
+    router.delete(route('profesor.files.destroy', { file: uuid }), {
       preserveScroll: true,
       onSuccess: () => router.reload({ only: ['files'] }),
     });
@@ -338,8 +338,7 @@ export default function Archivos() {
                   </div>
                   <div className="flex items-center gap-2 ml-4">
                     <a
-                      href={`/storage/${file.path}`}
-                      download
+                      href={`/profesor/clases/files/${file.uuid}/download`}
                       className="p-2.5 text-blue-600 hover:bg-blue-100 rounded-xl transition-all"
                       onClick={(e) => e.stopPropagation()}
                       title="Descargar archivo"
@@ -348,7 +347,7 @@ export default function Archivos() {
                     </a>
                     {file.can?.delete && (
                       <button
-                        onClick={() => deleteFile(file.id)}
+                        onClick={() => deleteFile(file.uuid)}
                         className="p-2.5 text-red-600 hover:bg-red-100 rounded-xl transition-all opacity-0 group-hover:opacity-100"
                         title="Eliminar archivo"
                       >

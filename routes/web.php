@@ -49,11 +49,6 @@ use App\Http\Controllers\Rector\RoleManagementController;
 use App\Http\Controllers\Rector\UserManagementController;
 use App\Http\Controllers\Rector\AuditController;
 
-// ─────────────────────────────────────────────
-// CSRF (Sanctum)
-// ─────────────────────────────────────────────
-Route::get('/sanctum/csrf-cookie', [\Laravel\Sanctum\Http\Controllers\CsrfCookieController::class, 'show'])
-    ->name('sanctum.csrf-cookie');
 
 // ─────────────────────────────────────────────
 // PÚBLICA
@@ -455,10 +450,10 @@ Route::middleware(['auth', 'check.active', 'check.password', 'throttle:authentic
         Route::put('/clases/folders/{folder}', [FolderController::class, 'update'])->name('profesor.folders.update')->middleware('can:update,folder');
         Route::delete('/clases/folders/{folder}', [FolderController::class, 'destroy'])->name('profesor.folders.destroy')->middleware('can:delete,folder');
 
-        // ARCHIVOS — {file} con RMB (ya correcto)
+       // ARCHIVOS — {file} con RMB
         Route::post('/clases/files', [FileController::class, 'store'])->name('profesor.files.store')->middleware(['permission:posts.create', 'throttle:upload']);
-        Route::get('/files/{file}/download', [FileController::class, 'download']);
-        Route::delete('/clases/files/{file}', [FileController::class, 'destroy'])->name('profesor.files.destroy')->middleware('can:delete,file');
+        Route::get('/clases/files/{file}/download', [FileController::class, 'download'])->name('profesor.files.download'); // ✅ sin /profesor/
+        Route::delete('/clases/files/{file}', [FileController::class, 'destroy'])->name('profesor.files.destroy')->middleware('can:delete,file'); // ✅ sin /profesor/
 
         // REUNIONES — {meeting} con RMB (ya correcto)
         Route::post('/clases/meetings', [MeetingController::class, 'store'])->name('profesor.meetings.store')->middleware(['permission:meetings.create', 'throttle:create-content']);
@@ -519,12 +514,16 @@ Route::middleware(['auth', 'check.active', 'check.password', 'throttle:authentic
         Route::delete('/posts/{post}', [EstudiantePostController::class, 'destroy'])->name('estudiante.posts.destroy')->middleware('can:delete,post');
         Route::get('/attachments/{attachment}/download', [EstudiantePostController::class, 'download']);
 
+        // En el grupo middleware role:estudiante
+        Route::get('/files/{file}/download', [FileController::class, 'download'])
+            ->name('estudiante.files.download');
+
         // TAREAS — {task} y {submission} con RMB (ya correcto)
         Route::prefix('tasks')->name('tasks.')->group(function () {
             Route::get('/', [EstudianteTaskController::class, 'index'])->name('index')->middleware('permission:assignments.view');
             Route::get('/{task}', [EstudianteTaskController::class, 'show'])->name('show')->middleware('can:view,task');
             Route::post('/submit', [EstudianteTaskController::class, 'submit'])->name('submit')->middleware(['permission:assignments.submit', 'throttle:task-submit']);
-            Route::get('/{task}/available-classmates', [EstudianteTaskController::class, 'getAvailableClassmates'])->name('available-classmates')->middleware('can:view,task');
+            Route::get('/{task}/available-classmates', [EstudianteTaskController::class, 'getAvailableClassmates'])->name('available-classmates');
             Route::delete('/files/{file}', [EstudianteTaskController::class, 'deleteFile'])->name('files.delete');
             Route::delete('/members/{member}', [EstudianteTaskController::class, 'removeMember'])->name('members.remove');
             Route::delete('/submissions/{submission}', [EstudianteTaskController::class, 'deleteSubmission'])

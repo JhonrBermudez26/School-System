@@ -13,7 +13,7 @@ export default function Periodos({ periodos, stats }) {
         name: '',
         start_date: '',
         end_date: '',
-        habilitado: true,
+        habilitado: false,
         directrices: '',
         porcentaje: '',
         password: ''
@@ -56,8 +56,16 @@ export default function Periodos({ periodos, stats }) {
     };
 
     const toggleHabilitado = (periodo) => {
-        if (!periodo.es_periodo_actual) { setPendingToggle(periodo.id); setShowPasswordModal(true); }
-        else { router.patch(route('coordinadora.periodos.toggle', periodo.id)); }
+        const quiereHabilitar = !periodo.habilitado;
+
+        // Contraseña SOLO si: quiere habilitar Y no es el periodo actual
+        if (quiereHabilitar && !periodo.es_periodo_actual) {
+            setPendingToggle(periodo.id);
+            setShowPasswordModal(true);
+        } else {
+            // Deshabilitar cualquiera, o habilitar el actual → sin contraseña
+            router.patch(route('coordinadora.periodos.toggle', periodo.id));
+        }
     };
 
     const handleAction = (action, periodoId, label) => {
@@ -79,11 +87,11 @@ export default function Periodos({ periodos, stats }) {
     const getStatusBadge = (status, esPeriodoActual) => {
         if (esPeriodoActual) return { label: 'Periodo Actual', icon: Sparkles, classes: 'bg-gradient-to-r from-blue-500 to-indigo-500 text-white border-0' };
         switch (status) {
-            case 'draft':    return { label: 'Borrador',  icon: Edit,         classes: 'bg-gray-100 text-gray-700 border-gray-200' };
-            case 'active':   return { label: 'Activo',    icon: CheckCircle2, classes: 'bg-green-100 text-green-700 border-green-200' };
-            case 'closed':   return { label: 'Cerrado',   icon: Lock,         classes: 'bg-red-100 text-red-700 border-red-200' };
-            case 'archived': return { label: 'Archivado', icon: Archive,      classes: 'bg-purple-100 text-purple-700 border-purple-200' };
-            default:         return { label: 'Inactivo',  icon: Clock,        classes: 'bg-gray-100 text-gray-700 border-gray-200' };
+            case 'draft': return { label: 'Borrador', icon: Edit, classes: 'bg-gray-100 text-gray-700 border-gray-200' };
+            case 'active': return { label: 'Activo', icon: CheckCircle2, classes: 'bg-green-100 text-green-700 border-green-200' };
+            case 'closed': return { label: 'Cerrado', icon: Lock, classes: 'bg-red-100 text-red-700 border-red-200' };
+            case 'archived': return { label: 'Archivado', icon: Archive, classes: 'bg-purple-100 text-purple-700 border-purple-200' };
+            default: return { label: 'Inactivo', icon: Clock, classes: 'bg-gray-100 text-gray-700 border-gray-200' };
         }
     };
 
@@ -100,13 +108,20 @@ export default function Periodos({ periodos, stats }) {
                         </h1>
                         <p className="text-gray-600 mt-1">Control del ciclo académico y carga de notas</p>
                     </div>
-                    <button
-                        onClick={() => { setEditingPeriodo(null); reset(); setShowModal(true); }}
-                        className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 text-sm font-semibold"
-                    >
-                        <Plus className="h-5 w-5" />
-                        Nuevo Periodo
-                    </button>
+                    <div className="flex flex-col items-end gap-1">
+                        <button
+                            onClick={() => { setEditingPeriodo(null); reset(); setShowModal(true); }}
+                            className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white px-6 py-3 rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5 text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:from-blue-600 disabled:hover:to-indigo-600 disabled:hover:translate-y-0 disabled:shadow-lg"
+                        >
+                            <Plus className="h-5 w-5" />
+                            Nuevo Periodo
+                        </button>
+                        {stats.porcentajeDisponible === 0 && (
+                            <p className="text-xs text-red-500 font-medium">
+                                El 100% ya está distribuido
+                            </p>
+                        )}
+                    </div>
                 </div>
 
                 {/* Stats Cards */}
@@ -141,33 +156,29 @@ export default function Periodos({ periodos, stats }) {
                         </div>
                     </div>
 
-                    <div className={`relative overflow-hidden rounded-2xl shadow-lg backdrop-blur-sm p-6 border ${
-                        stats.porcentajeDisponible === 0 ? 'bg-green-50/80 border-green-200'
+                    <div className={`relative overflow-hidden rounded-2xl shadow-lg backdrop-blur-sm p-6 border ${stats.porcentajeDisponible === 0 ? 'bg-green-50/80 border-green-200'
                         : stats.porcentajeDisponible < 25 ? 'bg-orange-50/80 border-orange-200'
-                        : 'bg-blue-50/80 border-blue-200'
-                    }`}>
-                        <div className={`absolute inset-0 ${
-                            stats.porcentajeDisponible === 0 ? 'bg-gradient-to-br from-green-500/10 to-emerald-500/10'
+                            : 'bg-blue-50/80 border-blue-200'
+                        }`}>
+                        <div className={`absolute inset-0 ${stats.porcentajeDisponible === 0 ? 'bg-gradient-to-br from-green-500/10 to-emerald-500/10'
                             : stats.porcentajeDisponible < 25 ? 'bg-gradient-to-br from-orange-500/10 to-red-500/10'
-                            : 'bg-gradient-to-br from-blue-500/10 to-indigo-500/10'
-                        }`}></div>
+                                : 'bg-gradient-to-br from-blue-500/10 to-indigo-500/10'
+                            }`}></div>
                         <div className="relative flex items-center justify-between">
                             <div>
                                 <p className="text-gray-600 text-sm font-medium">% Disponible</p>
-                                <p className={`text-2xl font-bold mt-1 bg-clip-text text-transparent ${
-                                    stats.porcentajeDisponible === 0 ? 'bg-gradient-to-r from-green-600 to-emerald-600'
+                                <p className={`text-2xl font-bold mt-1 bg-clip-text text-transparent ${stats.porcentajeDisponible === 0 ? 'bg-gradient-to-r from-green-600 to-emerald-600'
                                     : stats.porcentajeDisponible < 25 ? 'bg-gradient-to-r from-orange-600 to-red-600'
-                                    : 'bg-gradient-to-r from-blue-600 to-indigo-600'
-                                }`}>
+                                        : 'bg-gradient-to-r from-blue-600 to-indigo-600'
+                                    }`}>
                                     {stats.porcentajeDisponible}%
                                 </p>
                                 <p className="text-xs text-gray-500 mt-1">Usado: {stats.porcentajeTotal}%</p>
                             </div>
-                            <div className={`p-3 rounded-xl ${
-                                stats.porcentajeDisponible === 0 ? 'bg-gradient-to-br from-green-500 to-emerald-500'
+                            <div className={`p-3 rounded-xl ${stats.porcentajeDisponible === 0 ? 'bg-gradient-to-br from-green-500 to-emerald-500'
                                 : stats.porcentajeDisponible < 25 ? 'bg-gradient-to-br from-orange-500 to-red-500'
-                                : 'bg-gradient-to-br from-blue-500 to-indigo-500'
-                            }`}>
+                                    : 'bg-gradient-to-br from-blue-500 to-indigo-500'
+                                }`}>
                                 <Percent className="h-7 w-7 text-white" />
                             </div>
                         </div>
@@ -176,32 +187,28 @@ export default function Periodos({ periodos, stats }) {
 
                 {/* Alerta de porcentaje */}
                 {stats.porcentajeTotal !== 100 && (
-                    <div className={`rounded-xl p-4 flex items-start gap-3 border-2 ${
-                        stats.porcentajeTotal > 100 ? 'bg-red-50 border-red-200'
+                    <div className={`rounded-xl p-4 flex items-start gap-3 border-2 ${stats.porcentajeTotal > 100 ? 'bg-red-50 border-red-200'
                         : stats.porcentajeTotal === 0 ? 'bg-blue-50 border-blue-200'
-                        : 'bg-yellow-50 border-yellow-200'
-                    }`}>
-                        <AlertCircle className={`h-5 w-5 mt-0.5 flex-shrink-0 ${
-                            stats.porcentajeTotal > 100 ? 'text-red-600'
+                            : 'bg-yellow-50 border-yellow-200'
+                        }`}>
+                        <AlertCircle className={`h-5 w-5 mt-0.5 flex-shrink-0 ${stats.porcentajeTotal > 100 ? 'text-red-600'
                             : stats.porcentajeTotal === 0 ? 'text-blue-600' : 'text-yellow-600'
-                        }`} />
+                            }`} />
                         <div>
-                            <p className={`font-bold text-sm ${
-                                stats.porcentajeTotal > 100 ? 'text-red-800'
+                            <p className={`font-bold text-sm ${stats.porcentajeTotal > 100 ? 'text-red-800'
                                 : stats.porcentajeTotal === 0 ? 'text-blue-800' : 'text-yellow-800'
-                            }`}>
+                                }`}>
                                 {stats.porcentajeTotal > 100 ? '¡Porcentaje excedido!'
-                                : stats.porcentajeTotal === 0 ? 'Sin porcentajes asignados' : 'Configuración incompleta'}
+                                    : stats.porcentajeTotal === 0 ? 'Sin porcentajes asignados' : 'Configuración incompleta'}
                             </p>
-                            <p className={`text-sm mt-1 ${
-                                stats.porcentajeTotal > 100 ? 'text-red-700'
+                            <p className={`text-sm mt-1 ${stats.porcentajeTotal > 100 ? 'text-red-700'
                                 : stats.porcentajeTotal === 0 ? 'text-blue-700' : 'text-yellow-700'
-                            }`}>
+                                }`}>
                                 {stats.porcentajeTotal > 100
                                     ? `Total: ${stats.porcentajeTotal}%. Debe ser exactamente 100%.`
                                     : stats.porcentajeTotal === 0
-                                    ? 'Asigna porcentajes para calcular notas finales.'
-                                    : `Falta ${stats.porcentajeDisponible}% para completar el 100%.`}
+                                        ? 'Asigna porcentajes para calcular notas finales.'
+                                        : `Falta ${stats.porcentajeDisponible}% para completar el 100%.`}
                             </p>
                         </div>
                     </div>
@@ -225,11 +232,10 @@ export default function Periodos({ periodos, stats }) {
                                 return (
                                     <div
                                         key={periodo.id}
-                                        className={`rounded-xl border p-5 sm:p-6 hover:shadow-md transition-all ${
-                                            periodo.es_periodo_actual
-                                                ? 'bg-gradient-to-r from-blue-50/70 to-indigo-50/70 border-blue-200'
-                                                : 'bg-white border-gray-100 hover:border-gray-200'
-                                        }`}
+                                        className={`rounded-xl border p-5 sm:p-6 hover:shadow-md transition-all ${periodo.es_periodo_actual
+                                            ? 'bg-gradient-to-r from-blue-50/70 to-indigo-50/70 border-blue-200'
+                                            : 'bg-white border-gray-100 hover:border-gray-200'
+                                            }`}
                                     >
                                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
                                             <div className="flex-1">
@@ -463,7 +469,7 @@ export default function Periodos({ periodos, stats }) {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={processing}
+                                    disabled={processing || (!editingPeriodo && stats.porcentajeDisponible === 0)}
                                     className="px-8 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:from-blue-700 hover:to-indigo-700 transition-all disabled:opacity-50 font-semibold shadow-lg text-sm flex items-center justify-center gap-2"
                                 >
                                     {processing ? (

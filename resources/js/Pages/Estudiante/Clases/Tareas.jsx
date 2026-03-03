@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   ClipboardList, Calendar, Award, Users, FileText, Upload,
   CheckCircle, Clock, AlertCircle, Download, X, Paperclip,
@@ -33,38 +34,34 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
   // ===== CARGA INICIAL Y ACTUALIZACIÓN =====
   const loadTasks = async () => {
     try {
-      const response = await fetch(
-        `/estudiante/tasks?subject_id=${classInfo.subject_id}&group_id=${classInfo.group_id}`,
-        {
-          headers: { 'Accept': 'application/json' }
+        const { data } = await axios.get(
+            `/estudiante/tasks?subject_id=${classInfo.subject_id}&group_id=${classInfo.group_id}`
+        );
+        if (Array.isArray(data)) {
+            setTasks(data);
         }
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setTasks(data);
-      }
     } catch (error) {
-      console.error('Error cargando tareas:', error);
+        console.error('Error cargando tareas:', error.response?.data || error);
     }
-  };
+};
+
 
   // ===== CARGAR COMPAÑEROS DISPONIBLES =====
-  const loadAvailableClassmates = async (taskId) => {
+ const loadAvailableClassmates = async (taskId) => {
     setLoadingClassmates(true);
     try {
-      const response = await fetch(`/estudiante/tasks/${taskId}/available-classmates`, {
-        headers: { 'Accept': 'application/json' }
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setAvailableClassmates(data);
-      }
+        const { data } = await axios.get(
+            `/estudiante/tasks/${taskId}/available-classmates`
+        );
+        setAvailableClassmates(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error cargando compañeros:', error);
+        console.error('Error cargando compañeros:', error.response?.status, error.response?.data);
+        setAvailableClassmates([]);
     } finally {
-      setLoadingClassmates(false);
+        setLoadingClassmates(false);
     }
-  };
+};
+
 
   // ===== ESCUCHA DE EVENTOS EN TIEMPO REAL =====
   useEffect(() => {
@@ -242,30 +239,13 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
 
   const handleDeleteExistingFile = async (fileId) => {
     if (!confirm('¿Estás seguro de eliminar este archivo?')) return;
-
     try {
-      const response = await fetch(`/estudiante/tasks/files/${fileId}`, {
-        method: 'DELETE',
-        headers: {
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-          'Accept': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        showNotification('Archivo eliminado', 'success');
-        loadTasks();
-        if (selectedTask) {
-          const updatedTask = tasks.find(t => t.id === selectedTask.id);
-          setSelectedTask(updatedTask);
-        }
-      } else {
-        const errorData = await response.json();
-        alert(errorData.message || 'Error al eliminar el archivo');
-      }
+      await axios.delete(`/estudiante/tasks/files/${fileId}`);
+      showNotification('Archivo eliminado', 'success');
+      await loadTasks();
+      if (selectedTask) setSelectedTask(tasks.find(t => t.id === selectedTask.id) || null);
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error al eliminar el archivo');
+      alert(error.response?.data?.message || 'Error al eliminar el archivo');
     }
   };
 
@@ -312,33 +292,22 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
         });
       }
 
-      const response = await fetch('/estudiante/tasks/submit', {
-        method: 'POST',
-        headers: {
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-          'Accept': 'application/json',
-        },
-        body: formData,
+      await axios.post('/estudiante/tasks/submit', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      if (response.ok) {
-        setShowSubmit(false);
-        setSelectedTask(null);
-        setSubmissionComment('');
-        setFiles([]);
-        setSelectedMembers([]);
-        setIsEditing(false);
-        setEditingSubmissionId(null);
-        showNotification(isEditing ? '✅ Entrega actualizada' : '✅ Tarea entregada exitosamente', 'success');
-        await loadTasks(); // ✅ esperar que cargue antes de cerrar
-        setSelectedTask(null); // ✅ mover al final para que no quede estado viejo
-      } else {
-        const errorData = await response.json();
-        alert(errorData.message || 'Error al enviar la tarea');
-      }
+      setShowSubmit(false);
+      setSelectedTask(null);
+      setSubmissionComment('');
+      setFiles([]);
+      setSelectedMembers([]);
+      setIsEditing(false);
+      setEditingSubmissionId(null);
+      showNotification(isEditing ? '✅ Entrega actualizada' : '✅ Tarea entregada exitosamente', 'success');
+      await loadTasks();
+
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error al enviar la tarea. Por favor intenta de nuevo.');
+      alert(error.response?.data?.message || 'Error al enviar la tarea. Por favor intenta de nuevo.');
     } finally {
       setSubmitting(false);
     }
@@ -346,30 +315,13 @@ export default function Tareas({ tasks: initialTasks = [], classInfo }) {
 
   const handleRemoveMember = async (memberId) => {
     if (!confirm('¿Estás seguro de remover este miembro?')) return;
-
     try {
-      const response = await fetch(`/estudiante/tasks/members/${memberId}`, {
-        method: 'DELETE',
-        headers: {
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content,
-          'Accept': 'application/json',
-        },
-      });
-
-      if (response.ok) {
-        showNotification('Miembro removido', 'success');
-        loadTasks();
-        if (selectedTask) {
-          const updatedTask = tasks.find(t => t.id === selectedTask.id);
-          setSelectedTask(updatedTask);
-        }
-      } else {
-        const errorData = await response.json();
-        alert(errorData.message || 'Error al remover miembro');
-      }
+      await axios.delete(`/estudiante/tasks/members/${memberId}`);
+      showNotification('Miembro removido', 'success');
+      await loadTasks();
+      if (selectedTask) setSelectedTask(tasks.find(t => t.id === selectedTask.id) || null);
     } catch (error) {
-      console.error('Error:', error);
-      alert('Error al remover miembro');
+      alert(error.response?.data?.message || 'Error al remover miembro');
     }
   };
 

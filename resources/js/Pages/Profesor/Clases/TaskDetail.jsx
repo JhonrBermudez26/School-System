@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import {
   X,
   Calendar,
@@ -30,22 +31,16 @@ export default function TaskDetail({ task: initialTask, onClose, onUpdate }) {
   }, [initialTask.id]);
 
   const loadTaskDetails = async () => {
-    setLoading(true);
-    try {
-      const response = await fetch(`/profesor/clases/tasks/${initialTask.id}`, {
-        headers: { 'Accept': 'application/json' },
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setTask(data.task);
-      }
-    } catch (error) {
-      console.error('Error cargando detalles:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    const { data } = await axios.get(`/profesor/clases/tasks/${initialTask.id}`);
+    setTask(data.task);
+  } catch (error) {
+    console.error('Error cargando detalles:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const getFilteredSubmissions = () => {
     if (!task.submissions || task.submissions.length === 0) {

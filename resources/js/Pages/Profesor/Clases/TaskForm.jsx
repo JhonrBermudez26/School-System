@@ -14,8 +14,8 @@ import {
   Loader2
 } from 'lucide-react';
 
-// Importar utilidades CSRF
-import { fetchWithCsrf, deleteWithCsrf } from '@/Utils/csrf-utils';
+import axios from 'axios';
+
 
 export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTask = null }) {
   const [formData, setFormData] = useState({
@@ -66,19 +66,11 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
 
   const removeExistingAttachment = async (attachmentId) => {
     if (!confirm('¿Eliminar este archivo?')) return;
-
     try {
-      const response = await deleteWithCsrf(`/profesor/clases/tasks/attachments/${attachmentId}`);
-
-      if (response.ok) {
-        setExistingAttachments(prev => prev.filter(a => a.id !== attachmentId));
-      } else {
-        const errorData = await response.json();
-        alert(errorData.message || 'Error al eliminar el archivo');
-      }
+      await axios.delete(`/profesor/clases/tasks/attachments/${attachmentId}`);
+      setExistingAttachments(prev => prev.filter(a => a.id !== attachmentId));
     } catch (error) {
-      console.error('Error eliminando archivo:', error);
-      alert('Error al eliminar el archivo: ' + error.message);
+      alert(error.response?.data?.message || 'Error al eliminar el archivo');
     }
   };
 
@@ -122,23 +114,16 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     if (!validate()) return;
 
     setLoading(true);
-
     try {
       const submitData = new FormData();
       submitData.append('subject_id', classInfo.subject_id);
       submitData.append('group_id', classInfo.group_id);
 
-      // Agregar campos del formulario
       Object.keys(formData).forEach(key => {
-        // No enviar close_date si está vacío
-        if (key === 'close_date' && !formData[key]) {
-          return;
-        }
-
+        if (key === 'close_date' && !formData[key]) return;
         if (formData[key] !== undefined && formData[key] !== null && formData[key] !== '') {
           if (typeof formData[key] === 'boolean') {
             submitData.append(key, formData[key] ? '1' : '0');
@@ -148,45 +133,32 @@ export default function TaskForm({ classInfo, onClose, onTaskCreated, editingTas
         }
       });
 
-      // Agregar archivos adjuntos
       attachments.forEach((file) => {
         submitData.append('attachments[]', file);
       });
+
+      // Laravel requiere _method spoofing para PUT con FormData
+      if (editingTask) {
+        submitData.append('_method', 'PUT');
+      }
 
       const url = editingTask
         ? `/profesor/clases/tasks/${editingTask.id}`
         : '/profesor/clases/tasks';
 
-      if (editingTask) {
-        submitData.append('_method', 'PUT');
-      }
-
-      // Usar fetchWithCsrf que maneja automáticamente el token y reintentos
-      const response = await fetchWithCsrf(url, {
-        method: 'POST',
-        body: submitData,
+      const { data } = await axios.post(url, submitData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Tarea guardada:', data);
-        onTaskCreated();
-      } else {
-        let errorData;
-        try {
-          errorData = await response.json();
-        } catch {
-          errorData = { message: 'Error desconocido' };
-        }
+      console.log('Tarea guardada:', data);
+      onTaskCreated();
 
-        if (errorData.errors) {
-          setErrors(errorData.errors);
-        }
-        alert(errorData.message || 'Error al guardar la tarea');
-      }
     } catch (error) {
-      console.error('Error en handleSubmit:', error);
-      alert('Error al guardar la tarea: ' + (error.message || 'desconocido'));
+      const errorData = error.response?.data;
+      if (errorData?.errors) {
+        setErrors(errorData.errors);
+      }
+      alert(errorData?.message || 'Error al guardar la tarea');
     } finally {
       setLoading(false);
     }

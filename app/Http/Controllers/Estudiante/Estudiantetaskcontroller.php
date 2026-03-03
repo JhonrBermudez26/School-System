@@ -24,25 +24,73 @@ class EstudianteTaskController extends Controller
     /**
      * Verificar que el estudiante pertenece al grupo
      */
-    private function assertGroupMembership(int $groupId): void
-    {
-        Gate::authorize('access-class', [0, $groupId]); // 0 as subjectId since we don't have it here and Gate handles it
+ private function assertGroupMembership(int $groupId): void
+{
+    $belongs = DB::table('group_user')
+        ->where('group_id', $groupId)
+        ->where('user_id', Auth::id())
+        ->exists();
+
+    if (!$belongs) {
+        abort(403, 'No tienes acceso a este grupo.');
     }
+}
+
+public function getAvailableClassmates($taskId)
+{
+    $task = Task::findOrFail($taskId);
+
+    $this->assertGroupMembership($task->group_id);
+
+    if ($task->work_type === 'individual') {
+        return response()->json([]);
+    }
+
+    $availableStudents = User::select('users.id', 'users.name', 'users.email')
+        ->join('group_user', 'users.id', '=', 'group_user.user_id')
+        ->join('model_has_roles', function ($join) {
+            $join->on('users.id', '=', 'model_has_roles.model_id')
+                ->where('model_has_roles.model_type', '=', 'App\\Models\\User');
+        })
+        ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
+        ->where('group_user.group_id', $task->group_id)
+        ->where('roles.name', 'estudiante')
+        ->where('users.id', '!=', Auth::id())
+        ->whereNotExists(function ($query) use ($taskId) {
+            $query->select(DB::raw(1))
+                ->from('task_submissions')
+                ->whereColumn('task_submissions.student_id', 'users.id')
+                ->where('task_submissions.task_id', $taskId)
+                ->whereIn('task_submissions.status', ['submitted', 'graded']);
+        })
+        ->whereNotExists(function ($query) use ($taskId) {
+            $query->select(DB::raw(1))
+                ->from('task_submission_members')
+                ->join('task_submissions', 'task_submission_members.submission_id', '=', 'task_submissions.id')
+                ->whereColumn('task_submission_members.student_id', 'users.id')
+                ->where('task_submissions.task_id', $taskId)
+                ->where('task_submission_members.status', 'accepted');
+        })
+        ->orderBy('users.name')
+        ->get();
+
+    return response()->json($availableStudents);
+}
 
     /**
      * Obtener todas las tareas de un grupo/asignatura para el estudiante
      */
     public function index(Request $request)
     {
-        $request->validate([
-            'subject_id' => 'required|integer',
-            'group_id' => 'required|integer',
-        ]);
+          $request->validate([
+        'subject_id' => 'required|integer',
+        'group_id'   => 'required|integer',
+    ]);
 
-        $subjectId = (int) $request->query('subject_id');
-        $groupId = (int) $request->query('group_id');
+    $subjectId = (int) $request->query('subject_id');
+    $groupId   = (int) $request->query('group_id');
 
-        $this->assertGroupMembership($groupId);
+    $this->assertGroupMembership($groupId);
 
         $tasks = Task::with(['attachments'])
             ->where('subject_id', $subjectId)
@@ -184,50 +232,6 @@ class EstudianteTaskController extends Controller
             ],
             'submission' => $submissionData,
         ]);
-    }
-
-    /**
-     * Obtener compañeros disponibles para trabajar en la tarea
-     */
-    public function getAvailableClassmates($taskId)
-    {
-        $task = Task::findOrFail($taskId);
-        
-        $this->assertGroupMembership($task->group_id);
-
-        if ($task->work_type === 'individual') {
-            return response()->json([]);
-        }
-
-        $availableStudents = User::select('users.id', 'users.name', 'users.email')
-            ->join('group_user', 'users.id', '=', 'group_user.user_id')
-            ->join('model_has_roles', function ($join) {
-                $join->on('users.id', '=', 'model_has_roles.model_id')
-                    ->where('model_has_roles.model_type', '=', 'App\\Models\\User');
-            })
-            ->join('roles', 'model_has_roles.role_id', '=', 'roles.id')
-            ->where('group_user.group_id', $task->group_id)
-            ->where('roles.name', 'estudiante')
-            ->where('users.id', '!=', Auth::id())
-            ->whereNotExists(function ($query) use ($taskId) {
-                $query->select(DB::raw(1))
-                    ->from('task_submissions')
-                    ->whereColumn('task_submissions.student_id', 'users.id')
-                    ->where('task_submissions.task_id', $taskId)
-                    ->where('task_submissions.status', '!=', 'pending');
-            })
-            ->whereNotExists(function ($query) use ($taskId) {
-                $query->select(DB::raw(1))
-                    ->from('task_submission_members')
-                    ->join('task_submissions', 'task_submission_members.submission_id', '=', 'task_submissions.id')
-                    ->whereColumn('task_submission_members.student_id', 'users.id')
-                    ->where('task_submissions.task_id', $taskId)
-                    ->where('task_submission_members.status', 'accepted');
-            })
-            ->orderBy('users.name')
-            ->get();
-
-        return response()->json($availableStudents);
     }
 
         /**

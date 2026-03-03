@@ -85,9 +85,19 @@ class PeriodController extends Controller
         'grade_weight'  => $validated['porcentaje'],
     ]);
 
-    // ✅ Si el formulario indicó que debería estar habilitado, activar via método
-    if ($validated['habilitado']) {
-        $periodo->enableGradesManually();
+    $periodo->grades_enabled          = false;
+    $periodo->grades_enabled_manually = false;
+    $periodo->save();
+
+    // o si es el periodo actual (sin contraseña necesaria)
+    if (!empty($validated['habilitado'])) {
+        if ($periodo->isDentroFecha()) {
+            $periodo->grades_enabled = true;
+            $periodo->grades_enabled_manually = false;
+            $periodo->save();
+        } else {
+            $periodo->enableGradesManually();
+        }
     }
 
     $this->activityLog->log($periodo, 'created', null, $periodo->toArray());
@@ -103,35 +113,40 @@ public function toggle(Request $request, AcademicPeriod $academicPeriod)
 
     $oldValues       = $academicPeriod->toArray();
     $esPeriodoActual = $academicPeriod->isDentroFecha();
+    $quiereHabilitar = !$academicPeriod->grades_enabled;
 
-    if (!$esPeriodoActual && !$academicPeriod->grades_enabled) {
+    // ✅ Contraseña SOLO si: quiere HABILITAR un periodo que NO es el actual
+    if ($quiereHabilitar && !$esPeriodoActual) {
         $request->validate(['password' => 'required|string']);
 
         if (!Hash::check($request->password, auth()->user()->password)) {
             return back()->withErrors(['password' => 'La contraseña es incorrecta']);
         }
 
-        // ✅ CORREGIDO: usa método controlado del modelo
         $academicPeriod->enableGradesManually();
 
+    } elseif ($quiereHabilitar && $esPeriodoActual) {
+        // Habilitar el periodo actual — sin contraseña
+        $academicPeriod->grades_enabled          = true;
+        $academicPeriod->grades_enabled_manually = false; // es automático, no manual
+        $academicPeriod->save();
+
     } else {
-        // ✅ CORREGIDO: usa métodos controlados según estado actual
-        if ($academicPeriod->grades_enabled) {
-            // Deshabilitar — asignación directa permitida solo de este campo no protegido
-            // Si grades_enabled está en $fillable básico, usar update; si no, setter directo
-            $academicPeriod->grades_enabled = false;
-            if ($esPeriodoActual) {
-                $academicPeriod->grades_enabled_manually = false;
-            }
-            $academicPeriod->save();
-        } else {
-            $academicPeriod->enableGradesManually();
-        }
+        // ✅ Deshabilitar cualquier periodo — NUNCA pide contraseña
+        $academicPeriod->grades_enabled          = false;
+        $academicPeriod->grades_enabled_manually = false;
+        $academicPeriod->save();
     }
 
-    $this->activityLog->log($academicPeriod, 'toggled_grades_enabled', $oldValues, $academicPeriod->getChanges());
+    $this->activityLog->log(
+        $academicPeriod,
+        'toggled_grades_enabled',
+        $oldValues,
+        $academicPeriod->getChanges()
+    );
 
     $estado = $academicPeriod->grades_enabled ? 'habilitada' : 'deshabilitada';
+
     return redirect()->route('coordinadora.periodos')
         ->with('success', "Carga de notas {$estado} correctamente");
 }

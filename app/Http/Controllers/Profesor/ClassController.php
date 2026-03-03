@@ -153,16 +153,24 @@ class ClassController extends Controller
 
         // Archivos
         $files = ClassFile::where('subject_id', $subjectId)
-            ->where('group_id', $groupId)
-            ->orderByDesc('created_at')
-            ->get()
-            ->map(function ($file) {
-                return array_merge($file->toArray(), [
-                    'can' => [
-                        'delete' => auth()->user()->can('delete', $file),
-                    ]
-                ]);
-            });
+        ->where('group_id', $groupId)
+        ->orderByDesc('created_at')
+        ->get()
+        ->map(function ($file) {
+            return [
+                'id'         => $file->id,
+                'uuid'       => $file->uuid,  // ✅ explícito
+                'filename'   => $file->filename,
+                'path'       => $file->path,
+                'size'       => $file->size,
+                'mime'       => $file->mime,
+                'folder_id'  => $file->folder_id,
+                'created_at' => $file->created_at,
+                'can'        => [
+                    'delete' => auth()->user()->can('delete', $file),
+                ],
+            ];
+        });
 
         // Reunión activa
         $meeting = Meeting::where('subject_id', $subjectId)

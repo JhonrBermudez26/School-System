@@ -191,12 +191,12 @@ class EstudianteClasesController extends Controller
                 ];
             });
         
-        $files = DB::table('class_files')
-            ->where('subject_id', $subject_id)
-            ->where('group_id', $group_id)
-            ->select('id', 'filename', 'path', 'size', 'folder_id', 'created_at')
-            ->orderBy('created_at', 'desc')
-            ->get();
+       $files = DB::table('class_files')
+    ->where('subject_id', $subject_id)
+    ->where('group_id', $group_id)
+    ->select('id', 'uuid', 'filename', 'path', 'size', 'folder_id', 'created_at') // ✅
+    ->orderBy('created_at', 'desc')
+    ->get();
         
         // Reunión activa
         $meeting = Meeting::where('subject_id', $subject_id)

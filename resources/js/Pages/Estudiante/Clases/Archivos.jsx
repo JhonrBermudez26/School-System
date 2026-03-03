@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  Folder, File, Download, Home, ChevronRight, FileText, 
+  Folder, File, Download, Home, ChevronRight, FileText,
   Image, Film, Music, Archive, Code, FileSpreadsheet
 } from 'lucide-react';
 
@@ -10,7 +10,7 @@ export default function Archivos({ folders = [], files = [] }) {
   const getFileIcon = (filename) => {
     const ext = filename.split('.').pop().toLowerCase();
     const iconClass = "h-6 w-6";
-    
+
     if (['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext)) {
       return <Image className={iconClass} />;
     } else if (['mp4', 'avi', 'mov', 'wmv'].includes(ext)) {
@@ -37,18 +37,18 @@ export default function Archivos({ folders = [], files = [] }) {
 
   const getBreadcrumbPath = () => {
     if (!selectedFolder) return [];
-    
+
     const path = [];
     let currentId = selectedFolder;
-    
+
     while (currentId) {
       const folder = folders.find(f => f.id === currentId);
       if (!folder) break;
-      
+
       path.unshift(folder);
       currentId = folder.parent_id;
     }
-    
+
     return path;
   };
 
@@ -59,12 +59,12 @@ export default function Archivos({ folders = [], files = [] }) {
       {/* Breadcrumb */}
       <div className="bg-white rounded-2xl shadow-sm p-4 border border-gray-100">
         <div className="flex items-center gap-2 text-sm flex-wrap">
-          <button 
-            onClick={() => setSelectedFolder(null)} 
+          <button
+            onClick={() => setSelectedFolder(null)}
             className={`
               flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all
-              ${!selectedFolder 
-                ? 'bg-blue-100 text-blue-700 font-bold' 
+              ${!selectedFolder
+                ? 'bg-blue-100 text-blue-700 font-bold'
                 : 'text-gray-600 hover:bg-gray-100 hover:text-blue-600'
               }
             `}
@@ -72,7 +72,7 @@ export default function Archivos({ folders = [], files = [] }) {
             <Home className="h-4 w-4" />
             Inicio
           </button>
-          
+
           {breadcrumbPath.map((folder, index) => (
             <div key={folder.id} className="flex items-center gap-2">
               <ChevronRight className="h-4 w-4 text-gray-400" />
@@ -80,8 +80,8 @@ export default function Archivos({ folders = [], files = [] }) {
                 onClick={() => setSelectedFolder(folder.id)}
                 className={`
                   px-3 py-1.5 rounded-lg transition-all
-                  ${index === breadcrumbPath.length - 1 
-                    ? 'bg-blue-100 text-blue-700 font-bold' 
+                  ${index === breadcrumbPath.length - 1
+                    ? 'bg-blue-100 text-blue-700 font-bold'
                     : 'text-gray-600 hover:bg-gray-100 hover:text-blue-600'
                   }
                 `}
@@ -139,8 +139,8 @@ export default function Archivos({ folders = [], files = [] }) {
           <div className="bg-white rounded-2xl shadow-lg border-2 border-gray-200 overflow-hidden">
             <div className="divide-y-2 divide-gray-100">
               {currentFiles.map(file => (
-                <div 
-                  key={file.id} 
+                <div
+                  key={file.id}
                   className="p-4 flex items-center justify-between hover:bg-blue-50/50 transition-all group"
                 >
                   <div className="flex items-center gap-4 flex-1 min-w-0">
@@ -167,8 +167,7 @@ export default function Archivos({ folders = [], files = [] }) {
                     </div>
                   </div>
                   <a
-                    href={`/storage/${file.path}`}
-                    download
+                    href={`/estudiante/files/${file.uuid}/download`}
                     className="p-2.5 text-blue-600 hover:bg-blue-100 rounded-xl transition-all ml-4"
                     onClick={(e) => e.stopPropagation()}
                     title="Descargar archivo"

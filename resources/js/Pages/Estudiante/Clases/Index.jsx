@@ -8,7 +8,7 @@ export default function Index() {
     const { asignaciones = [] } = props;
 
     const openClass = (subject_id, group_id) => {
-        router.visit(route('estudiante.clases.show', { subject_id, group_id }));
+        router.visit(route('estudiante.clases.show', {subject: subject_id, group: group_id }));
     };
 
     return (

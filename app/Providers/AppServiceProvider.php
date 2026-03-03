@@ -102,6 +102,11 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(8)->by($request->user()?->id ?: $request->ip());
         });
 
+        // En configureRateLimiting() dentro de AppServiceProvider:
+        RateLimiter::for('update', function (Request $request) {
+            return Limit::perMinute(30)->by($request->user()?->id ?: $request->ip());
+        });
+
         // Acciones muy sensibles (suspender usuarios, reset password, force logout, etc)
         RateLimiter::for('sensitive', function (Request $request) {
             return Limit::perMinute(5)->by($request->user()?->id ?: $request->ip());

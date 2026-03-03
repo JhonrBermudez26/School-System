@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import axios from 'axios';
 import { X, Star, Save, AlertCircle, Loader2, Award, MessageSquare, Users, TrendingUp, CheckCircle, Sparkles } from 'lucide-react';
 
 export default function GradeSubmissionModal({ submission, task, onClose, onGraded }) {
@@ -59,29 +60,16 @@ export default function GradeSubmissionModal({ submission, task, onClose, onGrad
       }
 
       // ✅ CAMBIO: Usar PUT en lugar de POST para actualizaciones
-      const method = submission.status === 'graded' ? 'PUT' : 'POST';
-
-      const response = await fetch(`/profesor/clases/tasks/submissions/${submission.id}/grade`, {
-        method: method,
-        headers: {
-          'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        onGraded(data.submission);
-        onClose();
-      } else {
-        const errorData = await response.json();
-        setError(errorData.message || 'Error al calificar la entrega');
-      }
+      const method = submission.status === 'graded' ? 'put' : 'post';
+      const { data } = await axios[method](
+        `/profesor/clases/tasks/submissions/${submission.uuid}/grade`,
+        payload
+      );
+      onGraded(data.submission);
+      onClose();
     } catch (err) {
       console.error('Error al calificar:', err);
-      setError('Error de conexión. Intenta de nuevo.');
+      setError(err.response?.data?.message || 'Error de conexión. Intenta de nuevo.');
     } finally {
       setLoading(false);
     }
