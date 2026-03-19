@@ -22,7 +22,7 @@ class StoreUserRequest extends FormRequest
         'phone'           => 'nullable|string|max:15',
         'address'         => 'nullable|string|max:255',
         'birth_date'      => 'nullable|date',
-        'password'        => 'required|min:8|confirmed',
+        'password'        => 'required|min:8',
         ];
     }
 }

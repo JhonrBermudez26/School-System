@@ -1,7 +1,0 @@
-cosas por hacer:
-
-1. haer que en los periodos cuando ya se tenga el 100% del porcentaje se bloquee el boton de crear:
-
-2. boton de entregar tarea que aparece en el dashboard
-
-3.

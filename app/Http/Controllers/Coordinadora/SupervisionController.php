@@ -101,131 +101,117 @@ class SupervisionController extends Controller
                 abort(403);
             }
 
-            $groupId = $request->get('group_id');
+            $groupId  = $request->get('group_id');
             $periodId = $request->get('period_id');
-
-            Log::info('academicByGroup called', [
-                'group_id' => $groupId,
-                'period_id' => $periodId,
-            ]);
 
             if (!$groupId) {
                 return response()->json(['error' => 'group_id es requerido'], 400);
             }
 
-            // ✅ Si no hay periodo, usar el activo
             if (!$periodId) {
                 $activePeriod = AcademicPeriod::getPeriodoActivo();
-                $periodId = $activePeriod ? $activePeriod->id : null;
+                $periodId     = $activePeriod?->id;
             }
-
-            Log::info('Using period_id: ' . $periodId);
 
             $group = Group::with(['students', 'subjects', 'grade'])->findOrFail($groupId);
-            
-            Log::info('Group found', [
-                'id' => $group->id,
-                'nombre' => $group->nombre,
-                'students_count' => $group->students->count(),
-                'subjects_count' => $group->subjects->count(),
-            ]);
 
-            // ✅ Verificar si hay calificaciones
-            $totalScores = ManualGradeScore::count();
-            Log::info('Total scores in system: ' . $totalScores);
-
+            // ── Rendimiento por estudiante ──────────────────────────────────────
             $academicData = [];
-            
-            if ($group->students->isEmpty()) {
-                Log::warning('No students found in group ' . $groupId);
-            }
 
             foreach ($group->students as $student) {
-                // Buscar calificaciones del estudiante
-                $scoresQuery = ManualGradeScore::where('student_id', $student->id);
-                
-                if ($periodId) {
-                    $scoresQuery->whereHas('manualGrade', function($q) use ($groupId, $periodId) {
-                        $q->where('group_id', $groupId)
-                          ->where('academic_period_id', $periodId);
-                    });
-                }
-                
-                $scores = $scoresQuery->get();
-                $average = $scores->avg('score') ?? 0;
+                $allScores = collect();
 
-                Log::info('Student scores', [
-                    'student' => $student->name,
-                    'scores_count' => $scores->count(),
-                    'average' => $average,
-                ]);
+                // 1) Notas manuales (ManualGrade → ManualGradeScore)
+                $manualScores = ManualGradeScore::whereHas('manualGrade', function ($q) use ($groupId, $periodId) {
+                    $q->where('group_id', $groupId);
+                    if ($periodId) $q->where('academic_period_id', $periodId);
+                })
+                ->where('student_id', $student->id)
+                ->whereNotNull('score')
+                ->pluck('score');
+
+                $allScores = $allScores->merge($manualScores);
+
+                // 2) Notas de tareas (TaskSubmission calificadas)
+                $taskScores = \App\Models\TaskSubmission::whereHas('task', function ($q) use ($groupId, $periodId) {
+                    $q->where('group_id', $groupId);
+                    if ($periodId) $q->where('academic_period_id', $periodId);
+                })
+                ->where('student_id', $student->id)
+                ->where('status', 'graded')
+                ->whereNotNull('score')
+                ->pluck('score');
+
+                $allScores = $allScores->merge($taskScores);
+
+                $average = $allScores->count() > 0 ? round($allScores->avg(), 2) : 0;
 
                 $academicData[] = [
-                    'name' => $student->name,
-                    'average' => round($average, 2)
+                    'name'    => $student->name,
+                    'average' => $average,
                 ];
             }
 
-            // Promedio por asignatura
+            // Ordenar de mayor a menor promedio
+            usort($academicData, fn($a, $b) => $b['average'] <=> $a['average']);
+
+            // ── Rendimiento por asignatura ──────────────────────────────────────
             $subjectStats = [];
-            
-            if ($group->subjects->isEmpty()) {
-                Log::warning('No subjects found in group ' . $groupId);
-            }
 
             foreach ($group->subjects as $subject) {
-                $avgQuery = ManualGradeScore::whereHas('manualGrade', function($q) use ($subject, $groupId, $periodId) {
+                $allScores = collect();
+
+                // 1) Notas manuales de esta asignatura
+                $manualAvg = ManualGradeScore::whereHas('manualGrade', function ($q) use ($subject, $groupId, $periodId) {
                     $q->where('subject_id', $subject->id)
-                      ->where('group_id', $groupId);
-                    
-                    if ($periodId) {
-                        $q->where('academic_period_id', $periodId);
-                    }
-                });
-                
-                $avg = $avgQuery->avg('score') ?? 0;
-                
-                Log::info('Subject average', [
-                    'subject' => $subject->name,
-                    'average' => $avg,
-                ]);
-                
+                    ->where('group_id', $groupId);
+                    if ($periodId) $q->where('academic_period_id', $periodId);
+                })
+                ->whereNotNull('score')
+                ->pluck('score');
+
+                $allScores = $allScores->merge($manualAvg);
+
+                // 2) Notas de tareas de esta asignatura
+                $taskAvg = \App\Models\TaskSubmission::whereHas('task', function ($q) use ($subject, $groupId, $periodId) {
+                    $q->where('subject_id', $subject->id)
+                    ->where('group_id', $groupId);
+                    if ($periodId) $q->where('academic_period_id', $periodId);
+                })
+                ->where('status', 'graded')
+                ->whereNotNull('score')
+                ->pluck('score');
+
+                $allScores = $allScores->merge($taskAvg);
+
                 $subjectStats[] = [
-                    'name' => $subject->name,
-                    'average' => (float)round($avg, 2)
+                    'name'    => $subject->name,
+                    'average' => $allScores->count() > 0 ? (float) round($allScores->avg(), 2) : 0,
                 ];
             }
 
-            $response = [
+            return response()->json([
                 'group' => [
-                    'id' => $group->id,
-                    'name' => $group->nombre,
-                    'grade' => $group->grade ? ($group->grade->nombre ?? 'N/A') : 'N/A',
+                    'id'    => $group->id,
+                    'name'  => $group->nombre,
+                    'grade' => $group->grade?->nombre ?? 'N/A',
                 ],
-                'period' => $periodId ? AcademicPeriod::find($periodId) : null,
+                'period'   => $periodId ? AcademicPeriod::find($periodId) : null,
                 'students' => $academicData,
-                'subjects' => $subjectStats
-            ];
-
-            Log::info('Response prepared', [
-                'students_count' => count($academicData),
-                'subjects_count' => count($subjectStats),
+                'subjects' => $subjectStats,
             ]);
-
-            return response()->json($response);
 
         } catch (\Exception $e) {
             Log::error('Error in academicByGroup', [
                 'message' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => $e->getFile(),
-                'trace' => $e->getTraceAsString(),
+                'line'    => $e->getLine(),
+                'file'    => $e->getFile(),
             ]);
 
             return response()->json([
                 'error' => $e->getMessage(),
-                'line' => $e->getLine(),
-                'file' => basename($e->getFile()),
+                'line'  => $e->getLine(),
+                'file'  => basename($e->getFile()),
             ], 500);
         }
     }
