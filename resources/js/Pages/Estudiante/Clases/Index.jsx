@@ -10,8 +10,7 @@ export default function Index() {
     const openClass = (subject_id, group_id) => {
         router.visit(route('estudiante.clases.show', {subject: subject_id, group: group_id }));
     };
-
-    
+   
     return (
         <Layout>
             <Head title="Mis Clases" />
