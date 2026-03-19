@@ -1,7 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { Share2, FileText, Download, AlertTriangle, Users, Calendar, Search, MapPin, CheckCircle2, XCircle, Bell, X } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function ControlAsistencia({ groups, stats, current_period }) {
     const [selectedGroup, setSelectedGroup] = useState('');

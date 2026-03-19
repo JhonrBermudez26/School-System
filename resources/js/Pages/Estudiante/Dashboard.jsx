@@ -1,7 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { usePage } from '@inertiajs/react';
 import { BookOpen, ClipboardList, Award, TrendingUp, Calendar, FileText, Clock, User } from 'lucide-react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Dashboard() {
     const { props } = usePage();

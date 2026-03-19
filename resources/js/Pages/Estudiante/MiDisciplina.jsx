@@ -4,7 +4,7 @@ import {
     CheckCircle, AlertCircle, TrendingUp, X, BookOpen
 } from 'lucide-react';
 import { useState } from 'react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function MiDisciplina({ records, stats, filters }) {
     const [searchTerm, setSearchTerm] = useState(filters.search || '');

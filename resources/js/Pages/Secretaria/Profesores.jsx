@@ -1,7 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { Search, Edit3, Users, X, Filter, Plus, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useState, useMemo, useRef } from 'react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Profesores() {
     const editFormRef = useRef(null);

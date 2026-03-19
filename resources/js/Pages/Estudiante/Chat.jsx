@@ -6,7 +6,7 @@ import {
   UserPlus, Settings, ArrowLeft, LogOut, MoreVertical,
   Info, Copy, Clock, Menu, ChevronDown, Smile
 } from 'lucide-react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Chat() {
   const { props } = usePage();

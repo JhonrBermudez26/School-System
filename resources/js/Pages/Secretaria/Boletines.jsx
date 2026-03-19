@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function BoletinesSecretaria({ boletines, periodos, grupos, stats, filters, can }) {
     const [selectedPeriodo, setSelectedPeriodo] = useState(filters.periodo_id || periodos[0]?.id);

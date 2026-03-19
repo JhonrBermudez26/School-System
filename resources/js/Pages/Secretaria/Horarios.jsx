@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useRef } from 'react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 import { useForm, usePage, router } from "@inertiajs/react";
 import { Users, User, Calendar, ChevronRight, Clock, Printer } from 'lucide-react';
 

@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { usePage } from '@inertiajs/react';
 import { BookOpen, Calendar, Clock, GraduationCap, Printer } from 'lucide-react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Horario() {
     const { props } = usePage();

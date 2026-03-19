@@ -1,4 +1,4 @@
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 import { Users, UserPlus, Calendar, FileText, BookOpen, AlertCircle } from 'lucide-react';
 import { usePage, router } from "@inertiajs/react";
 

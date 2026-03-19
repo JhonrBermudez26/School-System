@@ -1,7 +1,7 @@
 import { Head, useForm, router } from '@inertiajs/react';
 import { Shield, Plus, Lock, CheckCircle, Trash2, Edit, AlertCircle, Info, Key } from 'lucide-react';
 import { useState } from 'react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function RoleManagement({ roles, permissions }) {
     const [showRoleModal, setShowRoleModal] = useState(false);

@@ -4,7 +4,7 @@ import {
   ArrowUpDown, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Asignaturas() {
   const { asignaturas, auth, error, flash, can } = usePage().props;

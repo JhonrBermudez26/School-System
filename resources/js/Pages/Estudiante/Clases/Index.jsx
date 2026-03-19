@@ -1,6 +1,6 @@
 import { Head, router } from '@inertiajs/react';
 import { usePage } from '@inertiajs/react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 import { BookOpen, Users, ArrowRight, GraduationCap, Calendar, User } from 'lucide-react';
 
 export default function Index() {
@@ -11,6 +11,7 @@ export default function Index() {
         router.visit(route('estudiante.clases.show', {subject: subject_id, group: group_id }));
     };
 
+    
     return (
         <Layout>
             <Head title="Mis Clases" />

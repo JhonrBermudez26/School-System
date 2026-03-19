@@ -1,6 +1,6 @@
 import { Head } from '@inertiajs/react';
 import { BookOpen, User, Calendar, FileText } from 'lucide-react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Clases() {
     // Datos de ejemplo - deberás reemplazarlos con datos reales del backend

@@ -1,7 +1,7 @@
 import { Head, useForm, router } from '@inertiajs/react';
 import { Shield, Search, Plus, Edit, Trash2, Calendar, User, FileText, CheckCircle, AlertCircle, TrendingUp, History, X, Users } from 'lucide-react';
 import { useState, useRef, useEffect } from 'react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function GestionDisciplinaria({ records, students, stats, filters }) {
     const [showModal, setShowModal] = useState(false);

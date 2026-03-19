@@ -1,6 +1,6 @@
 // Index.jsx
 import { usePage, router } from '@inertiajs/react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 import { BookOpen, Users, ArrowRight, GraduationCap, FolderOpen } from 'lucide-react';
 
 export default function Index() {

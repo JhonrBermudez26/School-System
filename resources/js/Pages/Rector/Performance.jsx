@@ -7,7 +7,7 @@ import {
     ChevronUp, ChevronDown, FileText, FileSpreadsheet,
     X, Calendar, BookOpen, Target
 } from 'lucide-react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Performance({
     kpis = {},

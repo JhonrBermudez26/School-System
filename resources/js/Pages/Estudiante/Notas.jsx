@@ -15,7 +15,7 @@ import {
     Target,
     Filter
 } from 'lucide-react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Notas({
     materias = [],

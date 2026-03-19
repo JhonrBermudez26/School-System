@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import { usePage, router } from '@inertiajs/react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 import {
   BookOpen, Users, ClipboardList, Plus, Save, Eye, Trash2, Award,
   TrendingUp, ChevronDown, Check, X, Loader2, BarChart3, Search,

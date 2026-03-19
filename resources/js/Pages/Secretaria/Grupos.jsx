@@ -4,7 +4,7 @@ import {
     ArrowUpDown, ArrowUp, ArrowDown,
 } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Grupos() {
     const { grupos, grados, cursos, auth, error, flash, can } = usePage().props;

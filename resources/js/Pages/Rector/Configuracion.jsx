@@ -1,7 +1,7 @@
 import { useForm, Head } from '@inertiajs/react';
 import { School, MapPin, Phone, Mail, Users, FileText, Upload, X, Check } from 'lucide-react';
 import { useState, useRef } from 'react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Configuracion({ settings }) {
     const [previewLogo, setPreviewLogo] = useState(

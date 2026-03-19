@@ -1,7 +1,7 @@
 import { Head, useForm, router } from '@inertiajs/react';
 import { Calendar, Plus, Edit, Trash2, Lock, Unlock, Percent, AlertCircle, Shield, X, CheckCircle2, Clock, Archive, Sparkles } from 'lucide-react';
 import { useState } from 'react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Periodos({ periodos, stats }) {
     const [showModal, setShowModal] = useState(false);

@@ -5,7 +5,7 @@ import {
     AlertCircle, Activity, Globe, Info
 } from 'lucide-react';
 import { useState } from 'react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function AuditLog({ logs, stats, filters }) {
     const [searchTerm, setSearchTerm] = useState(filters.search || '');

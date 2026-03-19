@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { usePage } from '@inertiajs/react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 import { MessageSquare, Folder, Video, BookOpen, GraduationCap, Users, Calendar, ClipboardList } from 'lucide-react';
 import Publicaciones from './Publicaciones';
 import Archivos from './Archivos';

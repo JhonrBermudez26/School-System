@@ -13,7 +13,7 @@ import {
     User,
     Award
 } from 'lucide-react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Asistencias({ 
     materias = [], 

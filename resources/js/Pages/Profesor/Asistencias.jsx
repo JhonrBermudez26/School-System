@@ -14,7 +14,7 @@ import {
     ChevronDown,
     ChevronUp
 } from 'lucide-react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Asistencias() {
     const { props } = usePage();

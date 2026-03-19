@@ -4,7 +4,7 @@ import {
     AlertCircle, Activity, Shield, Settings, History, Lock,
     Clock, CheckCircle, FileText
 } from 'lucide-react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Dashboard({ kpis, performance, attendance, discipline, recentActivity }) {
     const getTrendIcon = (trend) => {

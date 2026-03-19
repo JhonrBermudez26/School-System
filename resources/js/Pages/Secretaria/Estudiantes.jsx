@@ -1,7 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import { Search, Edit3, Users, X, Filter, Download, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useState, useMemo, useRef } from 'react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Estudiantes() {
     const { estudiantes, grupos, error, flash, can } = usePage().props;

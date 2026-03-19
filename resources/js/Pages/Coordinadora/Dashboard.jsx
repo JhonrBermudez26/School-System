@@ -5,7 +5,7 @@ import {
     ChevronRight, FileText, Percent, Lock, Activity, GraduationCap,
     Archive
 } from 'lucide-react';
-import Layout from '@/Components/Layout/Layout';
+import Layout from '@/Components/Layout/Layout.jsx';
 
 export default function Dashboard({
     current_period,
