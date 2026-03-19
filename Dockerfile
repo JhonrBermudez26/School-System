@@ -8,6 +8,7 @@ RUN docker-php-ext-install zip pdo pdo_mysql mbstring exif pcntl bcmath gd
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /app
+
 COPY . .
 
 RUN composer install --no-dev --optimize-autoloader --no-scripts
@@ -16,4 +17,4 @@ RUN chmod -R 777 storage bootstrap/cache
 
 EXPOSE 8000
 
-CMD php artisan serve --host=0.0.0.0 --port=$PORT
+CMD ["php", "-S", "0.0.0.0:8000", "-t", "public"]
