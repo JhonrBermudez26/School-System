@@ -5,7 +5,7 @@ import {
   Link as LinkIcon, MessageSquare, Clock, FileText, Download, Save,
   User
 } from 'lucide-react';
-import { sanitizeHtml } from '@/utils/sanitize';
+import { sanitizeHtml } from '@/Utils/sanitize';
 
 export default function Publicaciones({ publicaciones = [], classInfo }) {
   const editorRef = useRef(null);
