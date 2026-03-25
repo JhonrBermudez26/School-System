@@ -21,4 +21,4 @@ RUN chmod -R 777 storage bootstrap/cache
 
 EXPOSE 8000
 
-CMD bash -c "php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force && tail -f storage/logs/laravel.log & php artisan serve --host=0.0.0.0 --port=${PORT:-8000}"
+CMD bash -c "php artisan config:cache && php artisan route:cache && php artisan view:cache && php artisan migrate --force && touch storage/logs/laravel.log && tail -f storage/logs/laravel.log & php artisan serve --host=0.0.0.0 --port=${PORT:-8000} 2>&1"
