@@ -28,7 +28,7 @@ RUN npm install && npm run build
 # Permisos
 RUN chmod -R 777 storage bootstrap/cache
 
-# Cachear Laravel
+# Cachear Laravel (ignora errores de BD en build time)
 RUN php artisan config:cache || true
 RUN php artisan route:cache || true
 RUN php artisan view:cache || true
@@ -36,4 +36,4 @@ RUN php artisan view:cache || true
 EXPOSE 8000
 
 # Migrar y arrancar
-CMD php artisan migrate --force && php -S 0.0.0.0:$PORT -t public
+CMD bash -c "php artisan migrate --force && php -S 0.0.0.0:${PORT:-8000} -t public"
