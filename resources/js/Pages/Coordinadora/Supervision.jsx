@@ -1,7 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { Search, PieChart, BarChart2, TrendingUp, TrendingDown, Users, BookOpen, AlertCircle, FileText, Download } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import Layout from '@/Components/Layout/Layout.jsx';
+import Layout from '@/Components/Layout/Layout';
 
 export default function SupervisionAcademica({ active_period, groups, stats }) {
     const [selectedGroup, setSelectedGroup] = useState('');
