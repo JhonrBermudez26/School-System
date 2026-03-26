@@ -40,6 +40,10 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
 
+        if (config('app.env') === 'production') {
+    \URL::forceScheme('https');
+}
+
         date_default_timezone_set('America/Bogota');
         \Carbon\Carbon::setLocale('es');
         AcademicPeriod::observe(AcademicPeriodObserver::class);
